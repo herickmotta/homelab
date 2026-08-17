@@ -11,7 +11,6 @@ permissions:
 jobs:
   opentofu:
     name: opentofu
-    if: ${{ hashFiles('**/*.tf') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +45,6 @@ jobs:
 
   ansible:
     name: ansible-lint
-    if: ${{ hashFiles('roles/**/*.yml', 'roles/**/*.yaml', 'playbooks/**/*.yml', 'playbooks/**/*.yaml', 'ansible/**/*.yml', 'ansible/**/*.yaml') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +57,12 @@ jobs:
         run: pip install ansible-lint
 
       - name: Lint
-        run: ansible-lint
+        run: |
+          if ! ls roles playbooks ansible >/dev/null 2>&1; then
+            echo "No Ansible content"
+            exit 0
+          fi
+          ansible-lint
 
   ci:
     name: ci
