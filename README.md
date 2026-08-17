@@ -6,7 +6,9 @@ The private [homelab-live](https://github.com/herickmotta/homelab-live) reposito
 
 ## Current status
 
-Foundation only: repository conventions, gitignore, and CI stubs. No OpenTofu modules or Ansible roles yet. Directories listed below are the intended layout; they are created when the first real component needs them.
+First reusable OpenTofu module: `modules/proxmox-vm` (Proxmox cloud-init VM via bpg/proxmox 0.111.1). Dummy usage is in `examples/proxmox-vm`. No Ansible roles yet.
+
+Next: publish this repository (it is intended to be public), tag `v0.1.0` once this module is on `main`, and leave guest-agent enablement and Ansible roles until a second consumer needs them.
 
 ## What belongs here
 
