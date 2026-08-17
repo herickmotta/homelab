@@ -1,0 +1,43 @@
+# OpenTofu / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Keys
+keys.txt
+*.pem
+*.key
+id_rsa
+id_ed25519
+id_ecdsa
+
+# Decrypted SOPS output (this repo should not hold secrets)
+*.dec.yaml
+*.dec.yml
+*.dec.json
+
+# OS / editor
+.DS_Store
+*~
+*.swp
+.idea/
+.vscode/

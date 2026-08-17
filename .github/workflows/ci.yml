@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  opentofu:
+    name: opentofu
+    if: ${{ hashFiles('**/*.tf') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.12.1
+
+      - name: Format
+        run: tofu fmt -check -recursive
+
+      - name: Validate
+        run: |
+          set -euo pipefail
+          roots=()
+          if ls -- *.tf >/dev/null 2>&1; then
+            roots+=(".")
+          fi
+          for d in examples/*/ modules/*/; do
+            if [ -d "${d}" ] && ls -- "${d}"*.tf >/dev/null 2>&1; then
+              roots+=("${d}")
+            fi
+          done
+          if [ "${#roots[@]}" -eq 0 ]; then
+            echo "No OpenTofu roots to validate"
+            exit 0
+          fi
+          for root in "${roots[@]}"; do
+            echo "Validating ${root}"
+            (cd "${root}" && tofu init -backend=false -input=false && tofu validate)
+          done
+
+  ansible:
+    name: ansible-lint
+    if: ${{ hashFiles('roles/**/*.yml', 'roles/**/*.yaml', 'playbooks/**/*.yml', 'playbooks/**/*.yaml', 'ansible/**/*.yml', 'ansible/**/*.yaml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ansible-lint
+        run: pip install ansible-lint
+
+      - name: Lint
+        run: ansible-lint
+
+  ci:
+    name: ci
+    if: always()
+    needs: [opentofu, ansible]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge job results
+        run: |
+          set -euo pipefail
+          tofu_result="${{ needs.opentofu.result }}"
+          ansible_result="${{ needs.ansible.result }}"
+          echo "opentofu=${tofu_result} ansible=${ansible_result}"
+          if [ "${tofu_result}" = failure ] || [ "${tofu_result}" = cancelled ]; then
+            exit 1
+          fi
+          if [ "${ansible_result}" = failure ] || [ "${ansible_result}" = cancelled ]; then
+            exit 1
+          fi
