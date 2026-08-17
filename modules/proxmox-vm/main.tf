@@ -9,7 +9,7 @@ resource "proxmox_virtual_environment_vm" "this" {
   started         = true
   on_boot         = true
   bios            = "seabios"
-  scsi_hardware   = "virtio-scsi-pci"
+  scsi_hardware   = "virtio-scsi-single"
   boot_order      = ["scsi0"]
 
   agent {
