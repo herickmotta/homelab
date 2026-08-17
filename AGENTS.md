@@ -80,6 +80,8 @@ Where applicable, run:
 
 If validation cannot be run, explicitly state why.
 
+`main` requires the GitHub Actions job `ci` to pass (`strict`, including admins). Do not weaken that rule to land a change.
+
 ## Security
 
 * Never commit plaintext secrets.
