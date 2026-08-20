@@ -8,7 +8,9 @@ The private [homelab-live](https://github.com/herickmotta/homelab-live) reposito
 
 First reusable OpenTofu module: `modules/proxmox-vm` (Proxmox cloud-init VM via bpg/proxmox 0.111.1). Dummy usage is in `examples/proxmox-vm`. No Ansible roles yet.
 
-Next: publish this repository (it is intended to be public), tag `v0.1.0` once this module is on `main`, and leave guest-agent enablement and Ansible roles until a second consumer needs them.
+Next: publish this repository (it is intended to be public), tag `v0.1.0` once this module is on `main`.
+
+QEMU guest agent: `modules/proxmox-vm` sets `agent.enabled = true` and expects cloud-init vendor-data at `local:snippets/qemu-guest-agent.yaml` (copy [`modules/proxmox-vm/cloud-init/vendor-data.yaml`](modules/proxmox-vm/cloud-init/vendor-data.yaml) onto the node). Snippet upload via the provider needs SSH to Proxmox; this module stays API-only, so that file is a one-time host step. Enable **Snippets** on datastore `local` first.
 
 ## What belongs here
 

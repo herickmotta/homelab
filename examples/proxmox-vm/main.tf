@@ -1,3 +1,5 @@
+# Dummy values for tofu validate only. This example is never applied.
+# Guest agent expects local:snippets/qemu-guest-agent.yaml on the node (module default).
 module "example" {
   source = "../../modules/proxmox-vm"
 
