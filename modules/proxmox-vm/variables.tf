@@ -89,6 +89,22 @@ variable "tags" {
 
 variable "stop_on_destroy" {
   type        = bool
-  description = "Stop instead of ACPI shutdown on destroy. Needed until qemu-guest-agent is present."
+  description = "Stop instead of ACPI shutdown on destroy. Keep true as a safety net if the guest agent is down."
   default     = true
+}
+
+variable "vendor_data_file_id" {
+  type        = string
+  description = <<-EOT
+    Proxmox snippet id with cloud-init vendor-data that installs qemu-guest-agent
+    (default local:snippets/qemu-guest-agent.yaml). Copy modules/proxmox-vm/cloud-init/vendor-data.yaml
+    onto the node first. Empty string skips vendor-data; new guests will then hang until qemu-ga exists.
+  EOT
+  default     = "local:snippets/qemu-guest-agent.yaml"
+}
+
+variable "agent_timeout" {
+  type        = string
+  description = "How long the provider waits for qemu-guest-agent after start (first-boot apt needs this)."
+  default     = "15m"
 }

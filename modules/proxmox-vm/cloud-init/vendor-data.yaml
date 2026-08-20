@@ -1,0 +1,9 @@
+#cloud-config
+# Vendor-data for Ubuntu cloud images. Copy to the Proxmox snippets store
+# as qemu-guest-agent.yaml (see the module README). OpenTofu does not upload
+# this file: snippet upload needs SSH to the node, and this module is API-only.
+package_update: true
+packages:
+  - qemu-guest-agent
+runcmd:
+  - systemctl start qemu-guest-agent

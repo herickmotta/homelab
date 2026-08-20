@@ -13,10 +13,10 @@ resource "proxmox_virtual_environment_vm" "this" {
   boot_order      = ["scsi0"]
 
   agent {
-    # Must stay false at create time: Ubuntu cloud images do not ship qemu-guest-agent,
-    # and enabled=true makes the provider wait for it. The virtio port is therefore
-    # absent; Ansible installs the package and starts the service only if the port exists.
-    enabled = false
+    # Channel on from first boot. Ubuntu cloud images do not ship qemu-guest-agent;
+    # vendor-data (see vendor_data_file_id) installs it so the provider wait succeeds.
+    enabled = true
+    timeout = var.agent_timeout
   }
 
   cpu {
@@ -65,6 +65,9 @@ resource "proxmox_virtual_environment_vm" "this" {
       username = var.username
       keys     = [for k in var.ssh_public_keys : trimspace(k)]
     }
+
+    # Snippet must already exist on the node. Empty string omits vendor-data.
+    vendor_data_file_id = var.vendor_data_file_id != "" ? var.vendor_data_file_id : null
   }
 
   operating_system {
@@ -77,5 +80,14 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   vga {
     type = "serial0"
+  }
+
+  # Adding vendor_data_file_id later ForceNew-replaces the VM. Keep it for
+  # create (new guests install qemu-ga on first boot) but never replace an
+  # existing disk to attach it.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].vendor_data_file_id,
+    ]
   }
 }
