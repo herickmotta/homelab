@@ -1,4 +1,4 @@
-# homelab-infra
+# homelab
 
 Public, versioned implementation of a real homelab. This repository contains
 the reusable OpenTofu modules, Ansible collection, application templates,
@@ -66,7 +66,7 @@ Pin a reviewed full commit SHA in the private OpenTofu root:
 ```hcl
 module "guests" {
   # Keep this SHA aligned with ansible/requirements.yml in the private repo.
-  source = "git::https://github.com/herickmotta/homelab-infra.git//modules/proxmox-guests?ref=<full-commit-sha>"
+  source = "git::https://github.com/herickmotta/homelab.git//modules/proxmox-guests?ref=<full-commit-sha>"
 
   # Site values are decoded from the private site.yaml and passed as inputs.
 }
@@ -76,7 +76,7 @@ Install the Ansible collection from the same commit:
 
 ```yaml
 collections:
-  - name: https://github.com/herickmotta/homelab-infra.git
+  - name: https://github.com/herickmotta/homelab.git
     type: git
     version: <full-commit-sha>
 ```

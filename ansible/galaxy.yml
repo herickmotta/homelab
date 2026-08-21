@@ -13,8 +13,8 @@ tags:
   - infrastructure
   - docker
   - proxmox
-repository: https://github.com/herickmotta/homelab-infra
-documentation: https://github.com/herickmotta/homelab-infra/blob/main/README.md
-issues: https://github.com/herickmotta/homelab-infra/issues
+repository: https://github.com/herickmotta/homelab
+documentation: https://github.com/herickmotta/homelab/blob/main/README.md
+issues: https://github.com/herickmotta/homelab/issues
 build_ignore:
   - .ansible-lint

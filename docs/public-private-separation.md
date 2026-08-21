@@ -6,14 +6,14 @@ The homelab is split across two repositories with a dependency in one
 direction:
 
 ```text
-homelab-infra (public, versioned implementation)
+homelab (public, versioned implementation)
         |
         | pinned full commit SHA
         v
 homelab-live (private, site binding and deployment authority)
 ```
 
-`homelab-infra` explains and implements how the system works. `homelab-live`
+`homelab` explains and implements how the system works. `homelab-live`
 declares where that implementation runs. The public repository never reads,
 imports, or triggers the private repository.
 
