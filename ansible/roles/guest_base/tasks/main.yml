@@ -1,0 +1,42 @@
+---
+# Common first boot. OpenTofu enables the qemu-guest-agent virtio channel;
+# this role installs and starts the guest-side package.
+- name: Wait for SSH after cloud-init
+  ansible.builtin.wait_for_connection:
+    timeout: 600
+
+- name: Gather facts
+  ansible.builtin.setup:
+
+- name: Install guest agent and Docker
+  ansible.builtin.apt:
+    name:
+      - qemu-guest-agent
+      - docker.io
+      - docker-compose-v2
+    state: present
+    update_cache: true
+
+- name: Check for QEMU guest-agent virtio port
+  ansible.builtin.stat:
+    path: /dev/virtio-ports/org.qemu.guest_agent.0
+  register: guest_base_qemu_ga_port
+
+- name: Enable qemu-guest-agent
+  ansible.builtin.service:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  when: guest_base_qemu_ga_port.stat.exists
+
+- name: Enable Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Allow the guest user to use Docker
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true

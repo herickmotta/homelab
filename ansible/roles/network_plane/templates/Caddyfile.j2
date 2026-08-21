@@ -1,0 +1,18 @@
+{
+	email {$ACME_EMAIL}
+}
+
+*.{{ network_plane_domain }} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	@adguard host adguard.{{ network_plane_domain }}
+	handle @adguard {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle {
+		abort
+	}
+}

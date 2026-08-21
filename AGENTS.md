@@ -2,12 +2,19 @@
 
 ## Purpose
 
-This is the **public** repository for reusable homelab infrastructure code.
+This is the **public** repository for the versioned homelab implementation.
 
 The project is both:
 
 * a functional infrastructure project;
 * a learning/portfolio project focused on production-relevant engineering practices.
+
+The private `homelab-live` repository is a thin deployment binding. It pins a
+reviewed commit from this repository and supplies site-specific configuration,
+encrypted secrets, state backend configuration, and the apply workflow.
+
+The boundary and release choreography are
+[docs/public-private-separation.md](docs/public-private-separation.md).
 
 ## Principles
 
@@ -24,9 +31,10 @@ The project is both:
 This repository may contain:
 
 * reusable OpenTofu modules;
-* reusable Ansible roles;
+* the public Ansible collection and reusable roles;
+* Docker Compose and application templates owned by those roles;
 * generic cloud-init configuration;
-* examples;
+* a complete reference environment with fictional values;
 * tests;
 * CI configuration;
 * public architecture documentation.
@@ -44,6 +52,23 @@ This repository must NOT contain:
 The private `homelab-live` repository consumes components from this repository.
 
 Do not introduce dependencies from this repository to `homelab-live`.
+
+## Public/private implementation rules
+
+* Implementation belongs here; site binding belongs in `homelab-live`.
+* Do not copy a public role, module, template, or Compose file into
+  `homelab-live`. Add a typed input here when a real site variation is needed.
+* Keep secure, tested defaults public. Make values configurable because they
+  vary by site, not merely because they can be made configurable.
+* Public examples use reserved domains, documentation addresses, fake keys,
+  and fictional hardware identifiers.
+* Treat module variables and Ansible role argument specifications as public
+  APIs. Preserve compatibility within a release series and document breaking
+  changes.
+* Release OpenTofu and Ansible content from the same commit. The live
+  repository pins that immutable commit in both dependency declarations.
+* A public change cannot trigger a live deployment. Promotion happens only in
+  a reviewed private PR that updates the pinned commit and reviews a real plan.
 
 ## Infrastructure Responsibilities
 
@@ -66,7 +91,8 @@ For non-trivial changes:
 6. Review the resulting diff.
 7. Update documentation when architectural behavior changes.
 
-Do not create speculative modules or directories before they are needed.
+Do not create speculative modules, roles, or directories before they are
+needed by the live site or the reference environment.
 
 ## Validation
 

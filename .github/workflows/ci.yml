@@ -57,12 +57,10 @@ jobs:
         run: pip install ansible-lint
 
       - name: Lint
-        run: |
-          if ! ls roles playbooks ansible >/dev/null 2>&1; then
-            echo "No Ansible content"
-            exit 0
-          fi
-          ansible-lint
+        run: ansible-lint ansible
+
+      - name: Build collection
+        run: ansible-galaxy collection build ansible --output-path /tmp
 
   ci:
     name: ci

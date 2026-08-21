@@ -41,3 +41,8 @@ id_ecdsa
 *.swp
 .idea/
 .vscode/
+
+# Local Ansible collection installs/builds
+.ansible/
+collections/
+herickmotta-homelab-*.tar.gz

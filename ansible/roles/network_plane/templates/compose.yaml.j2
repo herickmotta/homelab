@@ -1,0 +1,25 @@
+# Managed by herickmotta.homelab.network_plane.
+services:
+  adguard:
+    image: "{{ network_plane_adguard_image }}"
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./adguard/work:/opt/adguardhome/work
+      - ./adguard/conf:/opt/adguardhome/conf
+
+  caddy:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - adguard
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

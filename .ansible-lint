@@ -1,0 +1,7 @@
+profile: basic
+offline: true
+exclude_paths:
+  - .github
+  - docs
+  - examples
+  - modules

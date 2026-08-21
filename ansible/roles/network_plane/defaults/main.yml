@@ -1,0 +1,15 @@
+---
+network_plane_install_dir: /opt/net
+network_plane_owner: "{{ ansible_user }}"
+network_plane_group: "{{ ansible_user }}"
+
+network_plane_adguard_image: adguard/adguardhome:v0.107.79
+network_plane_caddy_version: 2.9.1
+network_plane_tailscale_distribution: noble
+network_plane_tailscale_route_cidr: "{{ network_plane_lan_cidr }}"
+network_plane_tailscale_client_cidr: 100.64.0.0/10
+
+network_plane_adguard_user: admin
+network_plane_adguard_querylog_hours: 168
+network_plane_adguard_statistics_hours: 168
+network_plane_adguard_filter_refresh_hours: 24

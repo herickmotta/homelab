@@ -1,0 +1,38 @@
+---
+argument_specs:
+  main:
+    short_description: Configure the dedicated homelab network plane
+    options:
+      network_plane_hostname:
+        type: str
+        required: true
+      network_plane_domain:
+        type: str
+        required: true
+      network_plane_ipv4:
+        type: str
+        required: true
+      network_plane_lan_cidr:
+        type: str
+        required: true
+      network_plane_gateway:
+        type: str
+        required: true
+      network_plane_host_dns_servers:
+        type: list
+        elements: str
+        required: true
+      network_plane_tailscale_auth_key:
+        type: str
+        required: true
+      network_plane_cloudflare_api_token:
+        type: str
+        required: true
+      network_plane_acme_email:
+        type: str
+        required: true
+      network_plane_adguard_user:
+        type: str
+      network_plane_adguard_password_hash:
+        type: str
+        required: true

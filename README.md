@@ -1,56 +1,101 @@
-# homelab-infra
+# homelab
 
-Public reusable infrastructure for a homelab. This repository is both a working project and a learning/portfolio artifact.
+Public, versioned implementation of a real homelab. This repository contains
+the reusable OpenTofu modules, Ansible collection, application templates,
+reference configuration, tests, and architecture documentation. It is both a
+working infrastructure project and a learning/portfolio artifact.
 
-The private [homelab-live](https://github.com/herickmotta/homelab-live) repository consumes components from here. This repository must not depend on `homelab-live`.
+The private `homelab-live` repository is intentionally small: it pins an
+immutable commit from this repository and supplies real addresses, hostnames,
+hardware mappings, encrypted secrets, state configuration, and the deployment
+workflow. This repository never depends on the private deployment.
+
+See [Public implementation and private deployment](docs/public-private-separation.md)
+for the boundary, configuration layers, and promotion workflow.
 
 ## Current status
 
-First reusable OpenTofu module: `modules/proxmox-vm` (Proxmox cloud-init VM via bpg/proxmox 0.111.1). Dummy usage is in `examples/proxmox-vm`. Tagged `v0.1.0`. No Ansible roles yet.
+`modules/proxmox-vm` provisions one Proxmox cloud-init VM through
+`bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
+those guests from private site configuration. Dummy usage is under
+`examples/`; `v0.1.0` contains the original single-VM module and the next
+release adds composition and the `herickmotta.homelab` Ansible collection.
 
-QEMU guest agent: `modules/proxmox-vm` sets `agent.enabled = true` and expects cloud-init vendor-data at `local:snippets/qemu-guest-agent.yaml` (copy [`modules/proxmox-vm/cloud-init/vendor-data.yaml`](modules/proxmox-vm/cloud-init/vendor-data.yaml) onto the node). Snippet upload via the provider needs SSH to Proxmox; this module stays API-only, so that file is a one-time host step. Enable **Snippets** on datastore `local` first.
+The collection owns the Ubuntu guest baseline and the complete network-plane
+implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale
+subnet routing. Its roles render the final Compose and application
+configuration from typed site inputs; consumers do not copy those files.
+
+QEMU guest agent: `modules/proxmox-vm` sets `agent.enabled = true` and
+expects cloud-init vendor-data at
+`local:snippets/qemu-guest-agent.yaml`. Copy
+[`modules/proxmox-vm/cloud-init/vendor-data.yaml`](modules/proxmox-vm/cloud-init/vendor-data.yaml)
+onto the node. Snippet upload through the provider needs SSH to Proxmox; the
+module stays API-only, so this is a one-time host step.
 
 ## What belongs here
 
-Reusable OpenTofu modules, Ansible roles, generic cloud-init, examples with dummy values, tests, CI, and public architecture notes.
+This repository may contain reusable and composition-level OpenTofu modules,
+the public Ansible collection, application templates, fictional reference
+configuration, tests, CI, and public architecture notes.
 
-This repository must **not** contain:
+It must **not** contain:
 
 - real private IP addresses or internal hostnames
-- credentials, secrets, or private keys
-- private network topology or environment-specific identifiers
-- OpenTofu state
+- credentials, encrypted production secrets, or private keys
+- private network topology, hardware mappings, or environment identifiers
+- OpenTofu state, raw plans, apply logs, or a live deployment workflow
 
-## Intended layout
+## Layout
 
 ```
-modules/     reusable OpenTofu modules (first module lands here)
-examples/    dummy-value usage examples only; no live IPs or hostnames
-roles/       reusable Ansible roles, when OS configuration is needed
-playbooks/   reusable playbooks, when needed
-.github/     CI workflows
+modules/     reusable and composable OpenTofu modules
+ansible/     herickmotta.homelab collection, roles, and templates
+examples/    runnable dummy roots and a fictional site configuration
+docs/        architecture and public/private boundary
+.github/     public validation only; never live apply
 ```
 
-Do not add empty trees in advance. The stack is OpenTofu → Proxmox → cloud-init → Ansible → Docker Compose. Kubernetes is deferred until there is a concrete reason to introduce it.
+The stack is OpenTofu → Proxmox → cloud-init → Ansible → Docker Compose.
+Kubernetes remains deferred until a concrete workload requires it.
 
-## Consuming modules from homelab-live
+## Consuming a release
 
-Pin a git tag (or commit) when a module exists. Do not copy modules into the live repository.
+Pin a reviewed full commit SHA in the private OpenTofu root:
 
 ```hcl
-module "example" {
-  source = "git::https://github.com/herickmotta/homelab-infra.git//modules/<name>?ref=v0.1.0"
+module "guests" {
+  # Keep this SHA aligned with ansible/requirements.yml in the private repo.
+  source = "git::https://github.com/herickmotta/homelab.git//modules/proxmox-guests?ref=<full-commit-sha>"
+
+  # Site values are decoded from the private site.yaml and passed as inputs.
 }
 ```
 
+Install the Ansible collection from the same commit:
+
+```yaml
+collections:
+  - name: https://github.com/herickmotta/homelab.git
+    type: git
+    version: <full-commit-sha>
+```
+
+The reference shape is
+[`examples/site.example.yaml`](examples/site.example.yaml).
+
 ## Validation
 
-CI runs OpenTofu `fmt`/`validate` and `ansible-lint` only when matching files exist. Until then the workflow stays green.
+CI runs OpenTofu `fmt`/`validate`, `ansible-lint`, and an Ansible
+collection build. It uses only fictional example values and cannot reach or
+deploy the live environment.
 
-Locally, when those files exist:
+Locally:
 
-- `tofu fmt -check`
-- `tofu validate`
-- `ansible-lint`
+- `tofu fmt -check -recursive`
+- `tofu validate` in each example root
+- `ansible-lint ansible`
+- `ansible-galaxy collection build ansible`
 
-See [AGENTS.md](AGENTS.md) for repository boundaries, workflow, and safety rules.
+See [AGENTS.md](AGENTS.md) for repository boundaries, workflow, and safety
+rules.
