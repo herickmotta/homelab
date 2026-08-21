@@ -1,0 +1,9 @@
+# Custom Caddy with Cloudflare DNS-01.
+FROM caddy:{{ network_plane_caddy_version }}-builder AS builder
+
+RUN xcaddy build \
+    --with github.com/caddy-dns/cloudflare
+
+FROM caddy:{{ network_plane_caddy_version }}
+
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

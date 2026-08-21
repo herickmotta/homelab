@@ -1,0 +1,96 @@
+http:
+  address: 127.0.0.1:3000
+  session_ttl: 720h
+  doh:
+    insecure_enabled: false
+    routes:
+      - GET /dns-query
+      - POST /dns-query
+      - GET /dns-query/{ClientID}
+      - POST /dns-query/{ClientID}
+users:
+  - name: "{{ network_plane_adguard_user }}"
+    password: "{{ network_plane_adguard_password_hash }}"
+auth_attempts: 5
+block_auth_min: 15
+theme: auto
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  anonymize_client_ip: false
+  ratelimit: 20
+  refuse_any: true
+  allowed_clients:
+    - "{{ network_plane_lan_cidr }}"
+    - 127.0.0.1
+    - "{{ network_plane_tailscale_client_cidr }}"
+  upstream_dns:
+    - https://dns.cloudflare.com/dns-query
+    - tls://dns.quad9.net
+  bootstrap_dns:
+    - 1.1.1.1:53
+    - 1.0.0.1:53
+    - 9.9.9.9:53
+    - 149.112.112.112:53
+  fallback_dns:
+    - tls://dns.quad9.net
+  upstream_mode: load_balance
+  upstream_timeout: 10s
+  enable_dnssec: true
+  cache_enabled: true
+  cache_size: 4194304
+  cache_optimistic: true
+  cache_optimistic_answer_ttl: 30s
+  cache_optimistic_max_age: 12h
+  use_private_ptr_resolvers: true
+  local_ptr_upstreams:
+    - "{{ network_plane_gateway }}"
+  blocked_hosts:
+    - version.bind
+    - id.server
+    - hostname.bind
+  pending_requests:
+    enabled: true
+  serve_plain_dns: true
+filtering:
+  protection_enabled: true
+  filtering_enabled: true
+  filters_update_interval: "{{ network_plane_adguard_filter_refresh_hours }}"
+  blocking_mode: default
+  blocked_response_ttl: 10
+  safebrowsing_enabled: false
+  parental_enabled: false
+  rewrites_enabled: true
+  rewrites:
+    - domain: "*.{{ network_plane_domain }}"
+      answer: "{{ network_plane_ipv4 }}"
+      enabled: true
+querylog:
+  enabled: true
+  file_enabled: true
+  interval: "{{ network_plane_adguard_querylog_hours }}h"
+  size_memory: 1000
+  ignored_enabled: false
+statistics:
+  enabled: true
+  interval: "{{ network_plane_adguard_statistics_hours }}h"
+  ignored_enabled: false
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_48.txt
+    name: HaGeZi's Pro Blocklist
+    id: 48
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_44.txt
+    name: HaGeZi's Threat Intelligence Feeds
+    id: 44
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_71.txt
+    name: HaGeZi's DNS Rebind Protection
+    id: 71
+dhcp:
+  enabled: false
+tls:
+  enabled: false
+schema_version: 34

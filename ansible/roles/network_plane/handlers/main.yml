@@ -1,0 +1,19 @@
+---
+- name: Recreate network-plane compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --build --force-recreate
+    chdir: "{{ network_plane_install_dir }}"
+  changed_when: true
+
+- name: Recreate network-plane caddy
+  ansible.builtin.command:
+    cmd: >-
+      docker compose up -d --build --force-recreate --no-deps caddy
+    chdir: "{{ network_plane_install_dir }}"
+  changed_when: true
+
+- name: Recreate network-plane adguard
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate adguard
+    chdir: "{{ network_plane_install_dir }}"
+  changed_when: true

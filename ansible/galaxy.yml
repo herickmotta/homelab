@@ -1,0 +1,20 @@
+---
+namespace: herickmotta
+name: homelab
+version: 0.2.0
+readme: README.md
+authors:
+  - Herick Motta
+description: Public roles for the versioned homelab implementation.
+license:
+  - MIT
+tags:
+  - homelab
+  - infrastructure
+  - docker
+  - proxmox
+repository: https://github.com/herickmotta/homelab-infra
+documentation: https://github.com/herickmotta/homelab-infra/blob/main/README.md
+issues: https://github.com/herickmotta/homelab-infra/issues
+build_ignore:
+  - .ansible-lint

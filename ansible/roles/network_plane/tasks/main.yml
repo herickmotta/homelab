@@ -1,0 +1,188 @@
+---
+- name: Require non-empty network-plane secrets
+  ansible.builtin.assert:
+    that:
+      - network_plane_tailscale_auth_key | length > 0
+      - network_plane_cloudflare_api_token | length > 0
+      - network_plane_acme_email | length > 0
+      - network_plane_adguard_password_hash | length > 0
+    fail_msg: Supply network-plane secrets through the private deployment.
+  no_log: true
+
+- name: Create systemd-resolved drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Disable the systemd-resolved DNS stub
+  ansible.builtin.copy:
+    dest: /etc/systemd/resolved.conf.d/no-stub.conf
+    mode: "0644"
+    content: |
+      [Resolve]
+      DNS={{ network_plane_host_dns_servers | join(' ') }}
+      DNSStubListener=no
+  register: network_plane_resolved_stub
+
+- name: Restart systemd-resolved
+  ansible.builtin.service:
+    name: systemd-resolved
+    state: restarted
+  when: network_plane_resolved_stub.changed
+
+- name: Point resolv.conf at systemd-resolved
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    src: /run/systemd/resolve/resolv.conf
+    state: link
+    force: true
+
+- name: Enable IPv4 forwarding for Tailscale subnet routing
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-tailscale.conf
+    mode: "0644"
+    content: |
+      net.ipv4.ip_forward = 1
+  register: network_plane_tailscale_sysctl
+
+- name: Apply sysctl
+  ansible.builtin.command:
+    cmd: sysctl --system
+  changed_when: network_plane_tailscale_sysctl.changed
+  when: network_plane_tailscale_sysctl.changed
+
+- name: Install Tailscale apt key
+  ansible.builtin.get_url:
+    url: >-
+      https://pkgs.tailscale.com/stable/ubuntu/
+      {{ network_plane_tailscale_distribution }}.noarmor.gpg
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: "0644"
+
+- name: Install Tailscale apt source
+  ansible.builtin.get_url:
+    url: >-
+      https://pkgs.tailscale.com/stable/ubuntu/
+      {{ network_plane_tailscale_distribution }}.tailscale-keyring.list
+    dest: /etc/apt/sources.list.d/tailscale.list
+    mode: "0644"
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+    update_cache: true
+
+- name: Enable tailscaled
+  ansible.builtin.service:
+    name: tailscaled
+    state: started
+    enabled: true
+
+- name: Check Tailscale backend
+  ansible.builtin.command:
+    cmd: tailscale status --json
+  register: network_plane_tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Parse Tailscale backend state
+  ansible.builtin.set_fact:
+    network_plane_tailscale_backend: >-
+      {{ (network_plane_tailscale_status.stdout | from_json).BackendState }}
+  when:
+    - network_plane_tailscale_status.rc == 0
+    - network_plane_tailscale_status.stdout | length > 0
+
+- name: Bring Tailscale up
+  ansible.builtin.command:
+    cmd: >-
+      tailscale up
+      --auth-key={{ network_plane_tailscale_auth_key }}
+      --hostname={{ network_plane_hostname }}
+      --accept-dns=false
+      --advertise-routes={{ network_plane_tailscale_route_cidr }}
+  no_log: true
+  when: >-
+    network_plane_tailscale_backend | default('Unknown') != 'Running'
+
+- name: Advertise the configured LAN subnet
+  ansible.builtin.command:
+    cmd: >-
+      tailscale set
+      --advertise-routes={{ network_plane_tailscale_route_cidr }}
+  changed_when: false
+
+- name: Create network-plane directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0755"
+  loop:
+    - "{{ network_plane_install_dir }}"
+    - "{{ network_plane_install_dir }}/adguard"
+    - "{{ network_plane_install_dir }}/adguard/work"
+    - "{{ network_plane_install_dir }}/adguard/conf"
+
+- name: Install network-plane Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ network_plane_install_dir }}/compose.yaml"
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0644"
+  notify: Recreate network-plane compose
+
+- name: Install Caddy Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ network_plane_install_dir }}/Dockerfile"
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0644"
+  notify: Recreate network-plane caddy
+
+- name: Install Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ network_plane_install_dir }}/Caddyfile"
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0644"
+  notify: Recreate network-plane caddy
+
+- name: Install Caddy environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ network_plane_install_dir }}/.env"
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Recreate network-plane caddy
+
+- name: Install AdGuard configuration
+  ansible.builtin.template:
+    src: AdGuardHome.yaml.j2
+    dest: >-
+      {{ network_plane_install_dir }}/adguard/conf/AdGuardHome.yaml
+    owner: "{{ network_plane_owner }}"
+    group: "{{ network_plane_group }}"
+    mode: "0644"
+  no_log: true
+  notify: Recreate network-plane adguard
+
+- name: Start network-plane Compose project
+  ansible.builtin.command:
+    cmd: docker compose up -d --build
+    chdir: "{{ network_plane_install_dir }}"
+  register: network_plane_compose_up
+  changed_when: >-
+    network_plane_compose_up.rc == 0
+    and ('Started' in
+         (network_plane_compose_up.stderr ~ network_plane_compose_up.stdout)
+         or 'Built' in
+         (network_plane_compose_up.stderr ~ network_plane_compose_up.stdout))

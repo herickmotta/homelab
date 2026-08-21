@@ -1,0 +1,43 @@
+# Fictional reference values only. 192.0.2.0/24 and example.test are reserved
+# for documentation and must not be applied to a real network.
+---
+site:
+  domain: lab.example.test
+  timezone: Etc/UTC
+
+  hypervisor:
+    endpoint_ipv4: 192.0.2.10
+    node_name: pve-example
+    bridge: vmbr0
+    datastore: local-lvm
+
+  network:
+    cidr: 192.0.2.0/24
+    prefix_length: 24
+    gateway: 192.0.2.1
+    dns:
+      - 192.0.2.12
+
+  access:
+    username: ubuntu
+    ssh_public_keys:
+      - >-
+        ssh-ed25519
+        AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyOnlyNotRealAAAAAAAAAAAA
+        example@invalid
+
+  guests:
+    network_plane:
+      hostname: net-example
+      vm_id: 112
+      ipv4: 192.0.2.12
+      dns_servers:
+        - 192.0.2.1
+      groups:
+        - homelab_guest
+        - network_plane
+      cores: 2
+      memory_mb: 4096
+      disk_gb: 16
+      tags:
+        - network
