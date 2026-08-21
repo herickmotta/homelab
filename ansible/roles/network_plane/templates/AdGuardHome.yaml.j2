@@ -56,7 +56,7 @@ dns:
 filtering:
   protection_enabled: true
   filtering_enabled: true
-  filters_update_interval: "{{ network_plane_adguard_filter_refresh_hours }}"
+  filters_update_interval: {{ network_plane_adguard_filter_refresh_hours }}
   blocking_mode: default
   blocked_response_ttl: 10
   safebrowsing_enabled: false
