@@ -2,7 +2,7 @@
 
 Public, versioned implementation of a real homelab. This repository contains
 the reusable OpenTofu modules, Ansible collection, application templates,
-reference configuration, tests, and architecture documentation. It is both a
+fictional examples, CI, and architecture documentation. It is both a
 working infrastructure project and a learning/portfolio artifact.
 
 The private `homelab-live` repository is intentionally small: it pins an
@@ -17,9 +17,10 @@ for the boundary, configuration layers, and promotion workflow.
 
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
-those guests from private site configuration. Dummy usage is under
-`examples/`; `v0.1.0` contains the original single-VM module and the next
-release adds composition and the `herickmotta.homelab` Ansible collection.
+those guests from private site configuration. Fictional usage is under
+`examples/`. Collection `herickmotta.homelab` 0.2.0 ships `guest_base` and
+`network_plane`. Live sites pin a full commit SHA, not a moving tag;
+`v0.1.0` is the earlier single-VM module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
 implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale
@@ -37,7 +38,7 @@ module stays API-only, so this is a one-time host step.
 
 This repository may contain reusable and composition-level OpenTofu modules,
 the public Ansible collection, application templates, fictional reference
-configuration, tests, CI, and public architecture notes.
+configuration, CI, and public architecture notes.
 
 It must **not** contain:
 
@@ -51,7 +52,7 @@ It must **not** contain:
 ```
 modules/     reusable and composable OpenTofu modules
 ansible/     herickmotta.homelab collection, roles, and templates
-examples/    runnable dummy roots and a fictional site configuration
+examples/    fictional example roots and a site configuration shape
 docs/        architecture and public/private boundary
 .github/     public validation only; never live apply
 ```
