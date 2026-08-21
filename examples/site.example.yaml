@@ -11,6 +11,12 @@ site:
     bridge: vmbr0
     datastore: local-lvm
 
+  # Brownfield machines. OpenTofu does not create these; keep them out of guests.
+  hosts:
+    watchdog:
+      ipv4: 192.0.2.11
+      role: sentinel
+
   network:
     cidr: 192.0.2.0/24
     prefix_length: 24

@@ -45,7 +45,7 @@ state, raw plans, or deployment logs.
 The private repository owns:
 
 * one canonical `site.yaml` containing real topology and non-secret site
-  values;
+  values (guests OpenTofu manages, plus brownfield hosts it must not create);
 * SOPS-encrypted production credentials and the public SOPS recipient;
 * the OpenTofu backend and provider binding;
 * a thin OpenTofu root that passes `site.yaml` values into public modules;
