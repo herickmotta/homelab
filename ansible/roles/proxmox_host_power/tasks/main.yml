@@ -68,6 +68,7 @@
     cache_valid_time: 3600
 
 - name: Keep the distribution cpupower service from competing for policy
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: cpupower.service
     enabled: false
@@ -92,6 +93,7 @@
   notify: Restart homelab CPU power policy
 
 - name: Enable and apply the CPU power policy
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: homelab-cpu-power-policy.service
     daemon_reload: true

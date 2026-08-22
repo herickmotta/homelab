@@ -1,5 +1,6 @@
 ---
 - name: Restart homelab CPU power policy
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: homelab-cpu-power-policy.service
     daemon_reload: true
