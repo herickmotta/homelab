@@ -59,6 +59,9 @@ jobs:
       - name: Lint
         run: ansible-lint ansible
 
+      - name: Health unit tests
+        run: python3 -m unittest discover -s ansible/tests/unit -v
+
       - name: Build collection
         run: ansible-galaxy collection build ansible --output-path /tmp
 

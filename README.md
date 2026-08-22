@@ -17,10 +17,12 @@ for the boundary, configuration layers, and promotion workflow.
 
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
-those guests from private site configuration. Fictional usage is under
-`examples/`. Collection `herickmotta.homelab` 0.2.0 ships `guest_base` and
-`network_plane`. Live sites pin a full commit SHA, not a moving tag;
-`v0.1.0` is the earlier single-VM module only.
+those guests from private site configuration and can attach VirtioFS
+directory mappings. Fictional usage is under `examples/`. Collection
+`herickmotta.homelab` 0.4.0 ships `guest_base`, `network_plane`,
+`proxmox_host_power`, `proxmox_host_storage`, and `nas_server`. Live sites
+pin a full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM
+module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
 implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale
@@ -58,7 +60,9 @@ docs/        architecture and public/private boundary
 ```
 
 The stack is OpenTofu → Proxmox → cloud-init → Ansible → Docker Compose.
-Kubernetes remains deferred until a concrete workload requires it.
+Kubernetes remains deferred until a concrete workload requires it. Host-owned
+ZFS and the replaceable NAS VM are described in
+[Persistent storage and NAS serving](docs/persistent-storage.md).
 
 ## Consuming a release
 
@@ -96,6 +100,7 @@ Locally:
 - `tofu fmt -check -recursive`
 - `tofu validate` in each example root
 - `ansible-lint ansible`
+- `python3 -m unittest discover -s ansible/tests/unit`
 - `ansible-galaxy collection build ansible`
 
 See [AGENTS.md](AGENTS.md) for repository boundaries, workflow, and safety
