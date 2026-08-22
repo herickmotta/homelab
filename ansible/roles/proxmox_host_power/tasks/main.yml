@@ -2,8 +2,8 @@
 - name: Validate the target operating system
   ansible.builtin.assert:
     that:
-      - ansible_system == "Linux"
-      - ansible_os_family == "Debian"
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
     fail_msg: This role supports Debian-family Linux hosts only.
 
 - name: Inspect the CPU frequency policy
@@ -68,8 +68,13 @@
     update_cache: true
     cache_valid_time: 3600
 
+- name: Inspect installed services
+  ansible.builtin.service_facts:
+
 - name: Keep the distribution cpupower service from competing for policy
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'cpupower.service' in ansible_facts.services"
   ansible.builtin.systemd_service:
     name: cpupower.service
     enabled: false
