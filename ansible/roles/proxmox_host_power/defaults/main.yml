@@ -1,0 +1,8 @@
+---
+proxmox_host_power_required_scaling_driver: intel_pstate
+proxmox_host_power_cpu_governor: powersave
+proxmox_host_power_energy_performance_preference: balance_power
+proxmox_host_power_telemetry_packages:
+  - linux-cpupower
+  - lm-sensors
+  - powertop

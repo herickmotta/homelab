@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Configure Proxmox host CPU power policy and telemetry
+    options:
+      proxmox_host_power_required_scaling_driver:
+        type: str
+        default: intel_pstate
+      proxmox_host_power_cpu_governor:
+        type: str
+        default: powersave
+        choices:
+          - performance
+          - powersave
+      proxmox_host_power_energy_performance_preference:
+        type: str
+        default: balance_power
+        choices:
+          - default
+          - performance
+          - balance_performance
+          - balance_power
+          - power
+      proxmox_host_power_telemetry_packages:
+        type: list
+        elements: str
