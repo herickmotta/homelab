@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  author: Herick Motta
+  role_name: proxmox_host_power
+  description: Proxmox Linux CPU power policy and passive telemetry
+  license: MIT
+  min_ansible_version: "2.17"
+dependencies: []
