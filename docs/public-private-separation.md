@@ -31,7 +31,7 @@ The public repository owns:
   collection roles;
 * safe and opinionated defaults, including pinned application versions;
 * typed module variables and role argument specifications;
-* fictional reference configuration and examples;
+* fictional reference configuration, examples, and CI;
 * architecture decisions, failure modes, recovery guidance, and public build
   notes;
 * validation that requires no live credentials or network access.
@@ -97,7 +97,8 @@ before they are promoted to the live site.
 1. Discuss and implement a capability in a public PR.
 2. Validate OpenTofu modules, the Ansible collection, rendered configuration,
    and fictional examples without live access.
-3. Merge and tag the public release. Record the full commit SHA.
+3. Merge the public PR. Record the full commit SHA. A git tag is optional
+   hygiene; live execution pins the SHA, not a moving tag.
 4. Open a private PR that changes both the OpenTofu source and Ansible
    collection requirement to that same SHA.
 5. Validate the private `site.yaml`, initialize against the real backend, and

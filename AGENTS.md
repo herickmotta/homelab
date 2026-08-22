@@ -35,7 +35,6 @@ This repository may contain:
 * Docker Compose and application templates owned by those roles;
 * generic cloud-init configuration;
 * a complete reference environment with fictional values;
-* tests;
 * CI configuration;
 * public architecture documentation.
 
@@ -102,7 +101,7 @@ Where applicable, run:
 * `tofu validate`
 * `ansible-lint`
 * YAML/shell linting
-* relevant tests
+* `ansible-galaxy collection build` when collection files change
 
 If validation cannot be run, explicitly state why.
 
