@@ -9,6 +9,7 @@
 - name: Inspect the CPU frequency policy
   ansible.builtin.stat:
     path: /sys/devices/system/cpu/cpu0/cpufreq
+    follow: true
   register: proxmox_host_power_cpufreq
 
 - name: Require CPU frequency control
