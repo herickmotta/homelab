@@ -8,7 +8,7 @@
 
 - name: Inspect the CPU frequency policy
   ansible.builtin.stat:
-    path: /sys/devices/system/cpu/cpu0/cpufreq
+    path: /sys/devices/system/cpu/cpufreq/policy0
     follow: true
   register: proxmox_host_power_cpufreq
 
@@ -20,46 +20,16 @@
 
 - name: Read the active CPU scaling driver
   ansible.builtin.slurp:
-    src: /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver
+    src: /sys/devices/system/cpu/cpufreq/policy0/scaling_driver
   register: proxmox_host_power_active_driver
 
-- name: Read the available CPU governors
-  ansible.builtin.slurp:
-    src: /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
-  register: proxmox_host_power_available_governors
-
-- name: Inspect energy performance preference support
-  ansible.builtin.stat:
-    path: /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference
-  register: proxmox_host_power_epp
-
-- name: Require the configured CPU scaling driver and governor
+- name: Require the configured CPU scaling driver
   ansible.builtin.assert:
     that:
       - >-
         (proxmox_host_power_active_driver.content | b64decode | trim)
         == proxmox_host_power_required_scaling_driver
-      - >-
-        proxmox_host_power_cpu_governor in
-        (proxmox_host_power_available_governors.content | b64decode).split()
-      - proxmox_host_power_epp.stat.exists
-    fail_msg: >-
-      The host CPU scaling capabilities do not match the declared policy.
-
-- name: Read the available energy performance preferences
-  ansible.builtin.slurp:
-    src: >-
-      /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_available_preferences
-  register: proxmox_host_power_available_epp
-
-- name: Require the configured energy performance preference
-  ansible.builtin.assert:
-    that:
-      - >-
-        proxmox_host_power_energy_performance_preference in
-        (proxmox_host_power_available_epp.content | b64decode).split()
-    fail_msg: >-
-      The configured energy performance preference is not supported.
+    fail_msg: The host CPU scaling driver does not match the declared policy.
 
 - name: Install passive CPU and power telemetry tools
   ansible.builtin.apt:
@@ -71,6 +41,31 @@
 - name: Inspect installed services
   ansible.builtin.service_facts:
 
+- name: Disable the legacy CPU power policy service
+  when:
+    - not ansible_check_mode
+    - >-
+      'homelab-cpu-power-policy.service' in ansible_facts.services
+  ansible.builtin.systemd_service:
+    name: homelab-cpu-power-policy.service
+    enabled: false
+    state: stopped
+
+- name: Remove legacy CPU power policy files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/sbin/homelab-cpu-power-policy
+    - /etc/systemd/system/homelab-cpu-power-policy.service
+  register: proxmox_host_power_legacy_files
+
+- name: Reload systemd after removing the legacy service
+  when: not ansible_check_mode
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: proxmox_host_power_legacy_files.changed
+
 - name: Keep the distribution cpupower service from competing for policy
   when:
     - not ansible_check_mode
@@ -80,55 +75,25 @@
     enabled: false
     state: stopped
 
-- name: Install the CPU power policy helper
-  ansible.builtin.template:
-    src: homelab-cpu-power-policy.sh.j2
-    dest: /usr/local/sbin/homelab-cpu-power-policy
-    owner: root
-    group: root
-    mode: "0755"
-  notify: Restart homelab CPU power policy
-
-- name: Install the CPU power policy service
-  ansible.builtin.template:
-    src: homelab-cpu-power-policy.service.j2
-    dest: /etc/systemd/system/homelab-cpu-power-policy.service
+- name: Install the declarative CPU power policy
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/homelab-cpu-power.conf
     owner: root
     group: root
     mode: "0644"
-  notify: Restart homelab CPU power policy
+    content: |
+      # Managed by Ansible. Applied by systemd-tmpfiles during boot.
+      w /sys/devices/system/cpu/cpufreq/policy*/scaling_governor - - - - {{ proxmox_host_power_cpu_governor }}
+      w /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference - - - - {{
+        proxmox_host_power_energy_performance_preference
+      }}
+  register: proxmox_host_power_policy_file
 
-- name: Enable and apply the CPU power policy
+- name: Apply the CPU power policy
   when: not ansible_check_mode
-  ansible.builtin.systemd_service:
-    name: homelab-cpu-power-policy.service
-    daemon_reload: true
-    enabled: true
-    state: started
-
-- name: Apply pending CPU power policy changes
-  ansible.builtin.meta: flush_handlers
-
-- name: Read the applied CPU governor
-  when: not ansible_check_mode
-  ansible.builtin.slurp:
-    src: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-  register: proxmox_host_power_applied_governor
-
-- name: Read the applied energy performance preference
-  when: not ansible_check_mode
-  ansible.builtin.slurp:
-    src: /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference
-  register: proxmox_host_power_applied_epp
-
-- name: Verify the applied CPU power policy
-  when: not ansible_check_mode
-  ansible.builtin.assert:
-    that:
-      - >-
-        (proxmox_host_power_applied_governor.content | b64decode | trim)
-        == proxmox_host_power_cpu_governor
-      - >-
-        (proxmox_host_power_applied_epp.content | b64decode | trim)
-        == proxmox_host_power_energy_performance_preference
-    fail_msg: The CPU power policy did not converge.
+  ansible.builtin.command:
+    argv:
+      - systemd-tmpfiles
+      - --create
+      - /etc/tmpfiles.d/homelab-cpu-power.conf
+  changed_when: proxmox_host_power_policy_file.changed
