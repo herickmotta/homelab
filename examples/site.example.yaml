@@ -138,7 +138,7 @@ site:
         short_test: "S/../../1/02"
         long_test: "L/../07/./03"
       netdata:
-        allow_from: localhost 192.0.2.0/24
+        allow_from: "localhost 192.0.2.0/24"
     nas:
       smb_username: household
       smb_uid: 10000
