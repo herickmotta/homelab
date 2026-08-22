@@ -1,0 +1,22 @@
+---
+proxmox_host_storage_pools: {}
+proxmox_host_storage_datasets: {}
+proxmox_host_storage_prometheus_textfile_dir: /var/lib/prometheus/node-exporter
+proxmox_host_storage_email_destination: ""
+proxmox_host_storage_smtp_host: ""
+proxmox_host_storage_smtp_port: 587
+proxmox_host_storage_smtp_username: ""
+proxmox_host_storage_smtp_password: ""
+proxmox_host_storage_smtp_from: ""
+proxmox_host_storage_smtp_starttls: true
+proxmox_host_storage_smartd_short_test: "S/../../1/02"
+proxmox_host_storage_smartd_long_test: "L/../07/./03"
+proxmox_host_storage_scrubs: []
+proxmox_host_storage_health_calendar: hourly
+proxmox_host_storage_packages:
+  - smartmontools
+  - prometheus-node-exporter
+  - python3
+proxmox_host_storage_mail_packages:
+  - msmtp-mta
+  - bsd-mailx

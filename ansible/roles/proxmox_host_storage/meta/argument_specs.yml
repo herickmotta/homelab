@@ -1,0 +1,48 @@
+---
+argument_specs:
+  main:
+    short_description: Monitor host-owned ZFS pools without creating or repairing them
+    options:
+      proxmox_host_storage_pools:
+        type: dict
+        required: true
+      proxmox_host_storage_datasets:
+        type: dict
+        required: true
+      proxmox_host_storage_prometheus_textfile_dir:
+        type: str
+        default: /var/lib/prometheus/node-exporter
+      proxmox_host_storage_email_destination:
+        type: str
+      proxmox_host_storage_smtp_host:
+        type: str
+      proxmox_host_storage_smtp_port:
+        type: int
+        default: 587
+      proxmox_host_storage_smtp_username:
+        type: str
+      proxmox_host_storage_smtp_password:
+        type: str
+      proxmox_host_storage_smtp_from:
+        type: str
+      proxmox_host_storage_smtp_starttls:
+        type: bool
+        default: true
+      proxmox_host_storage_smartd_short_test:
+        type: str
+        default: "S/../../1/02"
+      proxmox_host_storage_smartd_long_test:
+        type: str
+        default: "L/../07/./03"
+      proxmox_host_storage_scrubs:
+        type: list
+        elements: dict
+      proxmox_host_storage_health_calendar:
+        type: str
+        default: hourly
+      proxmox_host_storage_packages:
+        type: list
+        elements: str
+      proxmox_host_storage_mail_packages:
+        type: list
+        elements: str

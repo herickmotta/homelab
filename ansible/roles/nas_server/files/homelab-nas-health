@@ -1,0 +1,415 @@
+#!/usr/bin/env python3
+"""NAS VirtioFS and Samba health for CLI, JSON, Prometheus, and journald."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import pathlib
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional
+
+SCHEMA_VERSION = 1
+DEFAULT_EXPECTED = "/etc/homelab/nas-expected.json"
+STATUS_OK = "ok"
+STATUS_WARNING = "warning"
+STATUS_CRITICAL = "critical"
+EXIT_BY_STATUS = {STATUS_OK: 0, STATUS_WARNING: 1, STATUS_CRITICAL: 2}
+RANK = {STATUS_OK: 0, STATUS_WARNING: 1, STATUS_CRITICAL: 2}
+
+Runner = Callable[[List[str]], subprocess.CompletedProcess]
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def isoformat(ts: datetime) -> str:
+    return ts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def run_cmd(argv: List[str], runner: Optional[Runner] = None) -> subprocess.CompletedProcess:
+    if runner is not None:
+        return runner(argv)
+    return subprocess.run(argv, check=False, capture_output=True, text=True)
+
+
+def worse(left: str, right: str) -> str:
+    return left if RANK[left] >= RANK[right] else right
+
+
+def add_alert(alerts: List[Dict[str, str]], status: str, code: str, message: str) -> str:
+    alerts.append({"status": status, "code": code, "message": message})
+    return status
+
+
+def load_expected(path: str) -> Dict[str, Any]:
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError("expected configuration must be a JSON object")
+    return data
+
+
+def parse_findmnt(text: str) -> Dict[str, Any]:
+    if not text.strip():
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    filesystems = payload.get("filesystems") or []
+    if not filesystems:
+        return {}
+    entry = filesystems[0]
+    return {
+        "target": entry.get("target"),
+        "source": entry.get("source"),
+        "fstype": entry.get("fstype"),
+        "options": entry.get("options"),
+    }
+
+
+def filesystem_usage(path: str) -> Dict[str, Any]:
+    usage = shutil.disk_usage(path)
+    return {
+        "size_bytes": usage.total,
+        "used_bytes": usage.used,
+        "avail_bytes": usage.free,
+    }
+
+
+def service_is_active(name: str, runner: Optional[Runner] = None) -> bool:
+    proc = run_cmd(["systemctl", "is-active", name], runner=runner)
+    return proc.returncode == 0 and proc.stdout.strip() == "active"
+
+
+def tcp_open(host: str, port: int, timeout: float = 2.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def gather_observed(expected: Dict[str, Any], runner: Optional[Runner] = None) -> Dict[str, Any]:
+    mounts = []
+    for mount in expected.get("mounts", []):
+        path = mount["path"]
+        proc = run_cmd(
+            ["findmnt", "-J", "-T", path],
+            runner=runner,
+        )
+        found = parse_findmnt(proc.stdout)
+        exists = pathlib.Path(path).is_dir()
+        usage = filesystem_usage(path) if exists else None
+        mounts.append(
+            {
+                "mapping": mount.get("mapping"),
+                "share": mount.get("share"),
+                "path": path,
+                "read_only": bool(mount.get("read_only", False)),
+                "exists": exists,
+                "mount": found,
+                "usage": usage,
+            }
+        )
+    smb_conf = pathlib.Path(expected.get("smb_conf", "/etc/samba/smb.conf"))
+    smb_text = smb_conf.read_text(encoding="utf-8") if smb_conf.is_file() else ""
+    return {
+        "mounts": mounts,
+        "smbd_active": service_is_active("smbd", runner=runner),
+        "nmbd_active": service_is_active("nmbd", runner=runner),
+        "smb_port_open": tcp_open("127.0.0.1", 445),
+        "smb_conf_exists": smb_conf.is_file(),
+        "smb_conf": smb_text,
+        "node_exporter_active": service_is_active(
+            expected.get("node_exporter_service", "prometheus-node-exporter"),
+            runner=runner,
+        ),
+    }
+
+
+def option_has(options: str, token: str) -> bool:
+    return token in {item.strip() for item in options.split(",")}
+
+
+def evaluate(expected: Dict[str, Any], observed: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
+    now = now or utc_now()
+    alerts: List[Dict[str, str]] = []
+    overall = STATUS_OK
+    mount_reports = []
+    shares = expected.get("mounts", [])
+    share_names = [item.get("share") for item in shares]
+    paths = [item.get("path") for item in shares]
+    if len(share_names) != len(set(share_names)):
+        overall = worse(
+            overall,
+            add_alert(alerts, STATUS_CRITICAL, "share_name_collision", "SMB share names are not unique"),
+        )
+    if len(paths) != len(set(paths)):
+        overall = worse(
+            overall,
+            add_alert(alerts, STATUS_CRITICAL, "share_path_collision", "NAS guest mount paths are not unique"),
+        )
+
+    for mount in observed.get("mounts", []):
+        status = STATUS_OK
+        found = mount.get("mount") or {}
+        if not mount.get("exists"):
+            status = worse(
+                status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "mount_path_missing",
+                    f"NAS path {mount['path']} does not exist",
+                ),
+            )
+        if found.get("fstype") != "virtiofs":
+            status = worse(
+                status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "virtiofs_unmounted",
+                    f"Required VirtioFS mount {mount['path']} is absent",
+                ),
+            )
+        elif found.get("source") and found.get("source") != mount.get("mapping"):
+            status = worse(
+                status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "virtiofs_mapping_mismatch",
+                    f"{mount['path']} is mounted from {found.get('source')}, expected {mount.get('mapping')}",
+                ),
+            )
+        options = found.get("options") or ""
+        if mount.get("read_only") and options and not option_has(options, "ro"):
+            status = worse(
+                status,
+                add_alert(
+                    alerts,
+                    STATUS_WARNING,
+                    "mount_not_read_only",
+                    f"{mount['path']} should be mounted read-only",
+                ),
+            )
+        overall = worse(overall, status)
+        mount_reports.append(
+            {
+                "mapping": mount.get("mapping"),
+                "share": mount.get("share"),
+                "path": mount.get("path"),
+                "status": status,
+                "fstype": found.get("fstype"),
+                "source": found.get("source"),
+                "usage": mount.get("usage"),
+            }
+        )
+
+    samba_status = STATUS_OK
+    if not observed.get("smbd_active"):
+        samba_status = worse(
+            samba_status,
+            add_alert(alerts, STATUS_CRITICAL, "smbd_inactive", "smbd is not active"),
+        )
+    if observed.get("nmbd_active"):
+        samba_status = worse(
+            samba_status,
+            add_alert(alerts, STATUS_WARNING, "nmbd_active", "nmbd is active; SMB1/NetBIOS should stay disabled"),
+        )
+    if not observed.get("smb_port_open"):
+        samba_status = worse(
+            samba_status,
+            add_alert(alerts, STATUS_CRITICAL, "smb_port_closed", "TCP 445 is not reachable on localhost"),
+        )
+    smb_conf = observed.get("smb_conf") or ""
+    if "server min protocol = SMB3" not in smb_conf:
+        samba_status = worse(
+            samba_status,
+            add_alert(alerts, STATUS_CRITICAL, "smb3_required", "smb.conf does not require SMB3"),
+        )
+    if "map to guest = Never" not in smb_conf and "map to guest = never" not in smb_conf.lower():
+        samba_status = worse(
+            samba_status,
+            add_alert(alerts, STATUS_CRITICAL, "smb_guest_enabled", "smb.conf must disable guest access"),
+        )
+    volatile_exposed = any(
+        "volatile" in (mount.get("path") or "") or "volatile" in (mount.get("mapping") or "")
+        for mount in expected.get("mounts", [])
+    )
+    if volatile_exposed:
+        samba_status = worse(
+            samba_status,
+            add_alert(
+                alerts,
+                STATUS_CRITICAL,
+                "volatile_exposed",
+                "volatile datasets must not be exposed through the NAS",
+            ),
+        )
+    overall = worse(overall, samba_status)
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "timestamp": isoformat(now),
+        "status": overall,
+        "mounts": mount_reports,
+        "samba": {
+            "status": samba_status,
+            "smbd_active": observed.get("smbd_active"),
+            "nmbd_active": observed.get("nmbd_active"),
+            "smb_port_open": observed.get("smb_port_open"),
+        },
+        "node_exporter_active": observed.get("node_exporter_active"),
+        "alerts": alerts,
+    }
+
+
+def prom_escape(value: Any) -> str:
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def prometheus_text(report: Dict[str, Any]) -> str:
+    lines = [
+        "# HELP homelab_nas_healthy 1 if overall NAS status is ok, 0 otherwise",
+        "# TYPE homelab_nas_healthy gauge",
+        f"homelab_nas_healthy {1 if report['status'] == STATUS_OK else 0}",
+        "# HELP homelab_nas_status Status rank: 0=ok 1=warning 2=critical",
+        "# TYPE homelab_nas_status gauge",
+        f"homelab_nas_status {RANK[report['status']]}",
+        "# HELP homelab_nas_smbd_active 1 if smbd is active",
+        "# TYPE homelab_nas_smbd_active gauge",
+        f"homelab_nas_smbd_active {1 if report['samba'].get('smbd_active') else 0}",
+        "# HELP homelab_nas_smb_port_open 1 if TCP 445 is open on localhost",
+        "# TYPE homelab_nas_smb_port_open gauge",
+        f"homelab_nas_smb_port_open {1 if report['samba'].get('smb_port_open') else 0}",
+        "# HELP homelab_nas_mount_up 1 if the required VirtioFS mount is present",
+        "# TYPE homelab_nas_mount_up gauge",
+        "# HELP homelab_nas_share_path_ok 1 if the share path exists and is mounted",
+        "# TYPE homelab_nas_share_path_ok gauge",
+        "# HELP homelab_nas_filesystem_size_bytes Filesystem size of a NAS share path",
+        "# TYPE homelab_nas_filesystem_size_bytes gauge",
+        "# HELP homelab_nas_filesystem_avail_bytes Filesystem free space of a NAS share path",
+        "# TYPE homelab_nas_filesystem_avail_bytes gauge",
+    ]
+    for mount in report["mounts"]:
+        labels = (
+            f'share="{prom_escape(mount.get("share") or "")}",'
+            f'mapping="{prom_escape(mount.get("mapping") or "")}",'
+            f'path="{prom_escape(mount.get("path") or "")}"'
+        )
+        mounted = mount.get("fstype") == "virtiofs"
+        lines.append(f"homelab_nas_mount_up{{{labels}}} {1 if mounted else 0}")
+        lines.append(
+            f"homelab_nas_share_path_ok{{{labels}}} {1 if mount['status'] == STATUS_OK else 0}"
+        )
+        usage = mount.get("usage") or {}
+        if isinstance(usage.get("size_bytes"), int):
+            lines.append(f"homelab_nas_filesystem_size_bytes{{{labels}}} {usage['size_bytes']}")
+        if isinstance(usage.get("avail_bytes"), int):
+            lines.append(f"homelab_nas_filesystem_avail_bytes{{{labels}}} {usage['avail_bytes']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_atomic(path: str, body: str) -> None:
+    destination = pathlib.Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=destination.name, suffix=".tmp", dir=destination.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(body)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, destination)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def render_human(report: Dict[str, Any]) -> str:
+    lines = [
+        f"homelab-nas-health {report['status']} at {report['timestamp']}",
+        f"mounts={len(report['mounts'])} smbd={report['samba'].get('smbd_active')} port445={report['samba'].get('smb_port_open')}",
+    ]
+    for mount in report["mounts"]:
+        lines.append(
+            f"mount {mount.get('share')} {mount.get('path')}: {mount['status']} fstype={mount.get('fstype')}"
+        )
+    for alert in report["alerts"]:
+        lines.append(f"{alert['status']} {alert['code']}: {alert['message']}")
+    return "\n".join(lines) + "\n"
+
+
+def journal_line(report: Dict[str, Any]) -> str:
+    codes = ",".join(alert["code"] for alert in report["alerts"]) or "none"
+    return f"homelab-nas-health status={report['status']} alerts={len(report['alerts'])} codes={codes}"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--expected", default=DEFAULT_EXPECTED)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--prometheus", action="store_true")
+    parser.add_argument("--prometheus-path", default="")
+    parser.add_argument("--test-warning", action="store_true")
+    return parser
+
+
+def apply_test_warning(report: Dict[str, Any]) -> Dict[str, Any]:
+    report = dict(report)
+    report["alerts"] = list(report["alerts"])
+    report["status"] = worse(
+        report["status"],
+        add_alert(
+            report["alerts"],
+            STATUS_WARNING,
+            "test_warning",
+            "Operator-requested test warning; no NAS fault was injected",
+        ),
+    )
+    return report
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    expected = load_expected(args.expected)
+    observed = gather_observed(expected)
+    report = evaluate(expected, observed)
+    if args.test_warning:
+        report = apply_test_warning(report)
+    textfile = args.prometheus_path or expected.get("prometheus_textfile")
+    if args.prometheus or textfile:
+        if not textfile:
+            raise SystemExit("prometheus textfile path is not configured")
+        write_atomic(textfile, prometheus_text(report))
+    print(journal_line(report), file=sys.stderr)
+    if args.json:
+        json.dump(report, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write(render_human(report))
+    return EXIT_BY_STATUS[report["status"]]
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except FileNotFoundError as exc:
+        print(f"homelab-nas-health critical config_missing: {exc}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"homelab-nas-health critical internal_error: {exc}", file=sys.stderr)
+        sys.exit(2)

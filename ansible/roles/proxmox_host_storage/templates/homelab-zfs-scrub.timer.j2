@@ -1,0 +1,11 @@
+[Unit]
+Description=Homelab ZFS scrub timer for {{ item.pool }}
+
+[Timer]
+OnCalendar={{ item.calendar }}
+Persistent=true
+RandomizedDelaySec=30min
+Unit=homelab-zfs-scrub@{{ item.pool }}.service
+
+[Install]
+WantedBy=timers.target

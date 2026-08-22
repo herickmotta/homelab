@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+pool="${1:-}"
+if [[ -z "${pool}" ]]; then
+  echo "usage: homelab-zpool-scrub POOL" >&2
+  exit 2
+fi
+
+if ! zpool list -H -o name | grep -Fxq "${pool}"; then
+  echo "homelab-zpool-scrub: pool ${pool} is not imported" >&2
+  exit 2
+fi
+
+if zpool status "${pool}" | grep -Fq "scrub in progress"; then
+  echo "homelab-zpool-scrub: scrub already running on ${pool}"
+  exit 0
+fi
+
+exec zpool scrub "${pool}"

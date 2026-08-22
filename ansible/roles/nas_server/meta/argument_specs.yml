@@ -1,0 +1,27 @@
+---
+argument_specs:
+  main:
+    short_description: Mount host-owned VirtioFS datasets and serve them with SMB3
+    options:
+      nas_server_smb_username:
+        type: str
+        required: true
+      nas_server_smb_password:
+        type: str
+        required: true
+      nas_server_mounts:
+        type: list
+        elements: dict
+        required: true
+      nas_server_prometheus_textfile_dir:
+        type: str
+        default: /var/lib/prometheus/node-exporter
+      nas_server_packages:
+        type: list
+        elements: str
+      nas_server_smb_conf:
+        type: str
+        default: /etc/samba/smb.conf
+      nas_server_health_calendar:
+        type: str
+        default: hourly

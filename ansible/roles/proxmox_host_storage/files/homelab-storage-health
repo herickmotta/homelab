@@ -1,0 +1,847 @@
+#!/usr/bin/env python3
+"""Host ZFS and SMART health for CLI, JSON, Prometheus, and journald."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional
+
+SCHEMA_VERSION = 1
+DEFAULT_EXPECTED = "/etc/homelab/storage-expected.json"
+STATUS_OK = "ok"
+STATUS_WARNING = "warning"
+STATUS_CRITICAL = "critical"
+EXIT_BY_STATUS = {STATUS_OK: 0, STATUS_WARNING: 1, STATUS_CRITICAL: 2}
+RANK = {STATUS_OK: 0, STATUS_WARNING: 1, STATUS_CRITICAL: 2}
+STALE_SCRUB_SECONDS = 40 * 24 * 3600
+
+Runner = Callable[[List[str]], subprocess.CompletedProcess]
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def isoformat(ts: datetime) -> str:
+    return ts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def run_cmd(argv: List[str], runner: Optional[Runner] = None) -> subprocess.CompletedProcess:
+    if runner is not None:
+        return runner(argv)
+    return subprocess.run(argv, check=False, capture_output=True, text=True)
+
+
+def load_expected(path: str) -> Dict[str, Any]:
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError("expected configuration must be a JSON object")
+    return data
+
+
+def worse(left: str, right: str) -> str:
+    return left if RANK[left] >= RANK[right] else right
+
+
+def durable_pool(pool: Dict[str, Any]) -> bool:
+    return pool.get("data_class", "durable") != "disposable"
+
+
+def durable_dataset(dataset: Dict[str, Any]) -> bool:
+    return dataset.get("class", "important_unbacked") != "disposable"
+
+
+def severity_for(durable: bool) -> str:
+    return STATUS_CRITICAL if durable else STATUS_WARNING
+
+
+def add_alert(alerts: List[Dict[str, str]], status: str, code: str, message: str) -> str:
+    alerts.append({"status": status, "code": code, "message": message})
+    return status
+
+
+def disk_by_id_matches(serial: str) -> List[str]:
+    root = pathlib.Path("/dev/disk/by-id")
+    if not root.is_dir():
+        return []
+    matches = []
+    for entry in sorted(root.iterdir()):
+        name = entry.name
+        if "-part" in name:
+            continue
+        if name.endswith(f"_{serial}") or name.endswith(f"-{serial}"):
+            matches.append(str(entry))
+    return matches
+
+
+def parse_smart_json(payload: str) -> Dict[str, Any]:
+    data = json.loads(payload) if payload.strip() else {}
+    table = {
+        int(item.get("id", 0)): item
+        for item in data.get("ata_smart_attributes", {}).get("table", [])
+        if isinstance(item, dict)
+    }
+
+    def raw(attr_id: int) -> Optional[int]:
+        item = table.get(attr_id)
+        if not item:
+            return None
+        value = item.get("raw", {}).get("value")
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "serial": data.get("serial_number"),
+        "model": data.get("model_name"),
+        "passed": data.get("smart_status", {}).get("passed"),
+        "temperature": data.get("temperature", {}).get("current"),
+        "reallocated": raw(5),
+        "pending": raw(197),
+        "uncorrectable": raw(198),
+        "udma_crc": raw(199),
+        "power_on_hours": raw(9),
+    }
+
+
+def gather_smart(device: str, runner: Optional[Runner] = None) -> Dict[str, Any]:
+    proc = run_cmd(["smartctl", "-j", "-H", "-A", "-i", device], runner=runner)
+    parsed: Dict[str, Any] = {"device": device, "smartctl_exit": proc.returncode}
+    if proc.stdout.strip():
+        try:
+            parsed.update(parse_smart_json(proc.stdout))
+        except json.JSONDecodeError:
+            parsed["parse_error"] = "smartctl JSON was not parseable"
+    else:
+        parsed["parse_error"] = proc.stderr.strip() or "smartctl produced no output"
+    return parsed
+
+
+def parse_scan_line(line: str) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "raw": line,
+        "in_progress": "scrub in progress" in line.lower(),
+        "errors": None,
+        "repaired_bytes": None,
+        "finished_at": None,
+    }
+    errors = re.search(r"with\s+(\d+)\s+errors", line)
+    if errors:
+        result["errors"] = int(errors.group(1))
+    repaired = re.search(r"repaired\s+(\S+)", line)
+    if repaired:
+        result["repaired"] = repaired.group(1)
+    finished = re.search(r"on\s+(.+)$", line)
+    if finished and "in progress" not in line.lower():
+        result["finished_at"] = finished.group(1).strip()
+    return result
+
+
+def parse_zpool_status(text: str) -> Dict[str, Any]:
+    pools: Dict[str, Any] = {}
+    current: Optional[str] = None
+    current_vdev: Optional[str] = None
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        pool_match = re.match(r"^\s*pool:\s+(\S+)\s*$", line)
+        if pool_match:
+            current = pool_match.group(1)
+            pools[current] = {
+                "name": current,
+                "state": None,
+                "scan": None,
+                "topology": None,
+                "devices": [],
+            }
+            current_vdev = None
+            continue
+        if current is None:
+            continue
+        state_match = re.match(r"^\s*state:\s+(\S+)\s*$", line)
+        if state_match:
+            pools[current]["state"] = state_match.group(1)
+            continue
+        scan_match = re.match(r"^\s*scan:\s+(.+)$", line)
+        if scan_match:
+            pools[current]["scan"] = parse_scan_line(scan_match.group(1))
+            continue
+        if re.match(r"^\s+NAME\s+STATE", line) or line.strip() in {"config:", "errors: No known data errors"}:
+            continue
+        if re.match(r"^\s+" + re.escape(current) + r"\s+\S+", line):
+            continue
+        vdev_match = re.match(r"^\s+(raidz1-\d+|mirror-\d+)\s+\S+", line)
+        if vdev_match:
+            current_vdev = vdev_match.group(1)
+            if current_vdev.startswith("raidz1"):
+                pools[current]["topology"] = "raidz1"
+            elif current_vdev.startswith("mirror"):
+                pools[current]["topology"] = "mirror"
+            continue
+        device_match = re.match(r"^\s+(/\S+)\s+(\S+)", line)
+        if device_match:
+            path, state = device_match.groups()
+            pools[current]["devices"].append({"path": path, "state": state})
+            if pools[current]["topology"] is None:
+                pools[current]["topology"] = "stripe"
+            continue
+    return pools
+
+
+def parse_zpool_list(text: str) -> Dict[str, Any]:
+    pools: Dict[str, Any] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 5:
+            parts = line.split()
+        if len(parts) < 5:
+            continue
+        name, health, size, alloc, free = parts[:5]
+        pools[name] = {
+            "name": name,
+            "health": health,
+            "size_bytes": int(size),
+            "alloc_bytes": int(alloc),
+            "free_bytes": int(free),
+        }
+    return pools
+
+
+def parse_zfs_list(text: str) -> Dict[str, Any]:
+    datasets: Dict[str, Any] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 6:
+            parts = line.split()
+        if len(parts) < 6:
+            continue
+        name, used, avail, refer, mountpoint, mounted = parts[:6]
+        datasets[name] = {
+            "name": name,
+            "used_bytes": int(used),
+            "avail_bytes": int(avail),
+            "refer_bytes": int(refer),
+            "mountpoint": mountpoint,
+            "mounted": mounted == "yes",
+        }
+    return datasets
+
+
+def gather_observed(expected: Dict[str, Any], runner: Optional[Runner] = None) -> Dict[str, Any]:
+    disks = []
+    seen_serials = []
+    for pool in expected.get("pools", {}).values():
+        for disk in pool.get("disks", []):
+            serial = disk["serial"]
+            seen_serials.append(serial)
+            matches = disk_by_id_matches(serial)
+            declared = disk.get("by_id")
+            chosen = declared if declared in matches else (matches[0] if matches else None)
+            smart = gather_smart(chosen, runner=runner) if chosen else {}
+            disks.append(
+                {
+                    "serial": serial,
+                    "pool": pool.get("name"),
+                    "declared_by_id": declared,
+                    "observed_by_id": matches,
+                    "accepted_degraded": bool(disk.get("accepted_degraded", False)),
+                    "data_class": pool.get("data_class", "durable"),
+                    "smart": smart,
+                }
+            )
+    status_proc = run_cmd(["zpool", "status", "-P"], runner=runner)
+    list_proc = run_cmd(
+        ["zpool", "list", "-Hp", "-o", "name,health,size,alloc,free"],
+        runner=runner,
+    )
+    zfs_proc = run_cmd(
+        ["zfs", "list", "-Hp", "-o", "name,used,avail,refer,mountpoint,mounted"],
+        runner=runner,
+    )
+    return {
+        "disks": disks,
+        "pools_status": parse_zpool_status(status_proc.stdout),
+        "pools_list": parse_zpool_list(list_proc.stdout),
+        "datasets": parse_zfs_list(zfs_proc.stdout),
+        "commands": {
+            "zpool_status_exit": status_proc.returncode,
+            "zpool_list_exit": list_proc.returncode,
+            "zfs_list_exit": zfs_proc.returncode,
+        },
+    }
+
+
+def device_serial_from_path(path: str) -> Optional[str]:
+    name = pathlib.Path(path).name
+    if "_" in name:
+        return name.rsplit("_", 1)[-1]
+    if "-" in name:
+        return name.rsplit("-", 1)[-1]
+    return None
+
+
+def parse_scrub_age(scan: Optional[Dict[str, Any]], now: datetime) -> Optional[int]:
+    if not scan or not scan.get("finished_at"):
+        return None
+    for fmt in ("%a %b %d %H:%M:%S %Y", "%a %b %d %H:%M:%S %Z %Y"):
+        try:
+            parsed = datetime.strptime(scan["finished_at"], fmt)
+            parsed = parsed.replace(tzinfo=timezone.utc)
+            return int((now - parsed).total_seconds())
+        except ValueError:
+            continue
+    return None
+
+
+def evaluate(expected: Dict[str, Any], observed: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
+    now = now or utc_now()
+    alerts: List[Dict[str, str]] = []
+    overall = STATUS_OK
+    disk_reports = []
+    pool_reports = []
+    dataset_reports = []
+
+    declared_serials = []
+    for pool_name, pool in expected.get("pools", {}).items():
+        disks = pool.get("disks", [])
+        serials = [disk["serial"] for disk in disks]
+        declared_serials.extend(serials)
+        if pool.get("topology") == "raidz1" and len(disks) < 3:
+            overall = worse(
+                overall,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "pool_topology_invalid",
+                    f"Pool {pool_name} declares raidz1 with fewer than three disks",
+                ),
+            )
+        if pool.get("topology") == "stripe" and len(disks) != 1:
+            overall = worse(
+                overall,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "pool_topology_invalid",
+                    f"Pool {pool_name} declares stripe and must have exactly one disk",
+                ),
+            )
+        if len(serials) != len(set(serials)):
+            overall = worse(
+                overall,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "serial_duplicated",
+                    f"Pool {pool_name} declares duplicate disk serials",
+                ),
+            )
+
+    if len(declared_serials) != len(set(declared_serials)):
+        overall = worse(
+            overall,
+            add_alert(
+                alerts,
+                STATUS_CRITICAL,
+                "serial_duplicated",
+                "Declared disk serials are not unique across pools",
+            ),
+        )
+
+    for disk in observed.get("disks", []):
+        serial = disk["serial"]
+        durable = disk.get("data_class", "durable") != "disposable"
+        matches = disk.get("observed_by_id") or []
+        smart = disk.get("smart") or {}
+        disk_status = STATUS_OK
+        if not matches:
+            disk_status = worse(
+                disk_status,
+                add_alert(
+                    alerts,
+                    severity_for(durable),
+                    "serial_missing",
+                    f"Disk serial {serial} was not found under /dev/disk/by-id",
+                ),
+            )
+        elif len(matches) > 1:
+            disk_status = worse(
+                disk_status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "serial_duplicated",
+                    f"Disk serial {serial} maps to multiple by-id paths",
+                ),
+            )
+        declared = disk.get("declared_by_id")
+        if declared and matches and declared not in matches:
+            disk_status = worse(
+                disk_status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "by_id_mismatch",
+                    f"Disk serial {serial} does not match declared by-id path",
+                ),
+            )
+        if smart.get("serial") and smart["serial"] != serial:
+            disk_status = worse(
+                disk_status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "smart_serial_mismatch",
+                    f"SMART serial for {serial} observed as {smart['serial']}",
+                ),
+            )
+        accepted = disk.get("accepted_degraded", False)
+        if smart.get("passed") is False:
+            disk_status = worse(
+                disk_status,
+                add_alert(
+                    alerts,
+                    STATUS_WARNING if accepted or not durable else STATUS_CRITICAL,
+                    "smart_failing",
+                    f"SMART overall-health failed for {serial}",
+                ),
+            )
+        for key, label in (
+            ("reallocated", "reallocated sectors"),
+            ("pending", "pending sectors"),
+            ("uncorrectable", "uncorrectable sectors"),
+        ):
+            value = smart.get(key)
+            if isinstance(value, int) and value > 0:
+                status = STATUS_WARNING if accepted or not durable else STATUS_WARNING
+                disk_status = worse(
+                    disk_status,
+                    add_alert(
+                        alerts,
+                        status,
+                        f"smart_{key}",
+                        f"{serial} reports {value} {label}",
+                    ),
+                )
+        overall = worse(overall, disk_status)
+        disk_reports.append(
+            {
+                "serial": serial,
+                "pool": disk.get("pool"),
+                "status": disk_status,
+                "declared_by_id": declared,
+                "observed_by_id": matches,
+                "smart": {
+                    "passed": smart.get("passed"),
+                    "temperature": smart.get("temperature"),
+                    "reallocated": smart.get("reallocated"),
+                    "pending": smart.get("pending"),
+                    "uncorrectable": smart.get("uncorrectable"),
+                    "udma_crc": smart.get("udma_crc"),
+                    "power_on_hours": smart.get("power_on_hours"),
+                },
+            }
+        )
+
+    for pool_name, pool in expected.get("pools", {}).items():
+        durable = durable_pool(pool)
+        listed = observed.get("pools_list", {}).get(pool_name)
+        status_info = observed.get("pools_status", {}).get(pool_name, {})
+        pool_status = STATUS_OK
+        if listed is None:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    severity_for(durable),
+                    "pool_missing",
+                    f"Expected pool {pool_name} is not imported",
+                ),
+            )
+            overall = worse(overall, pool_status)
+            pool_reports.append(
+                {
+                    "name": pool_name,
+                    "status": pool_status,
+                    "expected_topology": pool.get("topology"),
+                    "observed_topology": None,
+                    "health": None,
+                }
+            )
+            continue
+        health = listed.get("health") or status_info.get("state")
+        if health in {"DEGRADED", "DEGRADED-ERR"}:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    STATUS_WARNING,
+                    "pool_degraded",
+                    f"Pool {pool_name} is degraded",
+                ),
+            )
+        elif health not in {"ONLINE", "ONLINE-SCAN"}:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    severity_for(durable),
+                    "pool_unavailable",
+                    f"Pool {pool_name} health is {health}",
+                ),
+            )
+        observed_topology = status_info.get("topology")
+        if pool.get("topology") and observed_topology and observed_topology != pool["topology"]:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL,
+                    "pool_topology_mismatch",
+                    f"Pool {pool_name} topology is {observed_topology}, expected {pool['topology']}",
+                ),
+            )
+        expected_serials = {disk["serial"] for disk in pool.get("disks", [])}
+        observed_serials = {
+            device_serial_from_path(device["path"])
+            for device in status_info.get("devices", [])
+            if device_serial_from_path(device["path"])
+        }
+        missing = expected_serials - observed_serials
+        extra = observed_serials - expected_serials
+        if missing or extra:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    STATUS_CRITICAL if durable else STATUS_WARNING,
+                    "pool_membership_mismatch",
+                    f"Pool {pool_name} membership mismatch missing={sorted(missing)} extra={sorted(extra)}",
+                ),
+            )
+        scan = status_info.get("scan") or {}
+        scrub_errors = scan.get("errors")
+        if isinstance(scrub_errors, int) and scrub_errors > 0:
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    STATUS_WARNING,
+                    "scrub_errors",
+                    f"Pool {pool_name} last scrub reported {scrub_errors} errors",
+                ),
+            )
+        scrub_age = parse_scrub_age(scan, now)
+        if (
+            durable
+            and not scan.get("in_progress")
+            and (scrub_age is None or scrub_age > STALE_SCRUB_SECONDS)
+            and listed.get("alloc_bytes", 0) > 0
+        ):
+            pool_status = worse(
+                pool_status,
+                add_alert(
+                    alerts,
+                    STATUS_WARNING,
+                    "scrub_stale",
+                    f"Pool {pool_name} has no successful scrub within 40 days",
+                ),
+            )
+        overall = worse(overall, pool_status)
+        pool_reports.append(
+            {
+                "name": pool_name,
+                "status": pool_status,
+                "expected_topology": pool.get("topology"),
+                "observed_topology": observed_topology,
+                "health": health,
+                "size_bytes": listed.get("size_bytes"),
+                "alloc_bytes": listed.get("alloc_bytes"),
+                "free_bytes": listed.get("free_bytes"),
+                "devices": status_info.get("devices", []),
+                "scrub": {
+                    "in_progress": bool(scan.get("in_progress")),
+                    "errors": scrub_errors,
+                    "finished_at": scan.get("finished_at"),
+                    "age_seconds": scrub_age,
+                    "raw": scan.get("raw"),
+                },
+            }
+        )
+
+    for key, dataset in expected.get("datasets", {}).items():
+        name = dataset["dataset"]
+        observed_ds = observed.get("datasets", {}).get(name)
+        ds_status = STATUS_OK
+        durable = durable_dataset(dataset)
+        if observed_ds is None:
+            ds_status = worse(
+                ds_status,
+                add_alert(
+                    alerts,
+                    severity_for(durable),
+                    "dataset_missing",
+                    f"Expected dataset {name} is absent",
+                ),
+            )
+        else:
+            if dataset.get("mountpoint") and observed_ds.get("mountpoint") != dataset["mountpoint"]:
+                ds_status = worse(
+                    ds_status,
+                    add_alert(
+                        alerts,
+                        severity_for(durable),
+                        "mountpoint_mismatch",
+                        f"Dataset {name} mountpoint is {observed_ds.get('mountpoint')}",
+                    ),
+                )
+            if not observed_ds.get("mounted"):
+                ds_status = worse(
+                    ds_status,
+                    add_alert(
+                        alerts,
+                        severity_for(durable),
+                        "dataset_unmounted",
+                        f"Dataset {name} is not mounted",
+                    ),
+                )
+        overall = worse(overall, ds_status)
+        dataset_reports.append(
+            {
+                "id": key,
+                "dataset": name,
+                "status": ds_status,
+                "expected_mountpoint": dataset.get("mountpoint"),
+                "observed": observed_ds,
+            }
+        )
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "timestamp": isoformat(now),
+        "status": overall,
+        "disks": disk_reports,
+        "pools": pool_reports,
+        "datasets": dataset_reports,
+        "alerts": alerts,
+    }
+
+
+def prom_escape(value: Any) -> str:
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def prometheus_text(report: Dict[str, Any]) -> str:
+    lines = [
+        "# HELP homelab_storage_healthy 1 if overall storage status is ok, 0 otherwise",
+        "# TYPE homelab_storage_healthy gauge",
+        f"homelab_storage_healthy {1 if report['status'] == STATUS_OK else 0}",
+        "# HELP homelab_storage_status Status rank: 0=ok 1=warning 2=critical",
+        "# TYPE homelab_storage_status gauge",
+        f"homelab_storage_status {RANK[report['status']]}",
+        "# HELP homelab_storage_alert_count Active storage alerts",
+        "# TYPE homelab_storage_alert_count gauge",
+        f"homelab_storage_alert_count {len(report['alerts'])}",
+    ]
+    lines.extend(
+        [
+            "# HELP homelab_storage_disk_smart_passed 1 if SMART overall-health passed",
+            "# TYPE homelab_storage_disk_smart_passed gauge",
+            "# HELP homelab_storage_disk_reallocated_sectors SMART reallocated sector count",
+            "# TYPE homelab_storage_disk_reallocated_sectors gauge",
+            "# HELP homelab_storage_disk_pending_sectors SMART pending sector count",
+            "# TYPE homelab_storage_disk_pending_sectors gauge",
+            "# HELP homelab_storage_disk_uncorrectable_sectors SMART uncorrectable sector count",
+            "# TYPE homelab_storage_disk_uncorrectable_sectors gauge",
+        ]
+    )
+    for disk in report["disks"]:
+        labels = f'serial="{prom_escape(disk["serial"])}",pool="{prom_escape(disk.get("pool") or "")}"'
+        passed = disk.get("smart", {}).get("passed")
+        lines.append(
+            f'homelab_storage_disk_smart_passed{{{labels}}} {1 if passed else 0}'
+        )
+        for metric, key in (
+            ("homelab_storage_disk_reallocated_sectors", "reallocated"),
+            ("homelab_storage_disk_pending_sectors", "pending"),
+            ("homelab_storage_disk_uncorrectable_sectors", "uncorrectable"),
+        ):
+            value = disk.get("smart", {}).get(key)
+            if isinstance(value, int):
+                lines.append(f"{metric}{{{labels}}} {value}")
+    lines.extend(
+        [
+            "# HELP homelab_storage_pool_status Pool status rank: 0=ok 1=warning 2=critical",
+            "# TYPE homelab_storage_pool_status gauge",
+            "# HELP homelab_storage_pool_alloc_bytes Allocated pool bytes",
+            "# TYPE homelab_storage_pool_alloc_bytes gauge",
+            "# HELP homelab_storage_pool_free_bytes Free pool bytes",
+            "# TYPE homelab_storage_pool_free_bytes gauge",
+            "# HELP homelab_storage_pool_size_bytes Total pool bytes",
+            "# TYPE homelab_storage_pool_size_bytes gauge",
+            "# HELP homelab_storage_scrub_errors Errors from the last completed scrub",
+            "# TYPE homelab_storage_scrub_errors gauge",
+            "# HELP homelab_storage_scrub_age_seconds Age of the last completed scrub",
+            "# TYPE homelab_storage_scrub_age_seconds gauge",
+        ]
+    )
+    for pool in report["pools"]:
+        labels = f'pool="{prom_escape(pool["name"])}"'
+        lines.append(f'homelab_storage_pool_status{{{labels}}} {RANK[pool["status"]]}')
+        for metric, key in (
+            ("homelab_storage_pool_alloc_bytes", "alloc_bytes"),
+            ("homelab_storage_pool_free_bytes", "free_bytes"),
+            ("homelab_storage_pool_size_bytes", "size_bytes"),
+        ):
+            value = pool.get(key)
+            if isinstance(value, int):
+                lines.append(f"{metric}{{{labels}}} {value}")
+        scrub = pool.get("scrub") or {}
+        if isinstance(scrub.get("errors"), int):
+            lines.append(f'homelab_storage_scrub_errors{{{labels}}} {scrub["errors"]}')
+        if isinstance(scrub.get("age_seconds"), int):
+            lines.append(
+                f'homelab_storage_scrub_age_seconds{{{labels}}} {scrub["age_seconds"]}'
+            )
+    lines.extend(
+        [
+            "# HELP homelab_storage_dataset_mounted 1 if the expected dataset is mounted",
+            "# TYPE homelab_storage_dataset_mounted gauge",
+            "# HELP homelab_storage_dataset_used_bytes Dataset used bytes",
+            "# TYPE homelab_storage_dataset_used_bytes gauge",
+            "# HELP homelab_storage_dataset_avail_bytes Dataset available bytes",
+            "# TYPE homelab_storage_dataset_avail_bytes gauge",
+        ]
+    )
+    for dataset in report["datasets"]:
+        labels = f'dataset="{prom_escape(dataset["dataset"])}",id="{prom_escape(dataset["id"])}"'
+        observed = dataset.get("observed") or {}
+        lines.append(
+            f'homelab_storage_dataset_mounted{{{labels}}} {1 if observed.get("mounted") else 0}'
+        )
+        for metric, key in (
+            ("homelab_storage_dataset_used_bytes", "used_bytes"),
+            ("homelab_storage_dataset_avail_bytes", "avail_bytes"),
+        ):
+            value = observed.get(key)
+            if isinstance(value, int):
+                lines.append(f"{metric}{{{labels}}} {value}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_atomic(path: str, body: str) -> None:
+    destination = pathlib.Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=destination.name, suffix=".tmp", dir=destination.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(body)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, destination)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def render_human(report: Dict[str, Any]) -> str:
+    lines = [
+        f"homelab-storage-health {report['status']} at {report['timestamp']}",
+        f"disks={len(report['disks'])} pools={len(report['pools'])} datasets={len(report['datasets'])} alerts={len(report['alerts'])}",
+    ]
+    for pool in report["pools"]:
+        lines.append(
+            f"pool {pool['name']}: {pool['status']} health={pool.get('health')} topology={pool.get('observed_topology')}"
+        )
+    for disk in report["disks"]:
+        smart = disk.get("smart") or {}
+        lines.append(
+            f"disk {disk['serial']}: {disk['status']} smart_passed={smart.get('passed')} reallocated={smart.get('reallocated')}"
+        )
+    for dataset in report["datasets"]:
+        mounted = (dataset.get("observed") or {}).get("mounted")
+        lines.append(f"dataset {dataset['dataset']}: {dataset['status']} mounted={mounted}")
+    for alert in report["alerts"]:
+        lines.append(f"{alert['status']} {alert['code']}: {alert['message']}")
+    return "\n".join(lines) + "\n"
+
+
+def journal_line(report: Dict[str, Any]) -> str:
+    codes = ",".join(alert["code"] for alert in report["alerts"]) or "none"
+    return (
+        f"homelab-storage-health status={report['status']} "
+        f"alerts={len(report['alerts'])} codes={codes}"
+    )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--expected", default=DEFAULT_EXPECTED)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--prometheus", action="store_true")
+    parser.add_argument("--prometheus-path", default="")
+    parser.add_argument("--test-warning", action="store_true")
+    return parser
+
+
+def apply_test_warning(report: Dict[str, Any]) -> Dict[str, Any]:
+    report = dict(report)
+    report["alerts"] = list(report["alerts"])
+    report["status"] = worse(
+        report["status"],
+        add_alert(
+            report["alerts"],
+            STATUS_WARNING,
+            "test_warning",
+            "Operator-requested test warning; no storage fault was injected",
+        ),
+    )
+    return report
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    expected = load_expected(args.expected)
+    observed = gather_observed(expected)
+    report = evaluate(expected, observed)
+    if args.test_warning:
+        report = apply_test_warning(report)
+    textfile = args.prometheus_path or expected.get("prometheus_textfile")
+    if args.prometheus or textfile:
+        if not textfile:
+            raise SystemExit("prometheus textfile path is not configured")
+        write_atomic(textfile, prometheus_text(report))
+    print(journal_line(report), file=sys.stderr)
+    if args.json:
+        json.dump(report, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write(render_human(report))
+    return EXIT_BY_STATUS[report["status"]]
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except FileNotFoundError as exc:
+        print(f"homelab-storage-health critical config_missing: {exc}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"homelab-storage-health critical internal_error: {exc}", file=sys.stderr)
+        sys.exit(2)

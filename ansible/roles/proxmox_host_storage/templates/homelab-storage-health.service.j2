@@ -1,0 +1,10 @@
+[Unit]
+Description=Homelab storage health snapshot
+Documentation=https://github.com/herickmotta/homelab
+After=zfs-zed.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-storage-health --prometheus
+Nice=10
+SyslogIdentifier=homelab-storage-health

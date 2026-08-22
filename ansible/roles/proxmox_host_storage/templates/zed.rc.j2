@@ -1,0 +1,16 @@
+# Managed by herickmotta.homelab.proxmox_host_storage.
+ZED_DEBUG_LOG="/tmp/zed.debug.log"
+{% if proxmox_host_storage_mail_enabled %}
+ZED_EMAIL_ADDR="{{ proxmox_host_storage_email_destination }}"
+ZED_EMAIL_PROG="mail"
+ZED_EMAIL_OPTS="-s '@EVENT@ - @POOL@'"
+ZED_NOTIFY_VERBOSE=1
+{% else %}
+ZED_EMAIL_ADDR=""
+ZED_NOTIFY_VERBOSE=0
+{% endif %}
+ZED_NOTIFY_INTERVAL_SEC=3600
+ZED_NOTIFY_DATA=0
+ZED_USE_ENCLOSURE_LEDS=1
+ZED_SYSLOG_PRIORITY=daemon.notice
+ZED_SYSLOG_TAG="zed"

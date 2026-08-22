@@ -1,0 +1,39 @@
+# Managed by herickmotta.homelab.nas_server.
+[global]
+   workgroup = HOMELAB
+   server string = Homelab NAS
+   security = user
+   map to guest = Never
+   usershare allow guests = no
+   restrict anonymous = 2
+   guest account = nobody
+   disable netbios = yes
+   smb ports = 445
+   server min protocol = SMB3
+   client min protocol = SMB3
+   server max protocol = SMB3
+   logging = systemd
+   log level = 1
+   load printers = no
+   printing = bsd
+   printcap name = /dev/null
+   disable spoolss = yes
+   unix extensions = yes
+   vfs objects = acl_xattr
+   map acl inherit = yes
+   store dos attributes = yes
+   inherit acls = yes
+   ea support = yes
+
+{% for mount in nas_server_mounts %}
+[{{ mount.share }}]
+   path = {{ mount.path }}
+   browseable = yes
+   read only = {{ 'yes' if mount.read_only | default(false) else 'no' }}
+   writable = {{ 'no' if mount.read_only | default(false) else 'yes' }}
+   valid users = {{ nas_server_smb_username }}
+   force user = {{ nas_server_smb_username }}
+   create mask = 0664
+   directory mask = 0775
+
+{% endfor %}

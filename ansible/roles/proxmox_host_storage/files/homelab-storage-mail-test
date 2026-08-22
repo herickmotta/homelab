@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+
+dest="${1:-}"
+if [[ -z "${dest}" ]]; then
+  echo "usage: homelab-storage-mail-test ADDRESS" >&2
+  exit 2
+fi
+
+if ! command -v sendmail >/dev/null 2>&1; then
+  echo "homelab-storage-mail-test: sendmail is not installed; SMTP is not configured" >&2
+  exit 2
+fi
+
+sendmail -t <<EOF
+To: ${dest}
+Subject: homelab storage mail test
+Content-Type: text/plain; charset=UTF-8
+
+This is an operator-requested test from homelab-storage-mail-test.
+No storage fault was injected.
+EOF

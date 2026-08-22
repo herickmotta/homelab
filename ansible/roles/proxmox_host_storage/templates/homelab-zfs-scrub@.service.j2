@@ -1,0 +1,9 @@
+[Unit]
+Description=Homelab ZFS scrub for pool %i
+Documentation=https://github.com/herickmotta/homelab
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-zpool-scrub %i
+Nice=10
+SyslogIdentifier=homelab-zfs-scrub

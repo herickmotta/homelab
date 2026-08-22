@@ -1,0 +1,11 @@
+[Unit]
+Description=Homelab NAS health timer
+
+[Timer]
+OnCalendar={{ nas_server_health_calendar }}
+Persistent=true
+RandomizedDelaySec=5min
+Unit=homelab-nas-health.service
+
+[Install]
+WantedBy=timers.target

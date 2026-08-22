@@ -1,0 +1,11 @@
+---
+nas_server_smb_username: household
+nas_server_smb_password: ""
+nas_server_mounts: []
+nas_server_prometheus_textfile_dir: /var/lib/prometheus/node-exporter
+nas_server_packages:
+  - samba
+  - prometheus-node-exporter
+  - python3
+nas_server_smb_conf: /etc/samba/smb.conf
+nas_server_health_calendar: hourly

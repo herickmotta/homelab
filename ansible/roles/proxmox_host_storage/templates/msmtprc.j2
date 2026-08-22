@@ -1,0 +1,11 @@
+# Managed by herickmotta.homelab.proxmox_host_storage. Mode 0600.
+account default
+auth           on
+tls            {{ "on" if proxmox_host_storage_smtp_starttls else "off" }}
+tls_starttls   {{ "on" if proxmox_host_storage_smtp_starttls else "off" }}
+logfile        /var/log/msmtp.log
+host           {{ proxmox_host_storage_smtp_host }}
+port           {{ proxmox_host_storage_smtp_port }}
+user           {{ proxmox_host_storage_smtp_username }}
+from           {{ proxmox_host_storage_smtp_from if proxmox_host_storage_smtp_from | length > 0 else proxmox_host_storage_smtp_username }}
+password       {{ proxmox_host_storage_smtp_password }}

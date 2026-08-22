@@ -1,0 +1,11 @@
+[Unit]
+Description=Homelab storage health timer
+
+[Timer]
+OnCalendar={{ proxmox_host_storage_health_calendar }}
+Persistent=true
+RandomizedDelaySec=5min
+Unit=homelab-storage-health.service
+
+[Install]
+WantedBy=timers.target

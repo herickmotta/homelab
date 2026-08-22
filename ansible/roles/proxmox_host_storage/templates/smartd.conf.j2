@@ -1,0 +1,12 @@
+# Managed by herickmotta.homelab.proxmox_host_storage.
+# Weekly SMART short tests and monthly long tests. This file never creates
+# or repairs ZFS topology.
+{% set schedule = "(" ~ proxmox_host_storage_smartd_short_test ~ "|" ~ proxmox_host_storage_smartd_long_test ~ ")" %}
+{% if proxmox_host_storage_mail_enabled %}
+DEFAULT -a -o on -S on -n standby,q -s {{ schedule }} -m {{ proxmox_host_storage_email_destination }}
+{% else %}
+DEFAULT -a -o on -S on -n standby,q -s {{ schedule }}
+{% endif %}
+{% for disk in proxmox_host_storage_disks %}
+{{ disk.by_id }}
+{% endfor %}

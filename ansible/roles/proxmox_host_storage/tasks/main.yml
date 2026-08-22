@@ -1,0 +1,303 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require declared pools and datasets
+  ansible.builtin.assert:
+    that:
+      - proxmox_host_storage_pools | length > 0
+      - proxmox_host_storage_datasets | length > 0
+    fail_msg: Declare at least one pool and one dataset; this role does not create them.
+
+- name: Build the declared disk list
+  ansible.builtin.set_fact:
+    proxmox_host_storage_disks: >-
+      {{
+        proxmox_host_storage_pools
+        | dict2items
+        | map(attribute='value.disks')
+        | select('defined')
+        | list
+        | flatten
+      }}
+
+- name: Validate pool topology and disk identity
+  ansible.builtin.assert:
+    that:
+      - item.value.name | default(item.key) | length > 0
+      - item.value.topology in ["raidz1", "stripe"]
+      - item.value.disks | default([]) | length > 0
+      - >-
+        item.value.topology != "raidz1"
+        or item.value.disks | length >= 3
+      - >-
+        item.value.topology != "stripe"
+        or item.value.disks | length == 1
+    fail_msg: >-
+      Pool {{ item.key }} must declare a supported topology. raidz1 requires
+      at least three disks; stripe requires exactly one.
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Require unique disk serials
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          proxmox_host_storage_disks
+          | map(attribute='serial')
+          | list
+          | unique
+          | length
+        )
+        == (proxmox_host_storage_disks | length)
+      - >-
+        (
+          proxmox_host_storage_disks
+          | map(attribute='by_id')
+          | list
+          | unique
+          | length
+        )
+        == (proxmox_host_storage_disks | length)
+    fail_msg: Each declared disk serial and by-id path must be unique.
+
+- name: Require each by-id path to contain its serial
+  ansible.builtin.assert:
+    that:
+      - item.serial in item.by_id
+      - "'/dev/sd' not in item.by_id"
+    fail_msg: >-
+      Disk {{ item.serial }} must be identified by a by-id path containing that
+      serial, not a volatile /dev/sdX name.
+  loop: "{{ proxmox_host_storage_disks }}"
+  loop_control:
+    label: "{{ item.serial }}"
+
+- name: Validate datasets
+  ansible.builtin.assert:
+    that:
+      - item.value.dataset | length > 0
+      - item.value.pool in proxmox_host_storage_pools
+      - item.value.mountpoint is match('^/')
+      - item.value.dataset is match('^' + item.value.pool + '/')
+    fail_msg: Dataset {{ item.key }} must belong to a declared pool and use an absolute mountpoint.
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Validate scrub timers
+  ansible.builtin.assert:
+    that:
+      - item.pool in proxmox_host_storage_pools
+      - item.calendar | length > 0
+    fail_msg: Each scrub timer must name a declared pool and a systemd calendar.
+  loop: "{{ proxmox_host_storage_scrubs }}"
+  loop_control:
+    label: "{{ item.pool }}"
+
+- name: Decide whether SMTP mail is configured
+  ansible.builtin.set_fact:
+    proxmox_host_storage_mail_enabled: >-
+      {{
+        proxmox_host_storage_email_destination | length > 0
+        and proxmox_host_storage_smtp_host | length > 0
+        and proxmox_host_storage_smtp_password | length > 0
+      }}
+
+- name: Reject partial SMTP configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (
+          proxmox_host_storage_email_destination | length > 0
+          or proxmox_host_storage_smtp_host | length > 0
+          or proxmox_host_storage_smtp_password | length > 0
+        )
+        or proxmox_host_storage_mail_enabled
+    fail_msg: >-
+      SMTP alerting needs destination, host, and password together. Leave all
+      empty to keep metrics and journald without mail.
+
+- name: Install storage monitoring packages
+  ansible.builtin.apt:
+    name: "{{ proxmox_host_storage_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install SMTP packages
+  when: proxmox_host_storage_mail_enabled
+  ansible.builtin.apt:
+    name: "{{ proxmox_host_storage_mail_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create homelab and Prometheus textfile directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/homelab
+    - "{{ proxmox_host_storage_prometheus_textfile_dir }}"
+
+- name: Install expected storage configuration
+  ansible.builtin.copy:
+    dest: /etc/homelab/storage-expected.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ proxmox_host_storage_expected | to_nice_json }}"
+  vars:
+    proxmox_host_storage_expected:
+      schema_version: 1
+      pools: "{{ proxmox_host_storage_pools }}"
+      datasets: "{{ proxmox_host_storage_datasets }}"
+      prometheus_textfile: >-
+        {{ proxmox_host_storage_prometheus_textfile_dir }}/homelab-storage.prom
+
+- name: Install storage health command
+  ansible.builtin.copy:
+    src: homelab-storage-health
+    dest: /usr/local/sbin/homelab-storage-health
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install ZFS scrub helper
+  ansible.builtin.copy:
+    src: homelab-zpool-scrub
+    dest: /usr/local/sbin/homelab-zpool-scrub
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install storage mail test command
+  ansible.builtin.copy:
+    src: homelab-storage-mail-test
+    dest: /usr/local/sbin/homelab-storage-mail-test
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install smartd configuration
+  ansible.builtin.template:
+    src: smartd.conf.j2
+    dest: /etc/smartd.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart smartd
+
+- name: Enable smartd
+  ansible.builtin.systemd_service:
+    name: smartd.service
+    enabled: true
+    state: started
+
+- name: Enable ZED
+  ansible.builtin.systemd_service:
+    name: zfs-zed.service
+    enabled: true
+    state: started
+
+- name: Install ZED configuration
+  ansible.builtin.template:
+    src: zed.rc.j2
+    dest: /etc/zfs/zed.d/zed.rc
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ZED
+
+- name: Install msmtp configuration
+  when: proxmox_host_storage_mail_enabled
+  ansible.builtin.template:
+    src: msmtprc.j2
+    dest: /etc/msmtprc
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install node exporter defaults
+  ansible.builtin.template:
+    src: node-exporter-default.j2
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart node exporter
+
+- name: Enable node exporter
+  ansible.builtin.systemd_service:
+    name: prometheus-node-exporter.service
+    enabled: true
+    state: started
+
+- name: Install storage health systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: homelab-storage-health.service.j2
+      dest: /etc/systemd/system/homelab-storage-health.service
+    - src: homelab-storage-health.timer.j2
+      dest: /etc/systemd/system/homelab-storage-health.timer
+    - src: homelab-zfs-scrub@.service.j2
+      dest: /etc/systemd/system/homelab-zfs-scrub@.service
+  notify: Reload systemd
+
+- name: Install per-pool scrub timers
+  ansible.builtin.template:
+    src: homelab-zfs-scrub.timer.j2
+    dest: /etc/systemd/system/homelab-zfs-scrub-{{ item.pool }}.timer
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ proxmox_host_storage_scrubs }}"
+  loop_control:
+    label: "{{ item.pool }}"
+  notify: Reload systemd
+
+- name: Enable storage health timer
+  ansible.builtin.systemd_service:
+    name: homelab-storage-health.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable scrub timers
+  ansible.builtin.systemd_service:
+    name: homelab-zfs-scrub-{{ item.pool }}.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ proxmox_host_storage_scrubs }}"
+  loop_control:
+    label: "{{ item.pool }}"
+
+- name: Apply pending monitoring service changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Collect storage health
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/homelab-storage-health
+      - --json
+      - --prometheus
+  register: proxmox_host_storage_health
+  changed_when: false
+  failed_when: proxmox_host_storage_health.rc >= 2

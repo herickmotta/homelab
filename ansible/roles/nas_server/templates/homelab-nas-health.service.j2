@@ -1,0 +1,9 @@
+[Unit]
+Description=Homelab NAS health snapshot
+After=smbd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-nas-health --prometheus
+Nice=10
+SyslogIdentifier=homelab-nas-health
