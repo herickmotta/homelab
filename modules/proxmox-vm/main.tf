@@ -82,6 +82,26 @@ resource "proxmox_virtual_environment_vm" "this" {
     type = "serial0"
   }
 
+  dynamic "startup" {
+    for_each = var.startup == null ? [] : [var.startup]
+    content {
+      order      = startup.value.order
+      up_delay   = startup.value.up_delay
+      down_delay = startup.value.down_delay
+    }
+  }
+
+  dynamic "virtiofs" {
+    for_each = var.virtiofs
+    content {
+      mapping      = virtiofs.value.mapping
+      cache        = virtiofs.value.cache
+      direct_io    = virtiofs.value.direct_io
+      expose_acl   = virtiofs.value.expose_acl
+      expose_xattr = virtiofs.value.expose_xattr
+    }
+  }
+
   # Adding vendor_data_file_id later ForceNew-replaces the VM. Keep it for
   # create (new guests install qemu-ga on first boot) but never replace an
   # existing disk to attach it.

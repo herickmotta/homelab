@@ -1,5 +1,6 @@
 # Dummy values for tofu validate only. This example is never applied.
 # Guest agent expects local:snippets/qemu-guest-agent.yaml on the node (module default).
+# virtiofs defaults to [] so this guest receives no VirtioFS devices.
 module "example" {
   source = "../../modules/proxmox-vm"
 

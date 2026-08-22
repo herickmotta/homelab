@@ -47,3 +47,108 @@ site:
       disk_gb: 16
       tags:
         - network
+      startup:
+        order: 1
+        up_delay: 15
+
+    nas_gateway:
+      hostname: nas-example
+      vm_id: 114
+      ipv4: 192.0.2.14
+      groups:
+        - homelab_guest
+        - nas_server
+      cores: 2
+      memory_mb: 4096
+      disk_gb: 32
+      tags:
+        - nas
+      startup:
+        order: 2
+      virtiofs:
+        - mapping: example-personal
+          expose_acl: true
+        - mapping: example-media
+          expose_acl: true
+
+  storage:
+    pools:
+      iron:
+        name: iron
+        topology: raidz1
+        data_class: durable
+        ashift: 12
+        compression: lz4
+        atime: "off"
+        disks:
+          - serial: FAKEIRON01
+            by_id: /dev/disk/by-id/ata-EXAMPLE-FAKEIRON01
+          - serial: FAKEIRON02
+            by_id: /dev/disk/by-id/ata-EXAMPLE-FAKEIRON02
+          - serial: FAKEIRON03
+            by_id: /dev/disk/by-id/ata-EXAMPLE-FAKEIRON03
+      volatile:
+        name: volatile
+        topology: stripe
+        data_class: disposable
+        ashift: 12
+        compression: lz4
+        atime: "off"
+        disks:
+          - serial: FAKEVOL01
+            by_id: /dev/disk/by-id/ata-EXAMPLE-FAKEVOL01
+            accepted_degraded: true
+    datasets:
+      personal:
+        pool: iron
+        dataset: iron/personal
+        mountpoint: /srv/example/iron/personal
+        mapping_id: example-personal
+        class: important_unbacked
+      media:
+        pool: iron
+        dataset: iron/media
+        mountpoint: /srv/example/iron/media
+        mapping_id: example-media
+        class: replaceable
+      frigate:
+        pool: volatile
+        dataset: volatile/frigate
+        mountpoint: /srv/example/volatile/frigate
+        class: disposable
+      cache:
+        pool: volatile
+        dataset: volatile/cache
+        mountpoint: /srv/example/volatile/cache
+        class: disposable
+      tmp:
+        pool: volatile
+        dataset: volatile/tmp
+        mountpoint: /srv/example/volatile/tmp
+        class: disposable
+    monitoring:
+      prometheus_textfile_dir: /var/lib/prometheus/node-exporter
+      email_destination: storage@example.test
+      smtp:
+        host: smtp.example.test
+        port: 587
+        username: alerts@example.test
+        from: homelab@example.test
+        starttls: true
+      smartd:
+        short_test: "S/../../1/02"
+        long_test: "L/../07/./03"
+      scrub:
+        iron_calendar: "*-*-01 04:00:00"
+        volatile_calendar: "*-*-15 04:00:00"
+    nas:
+      smb_username: household
+      mounts:
+        - mapping: example-personal
+          path: /srv/personal
+          share: personal
+          read_only: false
+        - mapping: example-media
+          path: /srv/media
+          share: media
+          read_only: false

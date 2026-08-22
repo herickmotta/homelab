@@ -64,10 +64,39 @@ variable "agent_timeout" {
   default     = "15m"
 }
 
+variable "directory_mappings" {
+  description = <<-EOT
+    Proxmox directory mappings keyed by stable mapping identifier. Empty by
+    default. Paths are POSIX directories on node_name; the calling site must
+    create those directories before apply. Mapping names are attached to guests
+    through virtiofs[].mapping.
+  EOT
+  type = map(object({
+    path    = string
+    comment = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for key in keys(var.directory_mappings) : can(regex("^[A-Za-z][A-Za-z0-9._-]*$", key))
+    ])
+    error_message = "Directory mapping keys must start with a letter."
+  }
+
+  validation {
+    condition = alltrue([
+      for mapping in values(var.directory_mappings) : startswith(mapping.path, "/")
+    ])
+    error_message = "Directory mapping paths must be absolute POSIX paths."
+  }
+}
+
 variable "guests" {
   description = <<-EOT
     Guests keyed by stable logical identity. A key change is a resource address
-    change and requires an explicit state migration.
+    change and requires an explicit state migration. virtiofs defaults to no
+    devices. startup null leaves Proxmox start order unmanaged.
   EOT
 
   type = map(object({
@@ -83,6 +112,18 @@ variable "guests" {
     bridge          = optional(string)
     tags            = optional(set(string), [])
     stop_on_destroy = optional(bool, true)
+    startup = optional(object({
+      order      = number
+      up_delay   = optional(number)
+      down_delay = optional(number)
+    }))
+    virtiofs = optional(list(object({
+      mapping      = string
+      cache        = optional(string, "auto")
+      direct_io    = optional(bool, false)
+      expose_acl   = optional(bool, false)
+      expose_xattr = optional(bool, false)
+    })), [])
   }))
 
   validation {
@@ -104,5 +145,13 @@ variable "guests" {
       for key in keys(var.guests) : can(regex("^[a-z][a-z0-9_]*$", key))
     ])
     error_message = "Guest keys must be stable lowercase logical identifiers."
+  }
+
+  validation {
+    condition = alltrue([
+      for guest in values(var.guests) :
+      length(distinct([for share in guest.virtiofs : share.mapping])) == length(guest.virtiofs)
+    ])
+    error_message = "Each guest must use unique VirtioFS mapping identifiers."
   }
 }
