@@ -41,31 +41,6 @@
 - name: Inspect installed services
   ansible.builtin.service_facts:
 
-- name: Disable the legacy CPU power policy service
-  when:
-    - not ansible_check_mode
-    - >-
-      'homelab-cpu-power-policy.service' in ansible_facts.services
-  ansible.builtin.systemd_service:
-    name: homelab-cpu-power-policy.service
-    enabled: false
-    state: stopped
-
-- name: Remove legacy CPU power policy files
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /usr/local/sbin/homelab-cpu-power-policy
-    - /etc/systemd/system/homelab-cpu-power-policy.service
-  register: proxmox_host_power_legacy_files
-
-- name: Reload systemd after removing the legacy service
-  when: not ansible_check_mode
-  ansible.builtin.systemd_service:
-    daemon_reload: true
-  changed_when: proxmox_host_power_legacy_files.changed
-
 - name: Keep the distribution cpupower service from competing for policy
   when:
     - not ansible_check_mode
