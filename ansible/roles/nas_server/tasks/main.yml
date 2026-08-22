@@ -6,13 +6,17 @@
       - ansible_facts["os_family"] == "Debian"
     fail_msg: This role supports Debian-family Linux hosts only.
 
-- name: Require Samba credentials and mounts
+- name: Require Samba credentials, stable IDs, and mounts
   ansible.builtin.assert:
     that:
       - nas_server_smb_username | length > 0
       - nas_server_smb_password | length > 0
+      - nas_server_smb_uid | int >= 1000
+      - nas_server_smb_gid | int >= 1000
       - nas_server_mounts | length > 0
-    fail_msg: NAS serving requires a username, password, and at least one VirtioFS mount.
+    fail_msg: >-
+      NAS serving requires a username, password, UID/GID at or above 1000, and
+      at least one VirtioFS mount.
   no_log: true
 
 - name: Reject placeholder Samba passwords
@@ -53,6 +57,26 @@
         == (nas_server_mounts | length)
     fail_msg: NAS share names, guest paths, and mapping IDs must be unique.
 
+- name: Stop retired custom NAS monitors
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ nas_server_retired_units }}"
+  failed_when: false
+
+- name: Remove retired custom NAS files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ nas_server_retired_files }}"
+  notify: Reload systemd
+
+- name: Remove node exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: absent
+
 - name: Install NAS packages
   ansible.builtin.apt:
     name: "{{ nas_server_packages }}"
@@ -60,14 +84,14 @@
     update_cache: true
     cache_valid_time: 3600
 
-- name: Create homelab, share, and Prometheus directories
+- name: Create homelab and share directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
-  loop: "{{ ['/etc/homelab', nas_server_prometheus_textfile_dir] + (nas_server_mounts | map(attribute='path') | list) }}"
+  loop: "{{ ['/etc/homelab'] + (nas_server_mounts | map(attribute='path') | list) }}"
 
 - name: Install persistent VirtioFS mounts
   ansible.builtin.blockinfile:
@@ -83,7 +107,6 @@
     argv:
       - findmnt
       - -n
-      - -T
       - "{{ item.path }}"
   register: nas_server_findmnt
   changed_when: false
@@ -104,6 +127,60 @@
   loop_control:
     label: "{{ item.item.path }}"
 
+- name: Re-inspect required VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - FSTYPE,SOURCE
+      - "{{ item.path }}"
+  register: nas_server_mounted
+  changed_when: false
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Require VirtioFS mountpoints
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - (item.stdout.split() | length) >= 2
+      - item.stdout.split()[0] == "virtiofs"
+      - item.stdout.split()[1] == item.item.mapping
+    fail_msg: >-
+      {{ item.item.path }} must be VirtioFS mapping {{ item.item.mapping }}.
+  loop: "{{ nas_server_mounted.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Create the household group with a stable GID
+  ansible.builtin.group:
+    name: "{{ nas_server_smb_username }}"
+    gid: "{{ nas_server_smb_gid | int }}"
+    system: false
+
+- name: Create the UNIX Samba account with a stable UID
+  ansible.builtin.user:
+    name: "{{ nas_server_smb_username }}"
+    uid: "{{ nas_server_smb_uid | int }}"
+    group: "{{ nas_server_smb_username }}"
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+    system: false
+
+- name: Set share directory ownership
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ nas_server_smb_uid | string }}"
+    group: "{{ nas_server_smb_gid | string }}"
+    mode: "0775"
+    state: directory
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
 - name: Install expected NAS configuration
   ansible.builtin.copy:
     dest: /etc/homelab/nas-expected.json
@@ -113,28 +190,12 @@
     content: "{{ nas_server_expected | to_nice_json }}"
   vars:
     nas_server_expected:
-      schema_version: 1
+      schema_version: 2
       mounts: "{{ nas_server_mounts }}"
       smb_conf: "{{ nas_server_smb_conf }}"
-      node_exporter_service: prometheus-node-exporter
-      prometheus_textfile: "{{ nas_server_prometheus_textfile_dir }}/homelab-nas.prom"
-
-- name: Install NAS health command
-  ansible.builtin.copy:
-    src: homelab-nas-health
-    dest: /usr/local/sbin/homelab-nas-health
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Create the UNIX Samba account
-  ansible.builtin.user:
-    name: "{{ nas_server_smb_username }}"
-    shell: /usr/sbin/nologin
-    home: /nonexistent
-    create_home: false
-    system: true
-    groups: []
+      smb_username: "{{ nas_server_smb_username }}"
+      smb_uid: "{{ nas_server_smb_uid | int }}"
+      smb_gid: "{{ nas_server_smb_gid | int }}"
 
 - name: Discover Samba accounts
   ansible.builtin.command:
@@ -181,51 +242,40 @@
     enabled: true
     state: started
 
-- name: Install node exporter defaults
-  ansible.builtin.template:
-    src: node-exporter-default.j2
-    dest: /etc/default/prometheus-node-exporter
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart node exporter
-
-- name: Enable node exporter
-  ansible.builtin.systemd_service:
-    name: prometheus-node-exporter.service
-    enabled: true
-    state: started
-
-- name: Install NAS health systemd units
-  ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop:
-    - src: homelab-nas-health.service.j2
-      dest: /etc/systemd/system/homelab-nas-health.service
-    - src: homelab-nas-health.timer.j2
-      dest: /etc/systemd/system/homelab-nas-health.timer
-  notify: Reload systemd
-
-- name: Enable NAS health timer
-  ansible.builtin.systemd_service:
-    name: homelab-nas-health.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-
 - name: Apply pending NAS service changes
   ansible.builtin.meta: flush_handlers
 
-- name: Collect NAS health
+- name: Inspect Samba configuration
   ansible.builtin.command:
     argv:
-      - /usr/local/sbin/homelab-nas-health
-      - --json
-      - --prometheus
-  register: nas_server_health
+      - testparm
+      - -s
+  register: nas_server_testparm
   changed_when: false
-  failed_when: nas_server_health.rc >= 2
+
+- name: Require SMB3 without guest access
+  ansible.builtin.assert:
+    that:
+      - "'server min protocol = SMB3' in nas_server_testparm.stdout"
+      - "'map to guest = Never' in nas_server_testparm.stdout"
+      - "'smbd profiling level = count' in nas_server_testparm.stdout"
+      - >-
+        'nmbd.service' not in ansible_facts.services
+        or ansible_facts.services['nmbd.service'].state != 'running'
+    fail_msg: Samba must be SMB3-only with guest access and NetBIOS disabled.
+
+- name: Require smbd to be active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - smbd.service
+  register: nas_server_smbd
+  changed_when: false
+  failed_when: nas_server_smbd.stdout != "active"
+
+- name: Run SMB integration tests
+  when:
+    - nas_server_smb_integration_test | bool
+    - not ansible_check_mode
+  ansible.builtin.include_tasks: smb_probe.yml

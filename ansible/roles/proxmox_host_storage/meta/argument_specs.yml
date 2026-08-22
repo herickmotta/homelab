@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Monitor host-owned ZFS pools without creating or repairing them
+    short_description: Assert host-owned ZFS and configure smartd, ZED, and OpenZFS scrubs
     options:
       proxmox_host_storage_pools:
         type: dict
@@ -9,9 +9,12 @@ argument_specs:
       proxmox_host_storage_datasets:
         type: dict
         required: true
-      proxmox_host_storage_prometheus_textfile_dir:
-        type: str
-        default: /var/lib/prometheus/node-exporter
+      proxmox_host_storage_data_uid:
+        type: int
+        default: 10000
+      proxmox_host_storage_data_gid:
+        type: int
+        default: 10000
       proxmox_host_storage_email_destination:
         type: str
       proxmox_host_storage_smtp_host:
@@ -34,15 +37,15 @@ argument_specs:
       proxmox_host_storage_smartd_long_test:
         type: str
         default: "L/../07/./03"
-      proxmox_host_storage_scrubs:
-        type: list
-        elements: dict
-      proxmox_host_storage_health_calendar:
-        type: str
-        default: hourly
       proxmox_host_storage_packages:
         type: list
         elements: str
       proxmox_host_storage_mail_packages:
+        type: list
+        elements: str
+      proxmox_host_storage_retired_units:
+        type: list
+        elements: str
+      proxmox_host_storage_retired_files:
         type: list
         elements: str

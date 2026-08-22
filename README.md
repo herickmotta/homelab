@@ -19,10 +19,10 @@ for the boundary, configuration layers, and promotion workflow.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings. Fictional usage is under `examples/`. Collection
-`herickmotta.homelab` 0.4.0 ships `guest_base`, `network_plane`,
-`proxmox_host_power`, `proxmox_host_storage`, and `nas_server`. Live sites
-pin a full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM
-module only.
+`herickmotta.homelab` 0.5.0 ships `guest_base`, `network_plane`,
+`proxmox_host_power`, `proxmox_host_storage`, `nas_server`, and
+`netdata_agent`. Live sites pin a full commit SHA, not a moving tag;
+`v0.1.0` is the earlier single-VM module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
 implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale
@@ -100,7 +100,6 @@ Locally:
 - `tofu fmt -check -recursive`
 - `tofu validate` in each example root
 - `ansible-lint ansible`
-- `python3 -m unittest discover -s ansible/tests/unit`
 - `ansible-galaxy collection build ansible`
 
 See [AGENTS.md](AGENTS.md) for repository boundaries, workflow, and safety

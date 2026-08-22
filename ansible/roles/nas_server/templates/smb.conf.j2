@@ -12,6 +12,7 @@
    server min protocol = SMB3
    client min protocol = SMB3
    server max protocol = SMB3
+   smbd profiling level = count
    logging = systemd
    log level = 1
    load printers = no
@@ -33,6 +34,7 @@
    writable = {{ 'no' if mount.read_only | default(false) else 'yes' }}
    valid users = {{ nas_server_smb_username }}
    force user = {{ nas_server_smb_username }}
+   force group = {{ nas_server_smb_username }}
    create mask = 0664
    directory mask = 0775
 

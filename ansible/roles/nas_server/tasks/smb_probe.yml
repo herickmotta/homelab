@@ -1,0 +1,114 @@
+---
+- name: Probe SMB shares
+  block:
+    - name: Create an SMB probe credentials file
+      ansible.builtin.copy:
+        dest: /run/homelab-smb-test.auth
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          username={{ nas_server_smb_username }}
+          password={{ nas_server_smb_password }}
+      no_log: true
+
+    - name: Create local SMB probe files
+      ansible.builtin.copy:
+        dest: "/tmp/homelab-smb-probe-{{ item.share }}.txt"
+        owner: root
+        group: root
+        mode: "0644"
+        content: "homelab-smb-probe {{ item.share }} {{ item.mapping }}\n"
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.share }}"
+
+    - name: Write probe files through SMB3
+      ansible.builtin.command:
+        argv:
+          - smbclient
+          - "//127.0.0.1/{{ item.share }}"
+          - -A
+          - /run/homelab-smb-test.auth
+          - -m
+          - SMB3
+          - -c
+          - "put /tmp/homelab-smb-probe-{{ item.share }}.txt homelab-smb-probe-{{ item.share }}.txt"
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.share }}"
+
+    - name: Inspect probe files on VirtioFS paths
+      ansible.builtin.stat:
+        path: "{{ item.path }}/homelab-smb-probe-{{ item.share }}.txt"
+      register: nas_server_probe_stat
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Require each probe on its own share path
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: >-
+          SMB write to {{ item.item.share }} did not appear at {{ item.item.path }}.
+      loop: "{{ nas_server_probe_stat.results }}"
+      loop_control:
+        label: "{{ item.item.share }}"
+
+    - name: Inspect probes on the other share paths
+      ansible.builtin.stat:
+        path: "{{ item.0.path }}/homelab-smb-probe-{{ item.1.share }}.txt"
+      register: nas_server_probe_cross
+      loop: "{{ nas_server_mounts | product(nas_server_mounts) | list }}"
+      loop_control:
+        label: "{{ item.0.share }} / {{ item.1.share }}"
+      when: item.0.share != item.1.share
+
+    - name: Forbid probes from appearing on the other share
+      ansible.builtin.assert:
+        that:
+          - not (item.stat.exists | default(false))
+        fail_msg: >-
+          Probe for {{ item.item.1.share }} leaked onto {{ item.item.0.path }}.
+      loop: "{{ nas_server_probe_cross.results }}"
+      when: item.stat is defined
+
+  always:
+    - name: Delete probe files through SMB3
+      ansible.builtin.command:
+        argv:
+          - smbclient
+          - "//127.0.0.1/{{ item.share }}"
+          - -A
+          - /run/homelab-smb-test.auth
+          - -m
+          - SMB3
+          - -c
+          - "del homelab-smb-probe-{{ item.share }}.txt"
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.share }}"
+      failed_when: false
+
+    - name: Remove leftover probe files from VirtioFS paths
+      ansible.builtin.file:
+        path: "{{ item.path }}/homelab-smb-probe-{{ item.share }}.txt"
+        state: absent
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Remove local SMB probe files
+      ansible.builtin.file:
+        path: "/tmp/homelab-smb-probe-{{ item.share }}.txt"
+        state: absent
+      loop: "{{ nas_server_mounts }}"
+      loop_control:
+        label: "{{ item.share }}"
+
+    - name: Remove the SMB probe credentials file
+      ansible.builtin.file:
+        path: /run/homelab-smb-test.auth
+        state: absent

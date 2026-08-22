@@ -9,19 +9,28 @@ argument_specs:
       nas_server_smb_password:
         type: str
         required: true
+      nas_server_smb_uid:
+        type: int
+        default: 10000
+      nas_server_smb_gid:
+        type: int
+        default: 10000
       nas_server_mounts:
         type: list
         elements: dict
         required: true
-      nas_server_prometheus_textfile_dir:
-        type: str
-        default: /var/lib/prometheus/node-exporter
       nas_server_packages:
         type: list
         elements: str
       nas_server_smb_conf:
         type: str
         default: /etc/samba/smb.conf
-      nas_server_health_calendar:
-        type: str
-        default: hourly
+      nas_server_smb_integration_test:
+        type: bool
+        default: true
+      nas_server_retired_units:
+        type: list
+        elements: str
+      nas_server_retired_files:
+        type: list
+        elements: str

@@ -1,0 +1,7 @@
+# Managed by herickmotta.homelab.netdata_agent.
+default_run: yes
+modules:
+  zfspool: {{ 'yes' if netdata_agent_enable_zfspool | bool else 'no' }}
+  smartctl: {{ 'yes' if netdata_agent_enable_smartctl | bool else 'no' }}
+  samba: {{ 'yes' if netdata_agent_enable_samba | bool else 'no' }}
+  systemdunits: yes

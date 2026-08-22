@@ -1,8 +1,8 @@
-# Managed by herickmotta.homelab.proxmox_host_storage. Mode 0600.
+# Managed by herickmotta.homelab.proxmox_host_storage. Mode 0640 root:msmtp.
 account default
 auth           on
-tls            {{ "on" if proxmox_host_storage_smtp_starttls else "off" }}
-tls_starttls   {{ "on" if proxmox_host_storage_smtp_starttls else "off" }}
+tls            {{ "on" if proxmox_host_storage_smtp_starttls | bool else "off" }}
+tls_starttls   {{ "on" if proxmox_host_storage_smtp_starttls | bool else "off" }}
 logfile        /var/log/msmtp.log
 host           {{ proxmox_host_storage_smtp_host }}
 port           {{ proxmox_host_storage_smtp_port }}

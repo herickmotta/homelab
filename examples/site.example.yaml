@@ -127,7 +127,6 @@ site:
         mountpoint: /srv/example/volatile/tmp
         class: disposable
     monitoring:
-      prometheus_textfile_dir: /var/lib/prometheus/node-exporter
       email_destination: storage@example.test
       smtp:
         host: smtp.example.test
@@ -138,11 +137,12 @@ site:
       smartd:
         short_test: "S/../../1/02"
         long_test: "L/../07/./03"
-      scrub:
-        iron_calendar: "*-*-01 04:00:00"
-        volatile_calendar: "*-*-15 04:00:00"
+      netdata:
+        allow_from: localhost 192.0.2.0/24
     nas:
       smb_username: household
+      smb_uid: 10000
+      smb_gid: 10000
       mounts:
         - mapping: example-personal
           path: /srv/personal

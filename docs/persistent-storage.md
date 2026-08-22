@@ -1,6 +1,6 @@
 # Persistent storage and NAS serving
 
-Public implementation for host-owned ZFS monitoring and a replaceable NAS VM.
+Public implementation for host-owned ZFS and a replaceable NAS VM.
 Site-specific pool names, disk serials, addresses, and credentials belong in
 the private deployment repository.
 
@@ -53,33 +53,47 @@ bootstrap documentation.
 
 ## Ansible
 
-`herickmotta.homelab.proxmox_host_storage` is non-destructive. It validates
-declared serials, pools, datasets, and mountpoints; configures smartd, ZED,
-and systemd scrub/health timers; and exposes:
+`herickmotta.homelab.proxmox_host_storage` is non-destructive. It asserts
+declared serials, pool topology, datasets, and mountpoints; configures smartd
+short/long tests; edits the packaged ZED `zed.rc` with `lineinfile` only;
+enables OpenZFS `zfs-scrub-monthly@<pool>.timer`; and sets a stable numeric
+owner on NAS-exported datasets. It never creates, destroys, imports, replaces,
+or clears ZFS topology.
 
-```bash
-homelab-storage-health
-homelab-storage-health --json
-homelab-storage-health --prometheus
-homelab-storage-health --test-warning
-homelab-storage-mail-test ADDRESS
-```
+`herickmotta.homelab.nas_server` mounts declared VirtioFS filesystems, creates
+the household Samba account with a fixed UID/GID, configures SMB3 without
+guest access or SMB1, and writes a probe file to each share to confirm the
+file appears on the matching guest path only.
 
-It never creates, destroys, imports, replaces, or clears ZFS topology.
+`herickmotta.homelab.netdata_agent` is the reusable metrics and alert agent
+for the lab, not a NAS-only sidecar. Apply it to the Proxmox host and to
+guests that should be observed. It installs the official Netdata Agent and
+manages collectors and `health.d` rules as files. The local dashboard is a
+view, not the control plane, and Netdata Cloud is left disabled. Collectors
+used here:
 
-`herickmotta.homelab.nas_server` mounts declared VirtioFS filesystems,
-configures SMB3 without guest access or SMB1, and exposes:
+- Proxmox host/VM/systemd metrics from the agent on the hypervisor
+- `zfspool` and `smartctl` on the hypervisor
+- `samba` on the NAS VM (`smbd profiling level = count`)
+- agent-dispatched email when SMTP is configured
+- Prometheus-compatible `/api/v1/allmetrics?format=prometheus` for a later
+  central stack
 
-```bash
-homelab-nas-health
-homelab-nas-health --json
-homelab-nas-health --prometheus
-homelab-nas-health --test-warning
-```
+Custom `health.d` rules cover pool not online, SMART failed and critical
+sector counters, inactive `smbd`/smartd/ZED or VirtioFS mount units, and
+free-space thresholds on declared data mounts.
 
-Exit codes: `0` healthy, `1` warning/degraded but available, `2` critical or
-configuration mismatch. Prometheus textfiles are written atomically. Logs go
-to journald. Credentials are not included in JSON, metrics, or logs.
+Runtime health belongs to Netdata, ZED, and smartd. Recovery and debug stay
+on standard commands: `zpool status`, `smartctl -j`, `systemctl`, and
+`smbstatus`.
+
+## Stable data owner
+
+VirtioFS maps UIDs 1:1. The household Samba account must keep the same UID
+and GID across NAS rebuilds so files on host datasets stay writable. Declare
+those IDs in site configuration (10000/10000 in the example), create the
+guest user with them, and `chown` NAS-exported host mountpoints to the same
+numbers. Do not let the guest allocate a dynamic system UID.
 
 ## Out of scope here
 

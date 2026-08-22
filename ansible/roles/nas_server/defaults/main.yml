@@ -1,11 +1,20 @@
 ---
 nas_server_smb_username: household
 nas_server_smb_password: ""
+nas_server_smb_uid: 10000
+nas_server_smb_gid: 10000
 nas_server_mounts: []
-nas_server_prometheus_textfile_dir: /var/lib/prometheus/node-exporter
+nas_server_smb_conf: /etc/samba/smb.conf
+nas_server_smb_integration_test: true
 nas_server_packages:
   - samba
-  - prometheus-node-exporter
-  - python3
-nas_server_smb_conf: /etc/samba/smb.conf
-nas_server_health_calendar: hourly
+  - smbclient
+nas_server_retired_units:
+  - homelab-nas-health.timer
+  - homelab-nas-health.service
+  - prometheus-node-exporter.service
+nas_server_retired_files:
+  - /usr/local/sbin/homelab-nas-health
+  - /etc/systemd/system/homelab-nas-health.service
+  - /etc/systemd/system/homelab-nas-health.timer
+  - /var/lib/prometheus/node-exporter/homelab-nas.prom
