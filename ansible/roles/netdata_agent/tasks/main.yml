@@ -96,24 +96,21 @@
     - /opt/netdata/etc/netdata
   register: netdata_agent_config_candidates
 
+- name: Remember the Netdata config directory
+  ansible.builtin.set_fact:
+    netdata_agent_config_dir: "{{ item.item }}"
+  when:
+    - netdata_agent_config_dir is not defined
+    - item.stat.isdir | default(false) | bool
+  loop: "{{ netdata_agent_config_candidates.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
 - name: Require a Netdata config directory
   ansible.builtin.assert:
     that:
-      - >-
-        netdata_agent_config_candidates.results
-        | map(attribute='stat')
-        | selectattr('isdir')
-        | list
-        | length > 0
+      - netdata_agent_config_dir | default('') | length > 0
     fail_msg: Netdata installed without /etc/netdata or /opt/netdata/etc/netdata.
-
-- name: Remember the Netdata config directory
-  ansible.builtin.set_fact:
-    netdata_agent_config_dir: "{{
-        '/etc/netdata'
-        if netdata_agent_config_candidates.results[0].stat.isdir | default(false)
-        else '/opt/netdata/etc/netdata'
-      }}"
 
 - name: Require the ZFS pool collector binary
   when: netdata_agent_enable_zfspool | bool
