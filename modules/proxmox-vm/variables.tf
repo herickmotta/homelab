@@ -131,8 +131,10 @@ variable "virtiofs" {
   description = <<-EOT
     VirtioFS directory mappings attached to this VM. Empty by default so
     existing guests receive no VirtioFS devices. The mapping name must already
-    exist as a Proxmox directory mapping. bpg/proxmox 0.111.1 has no
-    hypervisor read-only flag; enforce read-only in the guest mount if needed.
+    exist as a Proxmox directory mapping. Enabling expose_acl also enables
+    expose_xattr because Proxmox rejects ACL without xattr. bpg/proxmox
+    0.111.1 has no hypervisor read-only flag; enforce read-only in the guest
+    mount if needed.
   EOT
   type = list(object({
     mapping      = string

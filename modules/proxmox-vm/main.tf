@@ -94,11 +94,16 @@ resource "proxmox_virtual_environment_vm" "this" {
   dynamic "virtiofs" {
     for_each = var.virtiofs
     content {
-      mapping      = virtiofs.value.mapping
-      cache        = virtiofs.value.cache
-      direct_io    = virtiofs.value.direct_io
-      expose_acl   = virtiofs.value.expose_acl
-      expose_xattr = virtiofs.value.expose_xattr
+      mapping    = virtiofs.value.mapping
+      cache      = virtiofs.value.cache
+      direct_io  = virtiofs.value.direct_io
+      expose_acl = virtiofs.value.expose_acl
+      # Proxmox requires xattr omitted or true when ACL is enabled. The
+      # provider serializes the Terraform default false, which the API
+      # rejects, so enable xattr with ACL and omit an explicit false.
+      expose_xattr = (
+        virtiofs.value.expose_acl || virtiofs.value.expose_xattr
+      ) ? true : null
     }
   }
 
