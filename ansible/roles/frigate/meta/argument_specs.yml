@@ -53,6 +53,9 @@ argument_specs:
         type: int
       frigate_snapshot_days:
         type: int
+      frigate_go2rtc_streams:
+        type: dict
+        required: true
       frigate_cameras:
         type: list
         elements: dict

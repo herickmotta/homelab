@@ -194,12 +194,27 @@ site:
     media_path: /mnt/frigate
     gpu_enabled: false
     model: bundled
+    # Stacked dual-lens example: one RTSP pull per device, ffmpeg crops into
+    # Frigate cameras. Combined streams are go2rtc-only. Fictional IPs.
+    go2rtc_streams:
+      porch_combined:
+        - "rtsp://camera:{FRIGATE_CAM_PASS_URL}@192.0.2.80:554/user=camera&password={FRIGATE_CAM_PASS_URL}&channel=1&stream=0.sdp?"
+      porch_top:
+        - "ffmpeg:porch_combined#video=h264#raw=-vf crop=iw:ih/2:0:0"
+      porch_bottom:
+        - "ffmpeg:porch_combined#video=h264#raw=-vf crop=iw:ih/2:0:ih/2"
+      yard_combined:
+        - "rtsp://camera:{FRIGATE_CAM_PASS_URL}@192.0.2.81:554/user=camera&password={FRIGATE_CAM_PASS_URL}&channel=1&stream=0.sdp?"
+      yard_top:
+        - "ffmpeg:yard_combined#video=h264#raw=-vf crop=iw:ih/2:0:0"
+      yard_bottom:
+        - "ffmpeg:yard_combined#video=h264#raw=-vf crop=iw:ih/2:0:ih/2"
     cameras:
-      - name: front
+      - name: porch_top
         enabled: false
-        record_url: rtsp://127.0.0.1:8554/front
-        detect_url: rtsp://127.0.0.1:8554/front_sub
-      - name: yard
+      - name: porch_bottom
         enabled: false
-        record_url: rtsp://127.0.0.1:8554/yard
-        detect_url: rtsp://127.0.0.1:8554/yard_sub
+      - name: yard_top
+        enabled: false
+      - name: yard_bottom
+        enabled: false

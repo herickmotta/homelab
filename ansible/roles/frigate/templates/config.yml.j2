@@ -53,27 +53,37 @@ snapshots:
 
 go2rtc:
   streams:
-{% for camera in frigate_cameras %}
-    {{ camera.name }}:
-      - "{{ camera.record_url }}"
-    {{ camera.name }}_sub:
-      - "{{ camera.detect_url }}"
+{% for stream_name, sources in frigate_go2rtc_streams.items() %}
+    {{ stream_name }}:
+{% for source in sources %}
+      - "{{ source }}"
+{% endfor %}
 {% endfor %}
 
 cameras:
 {% for camera in frigate_cameras %}
+{% set detect_stream = camera.detect_stream | default(camera.name) %}
+{% set record_stream = camera.record_stream | default(camera.name) %}
   {{ camera.name }}:
     enabled: {{ camera.enabled | default(false) | bool | lower }}
     ffmpeg:
       inputs:
-        - path: rtsp://127.0.0.1:8554/{{ camera.name }}_sub
+{% if detect_stream == record_stream %}
+        - path: rtsp://127.0.0.1:8554/{{ detect_stream }}
           input_args: preset-rtsp-restream
           roles:
             - detect
-        - path: rtsp://127.0.0.1:8554/{{ camera.name }}
+            - record
+{% else %}
+        - path: rtsp://127.0.0.1:8554/{{ detect_stream }}
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+        - path: rtsp://127.0.0.1:8554/{{ record_stream }}
           input_args: preset-rtsp-restream
           roles:
             - record
+{% endif %}
     detect:
       enabled: true
       width: {{ camera.detect_width | default(frigate_detect_width) }}
