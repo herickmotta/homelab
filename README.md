@@ -1,22 +1,21 @@
 # homelab
 
-Public, versioned implementation of a real homelab. This repository contains
+Public, versioned implementation of a household homelab. This repository holds
 the reusable OpenTofu modules, Ansible collection, application templates,
-fictional examples, CI, and architecture documentation. It is both a
-working infrastructure project and a learning/portfolio artifact.
+fictional examples, CI, and architecture documentation.
 
-The private `homelab-live` repository is intentionally small: it pins an
-immutable commit from this repository and supplies real addresses, hostnames,
-hardware mappings, encrypted secrets, state configuration, and the deployment
-workflow. This repository never depends on the private deployment.
+It is meant to be **read** as a portfolio of how the lab is organized, and
+**used** by a separate private repository that deploys a real site. This
+repository never depends on that private companion and never contains real
+addresses, hostnames, hardware mappings, credentials, or an apply workflow.
 
 See [Public implementation and private deployment](docs/public-private-separation.md)
 for the boundary, configuration layers, and promotion workflow.
 
 ```mermaid
 flowchart TD
-  public["homelab public implementation"] -->|"pin full commit SHA"| live["homelab-live private binding"]
-  live -->|"merge main"| sentinel["sentinel apply"]
+  public["homelab public implementation"] -->|"pin full commit SHA"| site["private site repository"]
+  site -->|"merge main"| sentinel["site apply runner"]
   sentinel --> tofu["OpenTofu"]
   sentinel --> ansible["Ansible"]
   tofu --> pve["Proxmox"]
@@ -26,9 +25,6 @@ flowchart TD
   guests --> compose["Docker Compose"]
 ```
 
-Live household status is private (`homelab-live` `docs/next.md`). This README
-only describes what this repository ships.
-
 ## What this repository ships
 
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
@@ -37,7 +33,7 @@ those guests from private site configuration and can attach VirtioFS
 directory mappings. Fictional usage is under `examples/`. Collection
 `herickmotta.homelab` 0.5.0 ships `guest_base`, `network_plane`,
 `proxmox_host_power`, `proxmox_host_storage`, `nas_server`, and
-`netdata_agent`. Live sites pin a full commit SHA, not a moving tag;
+`netdata_agent`. Site repositories pin a full commit SHA, not a moving tag;
 `v0.1.0` is the earlier single-VM module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
@@ -80,13 +76,25 @@ Kubernetes remains deferred until a concrete workload requires it. Host-owned
 ZFS and the replaceable NAS VM are described in
 [Persistent storage and NAS serving](docs/persistent-storage.md).
 
-## Consuming a release
+## Using this for a real site
+
+Create a **private site repository**. It should stay small: pin one commit
+from this repository, declare real topology, encrypt secrets, and own apply.
+
+A typical layout:
+
+```
+site.yaml      real topology, sizing, and non-secret inputs
+tofu/          backend/provider binding and pinned module call
+ansible/       collection pin, inventory, and role invocation
+secrets/       SOPS-encrypted credentials only
+```
 
 Pin a reviewed full commit SHA in the private OpenTofu root:
 
 ```hcl
 module "guests" {
-  # Keep this SHA aligned with ansible/requirements.yml in the private repo.
+  # Keep this SHA aligned with ansible/requirements.yml in the site repo.
   source = "git::https://github.com/herickmotta/homelab.git//modules/proxmox-guests?ref=<full-commit-sha>"
 
   # Site values are decoded from the private site.yaml and passed as inputs.
@@ -103,13 +111,17 @@ collections:
 ```
 
 The reference shape is
-[`examples/site.example.yaml`](examples/site.example.yaml).
+[`examples/site.example.yaml`](examples/site.example.yaml). Copy that shape,
+replace fictional values, and keep secrets out of `site.yaml`.
+
+A public change never deploys a site. Promotion is a private PR that updates
+both pins to the same SHA and reviews a real OpenTofu plan.
 
 ## Validation
 
 CI runs OpenTofu `fmt`/`validate`, `ansible-lint`, and an Ansible
 collection build. It uses only fictional example values and cannot reach or
-deploy the live environment.
+deploy a live environment.
 
 Locally:
 

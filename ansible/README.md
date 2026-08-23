@@ -29,7 +29,7 @@ Roles:
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).
 
-The calling repository owns inventory, site values, encrypted secrets, and
+A private site repository owns inventory, site values, encrypted secrets, and
 execution. Call roles by fully qualified collection name. The canonical
 repository boundary is
 [Public implementation and private deployment](../docs/public-private-separation.md).

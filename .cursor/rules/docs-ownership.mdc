@@ -1,13 +1,14 @@
 ---
-description: Update the owning doc for a fact; do not copy live status into this public repo.
+description: Update the owning doc for a fact; do not copy live status or private repo names into this public repo.
 globs: "**/*.{md,mdc,yml,yaml}"
 alwaysApply: false
 ---
 
 # Documentation ownership (public)
 
-Living site status is private (`homelab-live` `docs/next.md`). Do not copy
-proven-slice narratives or leftover lists into this repository.
+Living site status belongs in the private site repository that deploys this
+implementation. Do not copy proven-slice narratives, leftover lists, or a
+specific private repository name into this repository.
 
 | Change | Update |
 | --- | --- |
@@ -16,5 +17,5 @@ proven-slice narratives or leftover lists into this repository.
 | Storage architecture | `docs/persistent-storage.md` |
 | Typed public API | variables / argument specs, examples, describing README |
 
-Bad: paste live “current status” into this README.
-Good: describe what this commit ships; leave household leftovers private.
+Bad: name a private repo or paste live “current status” into this README.
+Good: describe what this commit ships and how a generic site repo consumes it.
