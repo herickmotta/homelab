@@ -1,19 +1,95 @@
 # homelab
 
-Public, versioned implementation of a real homelab. This repository contains
+Public, versioned implementation of a household homelab. This repository holds
 the reusable OpenTofu modules, Ansible collection, application templates,
-fictional examples, CI, and architecture documentation. It is both a
-working infrastructure project and a learning/portfolio artifact.
+fictional examples, CI, and architecture documentation.
 
-The private `homelab-live` repository is intentionally small: it pins an
-immutable commit from this repository and supplies real addresses, hostnames,
-hardware mappings, encrypted secrets, state configuration, and the deployment
-workflow. This repository never depends on the private deployment.
+It is meant to be **read** as a portfolio of how the lab is organized, and
+**used** by a separate private repository that deploys a real site. This
+repository never depends on that private companion and never contains real
+addresses, hostnames, hardware mappings, credentials, or an apply workflow.
 
 See [Public implementation and private deployment](docs/public-private-separation.md)
-for the boundary, configuration layers, and promotion workflow.
+for the repo split and how a site consumes this code. The diagram below is the
+**running system**, not the git workflow.
 
-## Current status
+## Architecture
+
+Two guests on one Proxmox host. The network-plane guest is the only place for
+DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
+end. ZFS stays on the hypervisor, so destroying the NAS VM does not destroy
+data.
+
+```mermaid
+flowchart TB
+  subgraph people["People and devices"]
+    lan["On the LAN"]
+    away["Away from home"]
+  end
+
+  subgraph net["Network-plane guest"]
+    dns["AdGuard Home"]
+    proxy["Caddy"]
+    mesh["Tailscale subnet router"]
+  end
+
+  subgraph host["Proxmox host"]
+    durable["Durable ZFS"]
+  end
+
+  subgraph nas["NAS guest"]
+    virtio["VirtioFS mounts"]
+    smb["SMB3 shares"]
+  end
+
+  away -->|"mesh VPN"| mesh
+  mesh --> dns
+  lan --> dns
+  dns -->|"lab names"| proxy
+  proxy -->|"AdGuard UI"| dns
+
+  durable --> virtio
+  virtio --> smb
+  lan --> smb
+  mesh --> smb
+```
+
+How traffic and data move:
+
+- LAN DHCP points at AdGuard. AdGuard filters ads and answers lab names.
+  Caddy terminates TLS and proxies to services. Today that is the AdGuard UI;
+  later household apps get names the same way. App workloads do not run on
+  the network-plane guest.
+- Tailscale on that guest advertises the LAN. Remote devices join the tailnet
+  and reach DNS and SMB without a second exposure path. Cloudflare is used
+  for DNS-01 certificates, not as a public reverse proxy for the LAN.
+- Personal and media datasets live on host ZFS. Proxmox maps those directories
+  into the NAS guest with VirtioFS. Samba exports SMB3. The disposable pool
+  is not shared; it is for later camera footage and cache.
+
+```mermaid
+flowchart LR
+  zfs["Host ZFS dataset"] --> posix["POSIX mount"]
+  posix --> map["Proxmox directory mapping"]
+  map --> virtio["VirtioFS"]
+  virtio --> samba["SMB3 share"]
+```
+
+Provisioning is a pipeline, not a second control plane:
+
+```mermaid
+flowchart LR
+  tofu["OpenTofu"] --> pve["Proxmox VMs"]
+  pve --> cidata["cloud-init"]
+  cidata --> ans["Ansible"]
+  ans --> apps["Compose, Samba, Netdata"]
+```
+
+OpenTofu creates guests. cloud-init gets SSH and networking. Ansible configures
+the OS and renders application config from site inputs. Merge-and-apply details
+stay in the private site repository.
+
+## What this repository ships
 
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
@@ -21,7 +97,7 @@ those guests from private site configuration and can attach VirtioFS
 directory mappings. Fictional usage is under `examples/`. Collection
 `herickmotta.homelab` 0.5.0 ships `guest_base`, `network_plane`,
 `proxmox_host_power`, `proxmox_host_storage`, `nas_server`, and
-`netdata_agent`. Live sites pin a full commit SHA, not a moving tag;
+`netdata_agent`. Site repositories pin a full commit SHA, not a moving tag;
 `v0.1.0` is the earlier single-VM module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
@@ -64,13 +140,25 @@ Kubernetes remains deferred until a concrete workload requires it. Host-owned
 ZFS and the replaceable NAS VM are described in
 [Persistent storage and NAS serving](docs/persistent-storage.md).
 
-## Consuming a release
+## Using this for a real site
+
+Create a **private site repository**. It should stay small: pin one commit
+from this repository, declare real topology, encrypt secrets, and own apply.
+
+A typical layout:
+
+```
+site.yaml      real topology, sizing, and non-secret inputs
+tofu/          backend/provider binding and pinned module call
+ansible/       collection pin, inventory, and role invocation
+secrets/       SOPS-encrypted credentials only
+```
 
 Pin a reviewed full commit SHA in the private OpenTofu root:
 
 ```hcl
 module "guests" {
-  # Keep this SHA aligned with ansible/requirements.yml in the private repo.
+  # Keep this SHA aligned with ansible/requirements.yml in the site repo.
   source = "git::https://github.com/herickmotta/homelab.git//modules/proxmox-guests?ref=<full-commit-sha>"
 
   # Site values are decoded from the private site.yaml and passed as inputs.
@@ -87,13 +175,17 @@ collections:
 ```
 
 The reference shape is
-[`examples/site.example.yaml`](examples/site.example.yaml).
+[`examples/site.example.yaml`](examples/site.example.yaml). Copy that shape,
+replace fictional values, and keep secrets out of `site.yaml`.
+
+A public change never deploys a site. Promotion is a private PR that updates
+both pins to the same SHA and reviews a real OpenTofu plan.
 
 ## Validation
 
 CI runs OpenTofu `fmt`/`validate`, `ansible-lint`, and an Ansible
 collection build. It uses only fictional example values and cannot reach or
-deploy the live environment.
+deploy a live environment.
 
 Locally:
 

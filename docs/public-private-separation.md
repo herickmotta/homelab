@@ -1,25 +1,33 @@
 # Public implementation and private deployment
 
+This is the canonical contract for the public/private split and promotion
+workflow. A private site repository should link here and record only
+site-private facts, not a second copy of this document.
+
 ## Decision
 
-The homelab is split across two repositories with a dependency in one
-direction:
+Implementation and deployment are split across two repositories with a
+dependency in one direction:
 
 ```text
 homelab (public, versioned implementation)
         |
         | pinned full commit SHA
         v
-homelab-live (private, site binding and deployment authority)
+private site repository (binding, secrets, state, apply)
 ```
 
-`homelab` explains and implements how the system works. `homelab-live`
-declares where that implementation runs. The public repository never reads,
-imports, or triggers the private repository.
+This repository explains and implements how the system works. The private
+site repository declares where that implementation runs. The public
+repository never reads, imports, or triggers a private repository.
 
-This boundary makes the complete engineering implementation reviewable as a
-portfolio artifact without publishing the live network, hardware mappings,
-credentials, state, or a LAN-connected deployment runner.
+The split keeps the engineering system reviewable — as a portfolio and as
+something another operator can reuse — without publishing a live network,
+hardware mappings, credentials, state, or a LAN-connected apply runner.
+
+Anyone deploying a similar lab follows the same pattern: consume this
+repository from a private companion; do not fork implementation into the
+site repo.
 
 ## Public repository responsibilities
 
@@ -40,9 +48,9 @@ Public code must not contain real IP addresses, internal hostnames, personal
 domains, VM or VLAN IDs, SSH identities, disk serials, bucket names, secrets,
 state, raw plans, or deployment logs.
 
-## Private repository responsibilities
+## Private site repository responsibilities
 
-The private repository owns:
+A private site repository owns:
 
 * one canonical `site.yaml` containing real topology and non-secret site
   values (guests OpenTofu manages, plus brownfield hosts it must not create);
@@ -52,8 +60,17 @@ The private repository owns:
 * a thin Ansible entrypoint that builds inventory from `site.yaml` and invokes
   public roles by fully qualified collection name;
 * immutable public dependency pins;
-* the self-hosted apply workflow, real plans, apply logs, and operational
-  verification.
+* the apply workflow, real plans, apply logs, and operational verification.
+
+Suggested layout:
+
+```text
+site.yaml      canonical non-secret topology and sizing
+tofu/          backend/provider binding and pinned public module call
+ansible/       collection pin and thin site entrypoint
+secrets/       SOPS-encrypted production credentials only
+docs/          site-private operations, if any
+```
 
 The private repository must not carry modified copies of public modules,
 roles, templates, or Compose files. A site-specific need becomes a typed public
@@ -90,7 +107,7 @@ flag is not a harmless feature toggle.
 
 Persistent data must not depend on a replaceable guest OS disk. Storage
 modules and roles must document lifecycle, backup, and migration behavior
-before they are promoted to the live site.
+before they are promoted to a live site.
 
 ## Release and promotion workflow
 
@@ -103,7 +120,7 @@ before they are promoted to the live site.
    collection requirement to that same SHA.
 5. Validate the private `site.yaml`, initialize against the real backend, and
    review a real OpenTofu plan.
-6. Merge the private PR to apply on the private self-hosted runner.
+6. Merge the private PR to apply on the site’s apply runner.
 7. Publish a sanitized outcome or build note publicly when useful. Never copy
    raw plans or runner logs.
 
@@ -114,8 +131,9 @@ the private plan and review.
 ## Compatibility policy
 
 OpenTofu modules and the Ansible collection are released from the same commit.
-The private repository pins that commit in both places. A release must document
-new required inputs, changed defaults, replacements, and any state migration.
+The private site repository pins that commit in both places. A release must
+document new required inputs, changed defaults, replacements, and any state
+migration.
 
 Prefer backward-compatible optional inputs with explicit defaults. Breaking
 module addresses, stable keys, role variables, paths that hold data, and

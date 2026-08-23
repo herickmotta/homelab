@@ -7,14 +7,19 @@ This is the **public** repository for the versioned homelab implementation.
 The project is both:
 
 * a functional infrastructure project;
-* a learning/portfolio project focused on production-relevant engineering practices.
+* a learning/portfolio project focused on production-relevant engineering
+  practices.
 
-The private `homelab-live` repository is a thin deployment binding. It pins a
-reviewed commit from this repository and supplies site-specific configuration,
-encrypted secrets, state backend configuration, and the apply workflow.
+Reusable modules, roles, templates, and architecture live here. A **private
+site repository** (not this one) pins a reviewed commit and supplies
+site-specific configuration, encrypted secrets, state backend configuration,
+and the apply workflow.
 
 The boundary and release choreography are
 [docs/public-private-separation.md](docs/public-private-separation.md).
+
+Public documentation describes that private-companion pattern. Do not name a
+specific private repository, live hostname, or real address here.
 
 ## Principles
 
@@ -46,17 +51,20 @@ This repository must NOT contain:
 * private network topology;
 * environment-specific identifiers;
 * OpenTofu state;
-* configuration that only makes sense for the private deployment.
+* configuration that only makes sense for one private deployment.
 
-The private `homelab-live` repository consumes components from this repository.
+Private site repositories consume components from this repository.
 
-Do not introduce dependencies from this repository to `homelab-live`.
+Do not introduce dependencies from this repository to any private site
+repository.
 
 ## Public/private implementation rules
 
-* Implementation belongs here; site binding belongs in `homelab-live`.
-* Do not copy a public role, module, template, or Compose file into
-  `homelab-live`. Add a typed input here when a real site variation is needed.
+* Implementation belongs here; site binding belongs in a private site
+  repository.
+* Do not copy a public role, module, template, or Compose file into a private
+  site repository. Add a typed input here when a real site variation is
+  needed.
 * Keep secure, tested defaults public. Make values configurable because they
   vary by site, not merely because they can be made configurable.
 * Public examples use reserved domains, documentation addresses, fake keys,
@@ -64,8 +72,8 @@ Do not introduce dependencies from this repository to `homelab-live`.
 * Treat module variables and Ansible role argument specifications as public
   APIs. Preserve compatibility within a release series and document breaking
   changes.
-* Release OpenTofu and Ansible content from the same commit. The live
-  repository pins that immutable commit in both dependency declarations.
+* Release OpenTofu and Ansible content from the same commit. A site repository
+  pins that immutable commit in both dependency declarations.
 * A public change cannot trigger a live deployment. Promotion happens only in
   a reviewed private PR that updates the pinned commit and reviews a real plan.
 
@@ -91,7 +99,7 @@ For non-trivial changes:
 7. Update documentation when architectural behavior changes.
 
 Do not create speculative modules, roles, or directories before they are
-needed by the live site or the reference environment.
+needed by a real site or the reference environment.
 
 ## Validation
 
@@ -122,3 +130,33 @@ For significant architectural changes:
 * explain the tradeoffs.
 
 Do not silently introduce major new technologies.
+
+## Documentation
+
+This repository does not track live site status. Living status belongs in the
+private site repository that deploys this implementation.
+
+Read this file every session. Open other docs only for the slice you are
+changing.
+
+| File | Owns |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Public contract: purpose, boundary, workflow, this map |
+| [README.md](README.md) | What this repository ships and how a site repo consumes it |
+| [docs/public-private-separation.md](docs/public-private-separation.md) | Canonical public/private contract and promotion |
+| [docs/persistent-storage.md](docs/persistent-storage.md) | Public storage and NAS architecture |
+| [ansible/README.md](ansible/README.md) | Collection role index |
+| [examples/](examples/) | Fictional site shape |
+
+### Update when you change
+
+| Change | Update |
+| --- | --- |
+| Boundary, promotion, or public/private rules | this file and `docs/public-private-separation.md` |
+| New or removed module, role, or shipped capability | `README.md` (what ships) and `ansible/README.md` if a role changed |
+| Storage architecture | `docs/persistent-storage.md` |
+| Typed public API | module variables / role argument specs, examples, and the README that describes them |
+| Live leftovers, pins, or household topology | nothing here; that belongs in the private site repository |
+
+Do not copy private proven-slice narratives, leftover lists, or a specific
+private repository name into this repository.
