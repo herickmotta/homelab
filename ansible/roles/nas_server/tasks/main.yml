@@ -245,20 +245,39 @@
 - name: Apply pending NAS service changes
   ansible.builtin.meta: flush_handlers
 
-- name: Inspect Samba configuration
+- name: Read Samba min protocol
   ansible.builtin.command:
     argv:
       - testparm
       - -s
-  register: nas_server_testparm
+      - --parameter-name=server min protocol
+  register: nas_server_min_protocol
+  changed_when: false
+
+- name: Read Samba guest mapping
+  ansible.builtin.command:
+    argv:
+      - testparm
+      - -s
+      - --parameter-name=map to guest
+  register: nas_server_map_to_guest
+  changed_when: false
+
+- name: Read Samba profiling
+  ansible.builtin.command:
+    argv:
+      - testparm
+      - -s
+      - --parameter-name=smbd profiling level
+  register: nas_server_profiling
   changed_when: false
 
 - name: Require SMB3 without guest access
   ansible.builtin.assert:
     that:
-      - "'server min protocol = SMB3' in nas_server_testparm.stdout"
-      - "'map to guest = Never' in nas_server_testparm.stdout"
-      - "'smbd profiling level = count' in nas_server_testparm.stdout"
+      - nas_server_min_protocol.stdout | trim == 'SMB3'
+      - nas_server_map_to_guest.stdout | trim == 'Never'
+      - nas_server_profiling.stdout | trim == 'count'
       - >-
         'nmbd.service' not in ansible_facts.services
         or ansible_facts.services['nmbd.service'].state != 'running'
