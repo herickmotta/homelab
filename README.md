@@ -10,20 +10,84 @@ repository never depends on that private companion and never contains real
 addresses, hostnames, hardware mappings, credentials, or an apply workflow.
 
 See [Public implementation and private deployment](docs/public-private-separation.md)
-for the boundary, configuration layers, and promotion workflow.
+for the repo split and how a site consumes this code. The diagram below is the
+**running system**, not the git workflow.
+
+## Architecture
+
+Two guests on one Proxmox host. The network-plane guest is the only place for
+DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
+end. ZFS stays on the hypervisor, so destroying the NAS VM does not destroy
+data.
 
 ```mermaid
-flowchart TD
-  public["homelab public implementation"] -->|"pin full commit SHA"| site["private site repository"]
-  site -->|"merge main"| sentinel["site apply runner"]
-  sentinel --> tofu["OpenTofu"]
-  sentinel --> ansible["Ansible"]
-  tofu --> pve["Proxmox"]
-  ansible --> pve
-  pve --> guests["cloud-init guests"]
-  ansible --> guests
-  guests --> compose["Docker Compose"]
+flowchart TB
+  subgraph people["People and devices"]
+    lan["On the LAN"]
+    away["Away from home"]
+  end
+
+  subgraph net["Network-plane guest"]
+    dns["AdGuard Home"]
+    proxy["Caddy"]
+    mesh["Tailscale subnet router"]
+  end
+
+  subgraph host["Proxmox host"]
+    durable["Durable ZFS"]
+  end
+
+  subgraph nas["NAS guest"]
+    virtio["VirtioFS mounts"]
+    smb["SMB3 shares"]
+  end
+
+  away -->|"mesh VPN"| mesh
+  mesh --> dns
+  lan --> dns
+  dns -->|"lab names"| proxy
+  proxy -->|"AdGuard UI"| dns
+
+  durable --> virtio
+  virtio --> smb
+  lan --> smb
+  mesh --> smb
 ```
+
+How traffic and data move:
+
+- LAN DHCP points at AdGuard. AdGuard filters ads and answers lab names.
+  Caddy terminates TLS and proxies to services. Today that is the AdGuard UI;
+  later household apps get names the same way. App workloads do not run on
+  the network-plane guest.
+- Tailscale on that guest advertises the LAN. Remote devices join the tailnet
+  and reach DNS and SMB without a second exposure path. Cloudflare is used
+  for DNS-01 certificates, not as a public reverse proxy for the LAN.
+- Personal and media datasets live on host ZFS. Proxmox maps those directories
+  into the NAS guest with VirtioFS. Samba exports SMB3. The disposable pool
+  is not shared; it is for later camera footage and cache.
+
+```mermaid
+flowchart LR
+  zfs["Host ZFS dataset"] --> posix["POSIX mount"]
+  posix --> map["Proxmox directory mapping"]
+  map --> virtio["VirtioFS"]
+  virtio --> samba["SMB3 share"]
+```
+
+Provisioning is a pipeline, not a second control plane:
+
+```mermaid
+flowchart LR
+  tofu["OpenTofu"] --> pve["Proxmox VMs"]
+  pve --> cidata["cloud-init"]
+  cidata --> ans["Ansible"]
+  ans --> apps["Compose, Samba, Netdata"]
+```
+
+OpenTofu creates guests. cloud-init gets SSH and networking. Ansible configures
+the OS and renders application config from site inputs. Merge-and-apply details
+stay in the private site repository.
 
 ## What this repository ships
 
