@@ -1,4 +1,26 @@
 ---
+- name: Validate reverse-proxy routes
+  ansible.builtin.assert:
+    that:
+      - network_plane_proxy_routes | length > 0
+      - item.hostname | length > 0
+      - item.hostname is match('^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')
+      - item.upstream | length > 0
+    fail_msg: >-
+      Proxy route hostname must be a DNS label and upstream must be host:port
+      or IP:port.
+  loop: "{{ network_plane_proxy_routes }}"
+  loop_control:
+    label: "{{ item.hostname | default('unknown') }}"
+
+- name: Require unique proxy hostnames
+  ansible.builtin.assert:
+    that:
+      - >-
+        (network_plane_proxy_routes | map(attribute='hostname') | list | unique | length)
+        == (network_plane_proxy_routes | length)
+    fail_msg: Proxy route hostnames must be unique.
+
 - name: Require non-empty network-plane secrets
   ansible.builtin.assert:
     that:

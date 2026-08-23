@@ -1,0 +1,26 @@
+---
+frigate_install_dir: /opt/frigate
+frigate_owner: "{{ ansible_user }}"
+frigate_group: "{{ ansible_user }}"
+frigate_image: ghcr.io/blakeblackshear/frigate:0.17.2
+frigate_tz: Etc/UTC
+frigate_port: 8971
+frigate_shm_size: 512mb
+frigate_cache_size_mb: 1024
+frigate_media_path: /mnt/frigate
+frigate_gpu_enabled: true
+frigate_gpu_render_node: /dev/dri/renderD128
+frigate_openvino_device: GPU
+frigate_jwt_secret: ""
+frigate_model: bundled
+frigate_yolov9_filename: yolov9-s-320.onnx
+frigate_yolov9_src: ""
+frigate_detect_width: 1280
+frigate_detect_height: 720
+frigate_detect_fps: 5
+frigate_record_days: 7
+frigate_alert_days: 30
+frigate_detection_days: 30
+frigate_snapshot_days: 30
+frigate_cameras: []
+frigate_camera_env: {}

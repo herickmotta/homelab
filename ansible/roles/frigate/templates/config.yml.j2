@@ -1,0 +1,109 @@
+# Managed by herickmotta.homelab.frigate. Camera credentials come from env.
+mqtt:
+  enabled: false
+
+auth:
+  enabled: true
+
+tls:
+  enabled: false
+
+{% if frigate_gpu_enabled | bool %}
+ffmpeg:
+  hwaccel_args: preset-vaapi
+{% endif %}
+
+detectors:
+  ov:
+    type: openvino
+    device: {{ frigate_openvino_device }}
+
+{% if frigate_model == 'yolov9s320' %}
+model:
+  model_type: yolo-generic
+  width: 320
+  height: 320
+  input_tensor: nchw
+  input_dtype: float
+  path: /config/model_cache/{{ frigate_yolov9_filename }}
+  labelmap_path: /labelmap/coco-80.txt
+{% endif %}
+
+objects:
+  track:
+    - person
+    - cat
+
+record:
+  enabled: true
+  retain:
+    days: {{ frigate_record_days }}
+    mode: all
+  alerts:
+    retain:
+      days: {{ frigate_alert_days }}
+  detections:
+    retain:
+      days: {{ frigate_detection_days }}
+
+snapshots:
+  enabled: true
+  retain:
+    default: {{ frigate_snapshot_days }}
+
+go2rtc:
+  streams:
+{% for camera in frigate_cameras %}
+    {{ camera.name }}:
+      - "{{ camera.record_url }}"
+    {{ camera.name }}_sub:
+      - "{{ camera.detect_url }}"
+{% endfor %}
+
+cameras:
+{% for camera in frigate_cameras %}
+  {{ camera.name }}:
+    enabled: {{ camera.enabled | default(false) | bool | lower }}
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/{{ camera.name }}_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+        - path: rtsp://127.0.0.1:8554/{{ camera.name }}
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+    detect:
+      enabled: true
+      width: {{ camera.detect_width | default(frigate_detect_width) }}
+      height: {{ camera.detect_height | default(frigate_detect_height) }}
+      fps: {{ camera.detect_fps | default(frigate_detect_fps) }}
+    objects:
+      track:
+        - person
+        - cat
+{% if camera.zones is defined and camera.zones | length > 0 %}
+    zones:
+{% for zone in camera.zones %}
+      {{ zone.name }}:
+        coordinates: "{{ zone.coordinates }}"
+{% if zone.objects is defined %}
+        objects:
+{% for object in zone.objects %}
+          - {{ object }}
+{% endfor %}
+{% endif %}
+{% if zone.loitering_time is defined %}
+        loitering_time: {{ zone.loitering_time }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if camera.review is defined %}
+    review:
+{{ camera.review | to_nice_yaml(indent=2) | indent(6, first=true) }}
+{% endif %}
+{% endfor %}
+
+# Local classifiers (visitor_type, gate state, cat_identity) stay omitted until
+# the Frigate UI has enough labeled examples. Do not invent polygons here.

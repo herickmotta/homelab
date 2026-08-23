@@ -37,10 +37,16 @@ this collection.
   devices, so existing guests are unchanged.
 - `startup`: optional start/shutdown order. Null leaves the host setting
   unmanaged.
+- `machine` and `hostpci`: optional QEMU machine type and PCI resource
+  mapping attachments. Defaults omit both, so existing guests stay on `pc`
+  with no host PCI devices. `hostpci` uses Proxmox mapping names only, not
+  raw PCI addresses.
 
 `modules/proxmox-guests` composes those inputs through the stable guest map
-and optionally manages `proxmox_hardware_mapping_dir` resources. Mapping
-identifiers must match `virtiofs[].mapping`.
+and optionally manages `proxmox_hardware_mapping_dir` and
+`proxmox_hardware_mapping_pci` resources. Directory mapping identifiers must
+match `virtiofs[].mapping`. PCI mapping identifiers must match
+`hostpci[].mapping`.
 
 bpg/proxmox 0.111.1 can attach VirtioFS devices and directory mappings. It
 does not expose a hypervisor read-only flag. Enforce read-only in the guest
@@ -96,10 +102,19 @@ those IDs in site configuration (10000/10000 in the example), create the
 guest user with them, and `chown` NAS-exported host mountpoints to the same
 numbers. Do not let the guest allocate a dynamic system UID.
 
+## Disposable camera footage
+
+Frigate recordings belong on a disposable host dataset mapped into the
+application guest with VirtioFS. That path is not an SMB share. The NAS role
+still rejects `volatile` in Samba mounts. Config, SQLite, and detector models
+stay on the guest OS disk and are reproducible from git except event history.
+
 ## Out of scope here
 
 - Creating or destroying ZFS pools
-- Nextcloud, Frigate, Jellyfin, or another application workload
+- Nextcloud, Jellyfin, or another application workload besides Frigate
+  footage on a disposable VirtioFS dataset
+- Treating Frigate recordings, event history, or detector models as backed up
 - NFS
 - A backup product
 - Prometheus, Grafana, Loki, Alertmanager, or another central monitoring stack

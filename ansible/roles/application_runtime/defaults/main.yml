@@ -1,0 +1,5 @@
+---
+application_runtime_mounts: []
+application_runtime_require_gpu: false
+application_runtime_gpu_render_node: /dev/dri/renderD128
+application_runtime_fstab: /etc/fstab

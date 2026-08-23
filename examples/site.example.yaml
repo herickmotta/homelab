@@ -10,6 +10,11 @@ site:
     node_name: pve-example
     bridge: vmbr0
     datastore: local-lvm
+    pci_mappings:
+      example-igpu:
+        id: "8086:0000"
+        path: "0000:00:02.0"
+        comment: Fictional Intel iGPU mapping
 
   # Brownfield machines. OpenTofu does not create these; keep them out of guests.
   hosts:
@@ -50,6 +55,37 @@ site:
       startup:
         order: 1
         up_delay: 15
+      proxy_routes:
+        - hostname: adguard
+          upstream: 127.0.0.1:3000
+        - hostname: frigate
+          upstream: 192.0.2.15:8971
+
+    application_runtime:
+      hostname: apps-example
+      vm_id: 115
+      ipv4: 192.0.2.15
+      groups:
+        - homelab_guest
+        - application_runtime
+        - frigate
+      cores: 4
+      cpu_type: host
+      memory_mb: 8192
+      disk_gb: 64
+      machine: q35
+      tags:
+        - apps
+      startup:
+        order: 3
+      virtiofs:
+        - mapping: example-frigate
+      hostpci:
+        - mapping: example-igpu
+          pcie: true
+      virtiofs_mounts:
+        - mapping: example-frigate
+          path: /mnt/frigate
 
     nas_gateway:
       hostname: nas-example
@@ -115,6 +151,7 @@ site:
         pool: volatile
         dataset: volatile/frigate
         mountpoint: /srv/example/volatile/frigate
+        mapping_id: example-frigate
         class: disposable
       cache:
         pool: volatile
@@ -152,3 +189,17 @@ site:
           path: /srv/media
           share: media
           read_only: false
+
+  frigate:
+    media_path: /mnt/frigate
+    gpu_enabled: false
+    model: bundled
+    cameras:
+      - name: front
+        enabled: false
+        record_url: rtsp://127.0.0.1:8554/front
+        detect_url: rtsp://127.0.0.1:8554/front_sub
+      - name: yard
+        enabled: false
+        record_url: rtsp://127.0.0.1:8554/yard
+        detect_url: rtsp://127.0.0.1:8554/yard_sub

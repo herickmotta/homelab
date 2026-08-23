@@ -11,6 +11,7 @@ resource "proxmox_virtual_environment_vm" "this" {
   bios            = "seabios"
   scsi_hardware   = "virtio-scsi-single"
   boot_order      = ["scsi0"]
+  machine         = var.machine
 
   agent {
     # Channel on from first boot. Ubuntu cloud images do not ship qemu-guest-agent;
@@ -88,6 +89,17 @@ resource "proxmox_virtual_environment_vm" "this" {
       order      = startup.value.order
       up_delay   = startup.value.up_delay
       down_delay = startup.value.down_delay
+    }
+  }
+
+  dynamic "hostpci" {
+    for_each = var.hostpci
+    content {
+      device  = coalesce(hostpci.value.device, "hostpci${hostpci.key}")
+      mapping = hostpci.value.mapping
+      pcie    = hostpci.value.pcie
+      rombar  = hostpci.value.rombar
+      xvga    = hostpci.value.xvga
     }
   }
 

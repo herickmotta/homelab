@@ -1,0 +1,25 @@
+---
+argument_specs:
+  main:
+    short_description: Mount host-owned VirtioFS datasets on the application VM
+    options:
+      application_runtime_mounts:
+        type: list
+        elements: dict
+        options:
+          mapping:
+            type: str
+            required: true
+          path:
+            type: str
+            required: true
+          read_only:
+            type: bool
+      application_runtime_require_gpu:
+        type: bool
+        default: false
+      application_runtime_gpu_render_node:
+        type: str
+      application_runtime_fstab:
+        type: str
+        default: /etc/fstab

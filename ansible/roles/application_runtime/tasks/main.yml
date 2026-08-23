@@ -1,0 +1,108 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Validate application VirtioFS mounts
+  ansible.builtin.assert:
+    that:
+      - item.mapping | length > 0
+      - item.mapping is match('^[A-Za-z][A-Za-z0-9._-]*$')
+      - item.path is match('^/')
+    fail_msg: >-
+      Application mount {{ item.mapping | default('unknown') }} must declare
+      a mapping identifier and an absolute guest path.
+  loop: "{{ application_runtime_mounts }}"
+  loop_control:
+    label: "{{ item.mapping | default(item.path) }}"
+  when: application_runtime_mounts | length > 0
+
+- name: Require unique mapping identifiers and guest paths
+  ansible.builtin.assert:
+    that:
+      - >-
+        (application_runtime_mounts | map(attribute='mapping') | list | unique | length)
+        == (application_runtime_mounts | length)
+      - >-
+        (application_runtime_mounts | map(attribute='path') | list | unique | length)
+        == (application_runtime_mounts | length)
+    fail_msg: Application VirtioFS mapping identifiers and guest paths must be unique.
+  when: application_runtime_mounts | length > 0
+
+- name: Create guest mountpoints
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ application_runtime_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install persistent VirtioFS mounts
+  ansible.builtin.blockinfile:
+    path: "{{ application_runtime_fstab }}"
+    marker: "# {mark} homelab application virtiofs"
+    block: |
+      {% for mount in application_runtime_mounts %}
+      {{ mount.mapping }} {{ mount.path }} virtiofs {{ 'ro' if mount.read_only | default(false) else 'rw' }},_netdev,x-systemd.device-timeout=60 0 0
+      {% endfor %}
+    state: "{{ 'present' if application_runtime_mounts | length > 0 else 'absent' }}"
+  notify: Reload systemd
+
+- name: Inspect required VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - "{{ item.path }}"
+  register: application_runtime_findmnt
+  changed_when: false
+  failed_when: false
+  loop: "{{ application_runtime_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Mount required VirtioFS filesystems
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ item.item.path }}"
+  register: application_runtime_mount
+  changed_when: application_runtime_mount.rc == 0
+  when: item.rc != 0
+  loop: "{{ application_runtime_findmnt.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Confirm required VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - "-t"
+      - virtiofs
+      - "{{ item.path }}"
+  changed_when: false
+  loop: "{{ application_runtime_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Check for the Intel render node
+  ansible.builtin.stat:
+    path: "{{ application_runtime_gpu_render_node }}"
+  register: application_runtime_gpu
+
+- name: Require the Intel render node
+  ansible.builtin.assert:
+    that:
+      - application_runtime_gpu.stat.exists
+      - application_runtime_gpu.stat.isblk or application_runtime_gpu.stat.ischr
+    fail_msg: >-
+      {{ application_runtime_gpu_render_node }} is missing. Confirm iGPU
+      passthrough before enabling application_runtime_require_gpu.
+  when: application_runtime_require_gpu | bool

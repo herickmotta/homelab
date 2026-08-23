@@ -11,10 +11,33 @@ resource "proxmox_hardware_mapping_dir" "this" {
   ]
 }
 
+resource "proxmox_hardware_mapping_pci" "this" {
+  for_each = var.pci_mappings
+
+  name    = each.key
+  comment = each.value.comment
+  map = [
+    {
+      node         = var.node_name
+      path         = each.value.path
+      id           = each.value.id
+      iommu_group  = each.value.iommu_group
+      subsystem_id = each.value.subsystem_id
+    }
+  ]
+  mediated_devices = false
+}
+
 locals {
   guest_virtiofs_mappings = distinct(flatten([
     for guest in values(var.guests) : [
       for share in guest.virtiofs : share.mapping
+    ]
+  ]))
+
+  guest_hostpci_mappings = distinct(flatten([
+    for guest in values(var.guests) : [
+      for device in guest.hostpci : device.mapping
     ]
   ]))
 }
@@ -26,6 +49,16 @@ check "virtiofs_mappings_declared" {
       contains(keys(var.directory_mappings), mapping)
     ])
     error_message = "Every guest VirtioFS mapping must exist in directory_mappings."
+  }
+}
+
+check "hostpci_mappings_declared" {
+  assert {
+    condition = alltrue([
+      for mapping in local.guest_hostpci_mappings :
+      contains(keys(var.pci_mappings), mapping)
+    ])
+    error_message = "Every guest hostpci mapping must exist in pci_mappings."
   }
 }
 
@@ -68,6 +101,11 @@ module "guest" {
   agent_timeout       = var.agent_timeout
   startup             = each.value.startup
   virtiofs            = each.value.virtiofs
+  machine             = each.value.machine
+  hostpci             = each.value.hostpci
 
-  depends_on = [proxmox_hardware_mapping_dir.this]
+  depends_on = [
+    proxmox_hardware_mapping_dir.this,
+    proxmox_hardware_mapping_pci.this,
+  ]
 }

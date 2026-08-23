@@ -36,3 +36,13 @@ argument_specs:
       network_plane_adguard_password_hash:
         type: str
         required: true
+      network_plane_proxy_routes:
+        type: list
+        elements: dict
+        options:
+          hostname:
+            type: str
+            required: true
+          upstream:
+            type: str
+            required: true

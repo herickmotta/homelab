@@ -15,10 +15,10 @@ for the repo split and how a site consumes this code. The diagram below is the
 
 ## Architecture
 
-Two guests on one Proxmox host. The network-plane guest is the only place for
+Three guests on one Proxmox host. The network-plane guest is the only place for
 DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
-end. ZFS stays on the hypervisor, so destroying the NAS VM does not destroy
-data.
+end. The application guest runs Compose workloads such as Frigate. ZFS stays
+on the hypervisor, so destroying a guest does not destroy host datasets.
 
 ```mermaid
 flowchart TB
@@ -35,6 +35,8 @@ flowchart TB
 
   subgraph host["Proxmox host"]
     durable["Durable ZFS"]
+    disposable["Disposable ZFS"]
+    igpu["Optional PCI mapping"]
   end
 
   subgraph nas["NAS guest"]
@@ -42,30 +44,39 @@ flowchart TB
     smb["SMB3 shares"]
   end
 
+  subgraph apps["Application guest"]
+    compose["Compose projects"]
+    frigate["Frigate"]
+  end
+
   away -->|"mesh VPN"| mesh
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
   proxy -->|"AdGuard UI"| dns
+  proxy -->|"Frigate UI"| frigate
 
   durable --> virtio
   virtio --> smb
   lan --> smb
   mesh --> smb
+  disposable -->|"VirtioFS"| frigate
+  igpu -->|"hostpci mapping"| apps
+  compose --> frigate
 ```
 
 How traffic and data move:
 
 - LAN DHCP points at AdGuard. AdGuard filters ads and answers lab names.
-  Caddy terminates TLS and proxies to services. Today that is the AdGuard UI;
-  later household apps get names the same way. App workloads do not run on
-  the network-plane guest.
+  Caddy terminates TLS and proxies to services. AdGuard stays on the
+  network-plane guest; Frigate and later apps run on the application guest
+  and receive names the same way.
 - Tailscale on that guest advertises the LAN. Remote devices join the tailnet
   and reach DNS and SMB without a second exposure path. Cloudflare is used
   for DNS-01 certificates, not as a public reverse proxy for the LAN.
 - Personal and media datasets live on host ZFS. Proxmox maps those directories
-  into the NAS guest with VirtioFS. Samba exports SMB3. The disposable pool
-  is not shared; it is for later camera footage and cache.
+  into the NAS guest with VirtioFS. Samba exports SMB3. Disposable camera
+  footage is mapped into the application guest, not exported over SMB.
 
 ```mermaid
 flowchart LR
@@ -94,8 +105,9 @@ stay in the private site repository.
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
-directory mappings. Fictional usage is under `examples/`. Collection
-`herickmotta.homelab` 0.5.0 ships `guest_base`, `network_plane`,
+directory mappings and optional PCI resource mappings. Fictional usage is
+under `examples/`. Collection `herickmotta.homelab` 0.6.0 ships
+`guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `proxmox_host_power`, `proxmox_host_storage`, `nas_server`, and
 `netdata_agent`. Site repositories pin a full commit SHA, not a moving tag;
 `v0.1.0` is the earlier single-VM module only.
