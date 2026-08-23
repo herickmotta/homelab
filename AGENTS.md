@@ -122,3 +122,33 @@ For significant architectural changes:
 * explain the tradeoffs.
 
 Do not silently introduce major new technologies.
+
+## Documentation
+
+This repository does not track live site status. Living status lives only in
+private `homelab-live` at `docs/next.md`.
+
+Read this file every session. Open other docs only for the slice you are
+changing.
+
+| File | Owns |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Public contract: purpose, boundary, workflow, this map |
+| [README.md](README.md) | What this repository ships |
+| [docs/public-private-separation.md](docs/public-private-separation.md) | Canonical public/private contract and promotion |
+| [docs/persistent-storage.md](docs/persistent-storage.md) | Public storage and NAS architecture |
+| [ansible/README.md](ansible/README.md) | Collection role index |
+| [examples/](examples/) | Fictional site shape |
+
+### Update when you change
+
+| Change | Update |
+| --- | --- |
+| Boundary, promotion, or public/private rules | this file and `docs/public-private-separation.md` |
+| New or removed module, role, or shipped capability | `README.md` (what ships) and `ansible/README.md` if a role changed |
+| Storage architecture | `docs/persistent-storage.md` |
+| Typed public API | module variables / role argument specs, examples, and the README that describes them |
+| Live leftovers, pins, or household topology | nothing here; that belongs in `homelab-live` |
+
+Do not copy private proven-slice narratives or leftover lists into this
+repository.

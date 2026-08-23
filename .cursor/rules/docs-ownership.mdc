@@ -1,0 +1,20 @@
+---
+description: Update the owning doc for a fact; do not copy live status into this public repo.
+globs: "**/*.{md,mdc,yml,yaml}"
+alwaysApply: false
+---
+
+# Documentation ownership (public)
+
+Living site status is private (`homelab-live` `docs/next.md`). Do not copy
+proven-slice narratives or leftover lists into this repository.
+
+| Change | Update |
+| --- | --- |
+| Boundary or promotion | `AGENTS.md`, `docs/public-private-separation.md` |
+| Shipped module/role | `README.md`, `ansible/README.md` if a role changed |
+| Storage architecture | `docs/persistent-storage.md` |
+| Typed public API | variables / argument specs, examples, describing README |
+
+Bad: paste live “current status” into this README.
+Good: describe what this commit ships; leave household leftovers private.

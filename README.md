@@ -13,7 +13,23 @@ workflow. This repository never depends on the private deployment.
 See [Public implementation and private deployment](docs/public-private-separation.md)
 for the boundary, configuration layers, and promotion workflow.
 
-## Current status
+```mermaid
+flowchart TD
+  public["homelab public implementation"] -->|"pin full commit SHA"| live["homelab-live private binding"]
+  live -->|"merge main"| sentinel["sentinel apply"]
+  sentinel --> tofu["OpenTofu"]
+  sentinel --> ansible["Ansible"]
+  tofu --> pve["Proxmox"]
+  ansible --> pve
+  pve --> guests["cloud-init guests"]
+  ansible --> guests
+  guests --> compose["Docker Compose"]
+```
+
+Live household status is private (`homelab-live` `docs/next.md`). This README
+only describes what this repository ships.
+
+## What this repository ships
 
 `modules/proxmox-vm` provisions one Proxmox cloud-init VM through
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of

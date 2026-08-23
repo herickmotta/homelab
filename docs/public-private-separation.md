@@ -1,5 +1,9 @@
 # Public implementation and private deployment
 
+This is the canonical contract for the public/private split and promotion
+workflow. Private `homelab-live` must link here and record only site-private
+facts, not a second copy of this document.
+
 ## Decision
 
 The homelab is split across two repositories with a dependency in one
