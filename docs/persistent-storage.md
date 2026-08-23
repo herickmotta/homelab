@@ -44,7 +44,8 @@ identifiers must match `virtiofs[].mapping`.
 
 bpg/proxmox 0.111.1 can attach VirtioFS devices and directory mappings. It
 does not expose a hypervisor read-only flag. Enforce read-only in the guest
-mount and Samba share when needed.
+mount and Samba share when needed. `expose_acl: true` also turns on
+`expose_xattr`; Proxmox rejects ACL shares when xattr is sent as false.
 
 Directory mapping create/update needs Proxmox `Mapping.Modify` in addition to
 `Mapping.Use`. If the provider cannot manage a mapping, keep VM-side VirtioFS
