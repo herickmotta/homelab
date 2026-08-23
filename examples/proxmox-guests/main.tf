@@ -22,6 +22,10 @@ module "example" {
       memory_mb   = 4096
       disk_gb     = 16
       tags        = ["network"]
+      startup = {
+        order    = 1
+        up_delay = 15
+      }
     }
 
     media = {
@@ -32,6 +36,40 @@ module "example" {
       memory_mb = 8192
       disk_gb   = 32
       tags      = ["media"]
+    }
+
+    nas_gateway = {
+      name      = "nas-example"
+      vm_id     = 114
+      ipv4      = "192.0.2.14"
+      cores     = 2
+      memory_mb = 4096
+      disk_gb   = 32
+      tags      = ["nas"]
+      startup = {
+        order = 2
+      }
+      virtiofs = [
+        {
+          mapping    = "example-personal"
+          expose_acl = true
+        },
+        {
+          mapping    = "example-media"
+          expose_acl = true
+        }
+      ]
+    }
+  }
+
+  directory_mappings = {
+    example-personal = {
+      path    = "/srv/example/iron/personal"
+      comment = "Fictional personal dataset"
+    }
+    example-media = {
+      path    = "/srv/example/iron/media"
+      comment = "Fictional media dataset"
     }
   }
 }

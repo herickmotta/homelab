@@ -1,3 +1,34 @@
+resource "proxmox_hardware_mapping_dir" "this" {
+  for_each = var.directory_mappings
+
+  name    = each.key
+  comment = each.value.comment
+  map = [
+    {
+      node = var.node_name
+      path = each.value.path
+    }
+  ]
+}
+
+locals {
+  guest_virtiofs_mappings = distinct(flatten([
+    for guest in values(var.guests) : [
+      for share in guest.virtiofs : share.mapping
+    ]
+  ]))
+}
+
+check "virtiofs_mappings_declared" {
+  assert {
+    condition = alltrue([
+      for mapping in local.guest_virtiofs_mappings :
+      contains(keys(var.directory_mappings), mapping)
+    ])
+    error_message = "Every guest VirtioFS mapping must exist in directory_mappings."
+  }
+}
+
 module "guest" {
   for_each = var.guests
   source   = "../proxmox-vm"
@@ -35,4 +66,8 @@ module "guest" {
   stop_on_destroy     = each.value.stop_on_destroy
   vendor_data_file_id = var.vendor_data_file_id
   agent_timeout       = var.agent_timeout
+  startup             = each.value.startup
+  virtiofs            = each.value.virtiofs
+
+  depends_on = [proxmox_hardware_mapping_dir.this]
 }

@@ -1,0 +1,313 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require a dashboard ACL
+  ansible.builtin.assert:
+    that:
+      - netdata_agent_allow_from | length > 0
+      - netdata_agent_disk_free_warn_percent | int > netdata_agent_disk_free_crit_percent | int
+      - netdata_agent_disk_free_crit_percent | int >= 0
+    fail_msg: Netdata needs an allow list and free-space thresholds with warn above crit.
+
+- name: Decide whether SMTP mail is configured
+  ansible.builtin.set_fact:
+    netdata_agent_mail_enabled: "{{
+        (netdata_agent_email_destination | length > 0)
+        and (netdata_agent_smtp_host | length > 0)
+        and (netdata_agent_smtp_password | length > 0)
+      }}"
+
+- name: Reject partial SMTP configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (
+          netdata_agent_email_destination | length > 0
+          or netdata_agent_smtp_host | length > 0
+          or netdata_agent_smtp_password | length > 0
+        )
+        or (netdata_agent_mail_enabled | bool)
+    fail_msg: >-
+      Netdata email needs destination, SMTP host, and password together. Leave
+      all empty to keep local dashboards and the Prometheus endpoint without mail.
+
+- name: Derive systemd mount unit names
+  ansible.builtin.set_fact:
+    netdata_agent_required_mount_units: "{{
+        netdata_agent_required_mount_paths
+        | map('regex_replace', '^/', '')
+        | map('regex_replace', '/', '-')
+        | map('regex_replace', '$', '.mount')
+        | list
+      }}"
+
+- name: Install Netdata prerequisites
+  ansible.builtin.apt:
+    name: "{{ netdata_agent_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Download the Netdata kickstart script
+  ansible.builtin.get_url:
+    url: "{{ netdata_agent_kickstart_url }}"
+    dest: /tmp/netdata-kickstart.sh
+    mode: "0755"
+
+- name: Check for an existing Netdata config
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - /etc/netdata/netdata.conf
+    - /opt/netdata/etc/netdata/netdata.conf
+  register: netdata_agent_installed
+
+- name: Install the Netdata agent
+  when: >-
+    netdata_agent_installed.results
+    | map(attribute='stat')
+    | selectattr('exists')
+    | list
+    | length == 0
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - /tmp/netdata-kickstart.sh
+      - --non-interactive
+      - --dont-wait
+      - --release-channel
+      - "{{ netdata_agent_release_channel }}"
+      - --no-updates
+  environment:
+    DISABLE_TELEMETRY: "1"
+
+- name: Discover the Netdata config directory
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - /etc/netdata
+    - /opt/netdata/etc/netdata
+  register: netdata_agent_config_candidates
+
+- name: Require a Netdata config directory
+  ansible.builtin.assert:
+    that:
+      - >-
+        netdata_agent_config_candidates.results
+        | map(attribute='stat')
+        | selectattr('isdir')
+        | list
+        | length > 0
+    fail_msg: Netdata installed without /etc/netdata or /opt/netdata/etc/netdata.
+
+- name: Remember the Netdata config directory
+  ansible.builtin.set_fact:
+    netdata_agent_config_dir: "{{
+        '/etc/netdata'
+        if netdata_agent_config_candidates.results[0].stat.isdir | default(false)
+        else '/opt/netdata/etc/netdata'
+      }}"
+
+- name: Require the ZFS pool collector binary
+  when: netdata_agent_enable_zfspool | bool
+  ansible.builtin.stat:
+    path: "{{ netdata_agent_zpool_binary }}"
+  register: netdata_agent_zpool
+
+- name: Assert the ZFS pool collector binary exists
+  when: netdata_agent_enable_zfspool | bool
+  ansible.builtin.assert:
+    that:
+      - netdata_agent_zpool.stat.executable | default(false)
+    fail_msg: zfspool collector needs {{ netdata_agent_zpool_binary }}.
+
+- name: Create Netdata collector directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ netdata_agent_config_dir }}/go.d"
+    - "{{ netdata_agent_config_dir }}/health.d"
+
+- name: Install go.d module switches
+  ansible.builtin.template:
+    src: go.d.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/go.d.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Install the systemd units collector
+  ansible.builtin.template:
+    src: go.d/systemdunits.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/go.d/systemdunits.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Install the ZFS pool collector
+  when: netdata_agent_enable_zfspool | bool
+  ansible.builtin.template:
+    src: go.d/zfspool.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/go.d/zfspool.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Remove the ZFS pool collector
+  when: not (netdata_agent_enable_zfspool | bool)
+  ansible.builtin.file:
+    path: "{{ netdata_agent_config_dir }}/go.d/zfspool.conf"
+    state: absent
+  notify: Restart netdata
+
+- name: Install the SMART collector
+  when: netdata_agent_enable_smartctl | bool
+  ansible.builtin.template:
+    src: go.d/smartctl.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/go.d/smartctl.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Remove the SMART collector
+  when: not (netdata_agent_enable_smartctl | bool)
+  ansible.builtin.file:
+    path: "{{ netdata_agent_config_dir }}/go.d/smartctl.conf"
+    state: absent
+  notify: Restart netdata
+
+- name: Install the Samba collector
+  when: netdata_agent_enable_samba | bool
+  ansible.builtin.template:
+    src: go.d/samba.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/go.d/samba.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Remove the Samba collector
+  when: not (netdata_agent_enable_samba | bool)
+  ansible.builtin.file:
+    path: "{{ netdata_agent_config_dir }}/go.d/samba.conf"
+    state: absent
+  notify: Restart netdata
+
+- name: Install homelab health rules
+  ansible.builtin.template:
+    src: health.d/homelab.conf.j2
+    dest: "{{ netdata_agent_config_dir }}/health.d/homelab.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+  notify: Restart netdata
+
+- name: Restrict the local Netdata dashboard
+  ansible.builtin.blockinfile:
+    path: "{{ netdata_agent_config_dir }}/netdata.conf"
+    marker: "# {mark} homelab netdata_agent"
+    insertafter: EOF
+    block: |
+      [web]
+          bind to = {{ netdata_agent_bind_to }}
+          allow connections from = {{ netdata_agent_allow_from }}
+          allow dashboard from = {{ netdata_agent_allow_from }}
+
+      [cloud]
+          enabled = no
+  notify: Restart netdata
+
+- name: Locate a stock health_alarm_notify.conf
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ netdata_agent_config_dir }}/health_alarm_notify.conf"
+    - /usr/lib/netdata/conf.d/health_alarm_notify.conf
+    - /opt/netdata/usr/lib/netdata/conf.d/health_alarm_notify.conf
+  register: netdata_agent_notify_candidates
+
+- name: Seed health_alarm_notify.conf from the stock file
+  when:
+    - not netdata_agent_notify_candidates.results[0].stat.exists
+    - netdata_agent_notify_candidates.results[1].stat.exists or netdata_agent_notify_candidates.results[2].stat.exists
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{
+        netdata_agent_notify_candidates.results[1].item
+        if netdata_agent_notify_candidates.results[1].stat.exists
+        else netdata_agent_notify_candidates.results[2].item
+      }}"
+    dest: "{{ netdata_agent_config_dir }}/health_alarm_notify.conf"
+    owner: root
+    group: netdata
+    mode: "0644"
+    force: false
+
+- name: Require health_alarm_notify.conf
+  ansible.builtin.stat:
+    path: "{{ netdata_agent_config_dir }}/health_alarm_notify.conf"
+  register: netdata_agent_notify_conf
+
+- name: Assert health_alarm_notify.conf exists
+  ansible.builtin.assert:
+    that:
+      - netdata_agent_notify_conf.stat.exists
+    fail_msg: Netdata health_alarm_notify.conf is missing after install.
+
+- name: Configure agent-dispatched email
+  ansible.builtin.blockinfile:
+    path: "{{ netdata_agent_config_dir }}/health_alarm_notify.conf"
+    marker: "# {mark} homelab netdata_agent"
+    insertafter: EOF
+    block: |
+      SEND_EMAIL="{{ 'YES' if netdata_agent_mail_enabled | bool else 'NO' }}"
+      DEFAULT_RECIPIENT_EMAIL="{{ netdata_agent_email_destination if netdata_agent_mail_enabled | bool else 'root' }}"
+  notify: Restart netdata
+
+- name: Install SMTP packages
+  when: netdata_agent_mail_enabled | bool
+  ansible.builtin.apt:
+    name: "{{ netdata_agent_mail_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Allow the Netdata user to read msmtp configuration
+  when: netdata_agent_mail_enabled | bool
+  ansible.builtin.user:
+    name: netdata
+    groups: msmtp
+    append: true
+  notify: Restart netdata
+
+- name: Install msmtp configuration
+  when: netdata_agent_mail_enabled | bool
+  ansible.builtin.template:
+    src: msmtprc.j2
+    dest: /etc/msmtprc
+    owner: root
+    group: msmtp
+    mode: "0640"
+  no_log: true
+
+- name: Enable netdata
+  ansible.builtin.systemd_service:
+    name: netdata.service
+    enabled: true
+    state: started
+    daemon_reload: true

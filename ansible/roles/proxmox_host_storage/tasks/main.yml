@@ -1,0 +1,451 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require declared pools and datasets
+  ansible.builtin.assert:
+    that:
+      - proxmox_host_storage_pools | length > 0
+      - proxmox_host_storage_datasets | length > 0
+      - proxmox_host_storage_data_uid | int >= 1000
+      - proxmox_host_storage_data_gid | int >= 1000
+    fail_msg: >-
+      Declare at least one pool and dataset, and a stable data UID/GID at or
+      above 1000. This role does not create pools.
+
+- name: Build the declared disk list
+  ansible.builtin.set_fact:
+    proxmox_host_storage_disks: >-
+      {{
+        proxmox_host_storage_pools
+        | dict2items
+        | map(attribute='value.disks')
+        | select('defined')
+        | list
+        | flatten
+      }}
+
+- name: Validate pool topology and disk identity
+  ansible.builtin.assert:
+    that:
+      - item.value.name | default(item.key) | length > 0
+      - item.value.topology in ["raidz1", "stripe"]
+      - item.value.disks | default([]) | length > 0
+      - >-
+        item.value.topology != "raidz1"
+        or item.value.disks | length >= 3
+      - >-
+        item.value.topology != "stripe"
+        or item.value.disks | length == 1
+    fail_msg: >-
+      Pool {{ item.key }} must declare a supported topology. raidz1 requires
+      at least three disks; stripe requires exactly one.
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Require unique disk serials
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          proxmox_host_storage_disks
+          | map(attribute='serial')
+          | list
+          | unique
+          | length
+        )
+        == (proxmox_host_storage_disks | length)
+      - >-
+        (
+          proxmox_host_storage_disks
+          | map(attribute='by_id')
+          | list
+          | unique
+          | length
+        )
+        == (proxmox_host_storage_disks | length)
+    fail_msg: Each declared disk serial and by-id path must be unique.
+
+- name: Require each by-id path to contain its serial
+  ansible.builtin.assert:
+    that:
+      - item.serial in item.by_id
+      - "'/dev/sd' not in item.by_id"
+    fail_msg: >-
+      Disk {{ item.serial }} must be identified by a by-id path containing that
+      serial, not a volatile /dev/sdX name.
+  loop: "{{ proxmox_host_storage_disks }}"
+  loop_control:
+    label: "{{ item.serial }}"
+
+- name: Validate datasets
+  ansible.builtin.assert:
+    that:
+      - item.value.dataset | length > 0
+      - item.value.pool in proxmox_host_storage_pools
+      - item.value.mountpoint is match('^/')
+      - item.value.dataset is match('^' + item.value.pool + '/')
+    fail_msg: Dataset {{ item.key }} must belong to a declared pool and use an absolute mountpoint.
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Decide whether SMTP mail is configured
+  ansible.builtin.set_fact:
+    proxmox_host_storage_mail_enabled: "{{
+        (proxmox_host_storage_email_destination | length > 0)
+        and (proxmox_host_storage_smtp_host | length > 0)
+        and (proxmox_host_storage_smtp_password | length > 0)
+      }}"
+
+- name: Reject partial SMTP configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (
+          proxmox_host_storage_email_destination | length > 0
+          or proxmox_host_storage_smtp_host | length > 0
+          or proxmox_host_storage_smtp_password | length > 0
+        )
+        or (proxmox_host_storage_mail_enabled | bool)
+    fail_msg: >-
+      SMTP alerting needs destination, host, and password together. Leave all
+      empty to keep smartd, ZED, and Netdata without mail.
+
+- name: Inspect declared disk by-id paths
+  ansible.builtin.stat:
+    path: "{{ item.by_id }}"
+  register: proxmox_host_storage_disk_stat
+  loop: "{{ proxmox_host_storage_disks }}"
+  loop_control:
+    label: "{{ item.serial }}"
+
+- name: Require declared disks to be present
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      Declared disk {{ item.item.serial }} is missing at {{ item.item.by_id }}.
+  loop: "{{ proxmox_host_storage_disk_stat.results }}"
+  loop_control:
+    label: "{{ item.item.serial }}"
+
+- name: Inspect declared pools
+  ansible.builtin.command:
+    argv:
+      - zpool
+      - list
+      - -H
+      - -o
+      - name,health
+      - "{{ item.value.name | default(item.key) }}"
+  register: proxmox_host_storage_pool_list
+  changed_when: false
+  failed_when: false
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Require declared pools to be imported
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - item.stdout | length > 0
+    fail_msg: >-
+      Pool {{ item.item.key }} is not imported. Create it with the documented
+      destructive bootstrap; this role will not.
+  loop: "{{ proxmox_host_storage_pool_list.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Inspect pool topology
+  ansible.builtin.command:
+    argv:
+      - zpool
+      - status
+      - -P
+      - "{{ item.value.name | default(item.key) }}"
+  register: proxmox_host_storage_pool_status
+  changed_when: false
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Assert pool topology and member disks
+  ansible.builtin.assert:
+    that:
+      - item.item.value.topology != "raidz1" or "raidz1" in item.stdout
+      - item.item.value.topology != "stripe" or "raidz" not in item.stdout
+      - >-
+        item.item.value.disks
+        | map(attribute='by_id')
+        | reject('in', item.stdout)
+        | list
+        | length == 0
+    fail_msg: >-
+      Pool {{ item.item.key }} topology or member disks do not match the
+      declared serial-based layout.
+  loop: "{{ proxmox_host_storage_pool_status.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Inspect declared datasets
+  ansible.builtin.command:
+    argv:
+      - zfs
+      - list
+      - -H
+      - -o
+      - name,mounted,mountpoint
+      - "{{ item.value.dataset }}"
+  register: proxmox_host_storage_dataset_list
+  changed_when: false
+  failed_when: false
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Require declared datasets to be mounted
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - (item.stdout.split('\t') | length) >= 3
+      - item.stdout.split('\t')[1] == "yes"
+      - item.stdout.split('\t')[2] == item.item.value.mountpoint
+    fail_msg: >-
+      Dataset {{ item.item.key }} is missing, unmounted, or not at
+      {{ item.item.value.mountpoint }}.
+  loop: "{{ proxmox_host_storage_dataset_list.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Inspect dataset filesystems
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - FSTYPE,SOURCE
+      - "{{ item.value.mountpoint }}"
+  register: proxmox_host_storage_dataset_findmnt
+  changed_when: false
+  failed_when: false
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Require dataset mountpoints to be ZFS
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - (item.stdout.split() | length) >= 2
+      - item.stdout.split()[0] == "zfs"
+      - item.stdout.split()[1] == item.item.value.dataset
+    fail_msg: >-
+      {{ item.item.value.mountpoint }} must be ZFS dataset
+      {{ item.item.value.dataset }}.
+  loop: "{{ proxmox_host_storage_dataset_findmnt.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Stop retired custom storage monitors
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ proxmox_host_storage_retired_units }}"
+  failed_when: false
+
+- name: Stop retired custom scrub timers
+  ansible.builtin.systemd_service:
+    name: "homelab-zfs-scrub-{{ item.key }}.timer"
+    enabled: false
+    state: stopped
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  failed_when: false
+
+- name: Remove retired custom storage files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ proxmox_host_storage_retired_files + proxmox_host_storage_custom_scrub_timers }}"
+  vars:
+    proxmox_host_storage_custom_scrub_timers: "{{
+        proxmox_host_storage_pools.keys()
+        | map('regex_replace', '^(.*)$', '/etc/systemd/system/homelab-zfs-scrub-\\1.timer')
+        | list
+      }}"
+  notify: Reload systemd
+
+- name: Remove node exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: absent
+
+- name: Install storage packages
+  ansible.builtin.apt:
+    name: "{{ proxmox_host_storage_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install SMTP packages
+  when: proxmox_host_storage_mail_enabled | bool
+  ansible.builtin.apt:
+    name: "{{ proxmox_host_storage_mail_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the homelab configuration directory
+  ansible.builtin.file:
+    path: /etc/homelab
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install expected storage configuration
+  ansible.builtin.copy:
+    dest: /etc/homelab/storage-expected.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ proxmox_host_storage_expected | to_nice_json }}"
+  vars:
+    proxmox_host_storage_expected:
+      schema_version: 2
+      pools: "{{ proxmox_host_storage_pools }}"
+      datasets: "{{ proxmox_host_storage_datasets }}"
+      data_uid: "{{ proxmox_host_storage_data_uid | int }}"
+      data_gid: "{{ proxmox_host_storage_data_gid | int }}"
+
+- name: Install smartd configuration
+  ansible.builtin.template:
+    src: smartd.conf.j2
+    dest: /etc/smartd.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart smartd
+
+- name: Enable smartd
+  ansible.builtin.systemd_service:
+    name: smartd.service
+    enabled: true
+    state: started
+
+- name: Require the packaged ZED configuration
+  ansible.builtin.stat:
+    path: /etc/zfs/zed.d/zed.rc
+  register: proxmox_host_storage_zed_rc
+
+- name: Assert ZED configuration exists
+  ansible.builtin.assert:
+    that:
+      - proxmox_host_storage_zed_rc.stat.exists
+    fail_msg: Packaged /etc/zfs/zed.d/zed.rc is missing; install zfs-zed.
+
+- name: Point ZED at the configured mailbox
+  when: proxmox_host_storage_mail_enabled | bool
+  ansible.builtin.lineinfile:
+    path: /etc/zfs/zed.d/zed.rc
+    regexp: '^#?\s*ZED_EMAIL_ADDR='
+    line: 'ZED_EMAIL_ADDR="{{ proxmox_host_storage_email_destination }}"'
+    backup: true
+  notify: Restart ZED
+
+- name: Enable ZED
+  ansible.builtin.systemd_service:
+    name: zfs-zed.service
+    enabled: true
+    state: started
+
+- name: Install msmtp configuration
+  when: proxmox_host_storage_mail_enabled | bool
+  ansible.builtin.template:
+    src: msmtprc.j2
+    dest: /etc/msmtprc
+    owner: root
+    group: msmtp
+    mode: "0640"
+  no_log: true
+
+- name: Locate the OpenZFS monthly scrub timer
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /usr/lib/systemd/system/zfs-scrub-monthly@.timer
+    - /lib/systemd/system/zfs-scrub-monthly@.timer
+  register: proxmox_host_storage_scrub_timer
+
+- name: Require OpenZFS monthly scrub timers
+  ansible.builtin.assert:
+    that:
+      - >-
+        proxmox_host_storage_scrub_timer.results
+        | map(attribute='stat')
+        | selectattr('exists')
+        | list
+        | length > 0
+    fail_msg: OpenZFS zfs-scrub-monthly@.timer is missing.
+
+- name: Read Debian periodic-scrub properties
+  ansible.builtin.command:
+    argv:
+      - zfs
+      - get
+      - -H
+      - -o
+      - value
+      - org.debian:periodic-scrub
+      - "{{ item.value.name | default(item.key) }}"
+  register: proxmox_host_storage_periodic_scrub
+  changed_when: false
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Disable Debian cron scrubs on declared pools
+  when: item.stdout != "disable"
+  ansible.builtin.command:
+    argv:
+      - zfs
+      - set
+      - org.debian:periodic-scrub=disable
+      - "{{ item.item.value.name | default(item.item.key) }}"
+  loop: "{{ proxmox_host_storage_periodic_scrub.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Enable OpenZFS monthly scrub timers
+  ansible.builtin.systemd_service:
+    name: "zfs-scrub-monthly@{{ item.value.name | default(item.key) }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ proxmox_host_storage_pools | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Set stable ownership on NAS-exported datasets
+  when: item.value.mapping_id | default('') | length > 0
+  ansible.builtin.file:
+    path: "{{ item.value.mountpoint }}"
+    owner: "{{ proxmox_host_storage_data_uid | string }}"
+    group: "{{ proxmox_host_storage_data_gid | string }}"
+    mode: "0775"
+    state: directory
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Apply pending storage service changes
+  ansible.builtin.meta: flush_handlers

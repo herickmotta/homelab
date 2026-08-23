@@ -108,3 +108,59 @@ variable "agent_timeout" {
   description = "How long the provider waits for qemu-guest-agent after start (first-boot apt needs this)."
   default     = "15m"
 }
+
+variable "startup" {
+  description = <<-EOT
+    Optional Proxmox start/shutdown order. Null leaves order unmanaged so
+    existing guests keep their current host setting.
+  EOT
+  type = object({
+    order      = number
+    up_delay   = optional(number)
+    down_delay = optional(number)
+  })
+  default = null
+
+  validation {
+    condition     = var.startup == null || var.startup.order >= 0
+    error_message = "startup.order must be a non-negative number."
+  }
+}
+
+variable "virtiofs" {
+  description = <<-EOT
+    VirtioFS directory mappings attached to this VM. Empty by default so
+    existing guests receive no VirtioFS devices. The mapping name must already
+    exist as a Proxmox directory mapping. bpg/proxmox 0.111.1 has no
+    hypervisor read-only flag; enforce read-only in the guest mount if needed.
+  EOT
+  type = list(object({
+    mapping      = string
+    cache        = optional(string, "auto")
+    direct_io    = optional(bool, false)
+    expose_acl   = optional(bool, false)
+    expose_xattr = optional(bool, false)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for share in var.virtiofs : can(regex("^[A-Za-z][A-Za-z0-9._-]*$", share.mapping))
+    ])
+    error_message = "Each VirtioFS mapping identifier must start with a letter."
+  }
+
+  validation {
+    condition = length(distinct([
+      for share in var.virtiofs : share.mapping
+    ])) == length(var.virtiofs)
+    error_message = "VirtioFS mapping identifiers on a VM must be unique."
+  }
+
+  validation {
+    condition = alltrue([
+      for share in var.virtiofs : contains(["auto", "always", "metadata", "never"], share.cache)
+    ])
+    error_message = "VirtioFS cache must be auto, always, metadata, or never."
+  }
+}

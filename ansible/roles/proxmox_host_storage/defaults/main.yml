@@ -1,0 +1,32 @@
+---
+proxmox_host_storage_pools: {}
+proxmox_host_storage_datasets: {}
+proxmox_host_storage_data_uid: 10000
+proxmox_host_storage_data_gid: 10000
+proxmox_host_storage_email_destination: ""
+proxmox_host_storage_smtp_host: ""
+proxmox_host_storage_smtp_port: 587
+proxmox_host_storage_smtp_username: ""
+proxmox_host_storage_smtp_password: ""
+proxmox_host_storage_smtp_from: ""
+proxmox_host_storage_smtp_starttls: true
+proxmox_host_storage_smartd_short_test: "S/../../1/02"
+proxmox_host_storage_smartd_long_test: "L/../07/./03"
+proxmox_host_storage_packages:
+  - smartmontools
+  - zfs-zed
+proxmox_host_storage_mail_packages:
+  - msmtp-mta
+  - bsd-mailx
+proxmox_host_storage_retired_units:
+  - homelab-storage-health.timer
+  - homelab-storage-health.service
+  - prometheus-node-exporter.service
+proxmox_host_storage_retired_files:
+  - /usr/local/sbin/homelab-storage-health
+  - /usr/local/sbin/homelab-zpool-scrub
+  - /usr/local/sbin/homelab-storage-mail-test
+  - /etc/systemd/system/homelab-storage-health.service
+  - /etc/systemd/system/homelab-storage-health.timer
+  - /etc/systemd/system/homelab-zfs-scrub@.service
+  - /var/lib/prometheus/node-exporter/homelab-storage.prom

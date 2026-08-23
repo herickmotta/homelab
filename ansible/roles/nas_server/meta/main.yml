@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  author: Herick Motta
+  role_name: nas_server
+  description: VirtioFS mounts and SMB3 shares for a replaceable NAS VM
+  license: MIT
+  min_ansible_version: "2.17"
+dependencies: []

@@ -1,0 +1,11 @@
+# Managed by herickmotta.homelab.netdata_agent. Mode 0640 root:msmtp.
+account default
+auth           on
+tls            {{ "on" if netdata_agent_smtp_starttls | bool else "off" }}
+tls_starttls   {{ "on" if netdata_agent_smtp_starttls | bool else "off" }}
+logfile        /var/log/msmtp.log
+host           {{ netdata_agent_smtp_host }}
+port           {{ netdata_agent_smtp_port }}
+user           {{ netdata_agent_smtp_username }}
+from           {{ netdata_agent_smtp_from if netdata_agent_smtp_from | length > 0 else netdata_agent_smtp_username }}
+password       {{ netdata_agent_smtp_password }}

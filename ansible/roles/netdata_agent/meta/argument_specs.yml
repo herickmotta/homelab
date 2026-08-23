@@ -1,0 +1,69 @@
+---
+argument_specs:
+  main:
+    short_description: Install and configure the Netdata Agent from files
+    options:
+      netdata_agent_kickstart_url:
+        type: str
+        default: https://get.netdata.cloud/kickstart.sh
+      netdata_agent_release_channel:
+        type: str
+        default: stable
+      netdata_agent_config_dir:
+        type: str
+        default: /etc/netdata
+      netdata_agent_bind_to:
+        type: str
+        default: "*"
+      netdata_agent_allow_from:
+        type: str
+        default: localhost
+      netdata_agent_enable_zfspool:
+        type: bool
+        default: false
+      netdata_agent_enable_smartctl:
+        type: bool
+        default: false
+      netdata_agent_enable_samba:
+        type: bool
+        default: false
+      netdata_agent_zpool_binary:
+        type: str
+        default: /usr/sbin/zpool
+      netdata_agent_required_services:
+        type: list
+        elements: str
+      netdata_agent_required_mount_paths:
+        type: list
+        elements: str
+      netdata_agent_disk_mount_points:
+        type: list
+        elements: str
+      netdata_agent_disk_free_warn_percent:
+        type: int
+        default: 15
+      netdata_agent_disk_free_crit_percent:
+        type: int
+        default: 5
+      netdata_agent_email_destination:
+        type: str
+      netdata_agent_smtp_host:
+        type: str
+      netdata_agent_smtp_port:
+        type: int
+        default: 587
+      netdata_agent_smtp_username:
+        type: str
+      netdata_agent_smtp_password:
+        type: str
+      netdata_agent_smtp_from:
+        type: str
+      netdata_agent_smtp_starttls:
+        type: bool
+        default: true
+      netdata_agent_mail_packages:
+        type: list
+        elements: str
+      netdata_agent_packages:
+        type: list
+        elements: str

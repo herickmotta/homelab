@@ -1,0 +1,281 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require Samba credentials, stable IDs, and mounts
+  ansible.builtin.assert:
+    that:
+      - nas_server_smb_username | length > 0
+      - nas_server_smb_password | length > 0
+      - nas_server_smb_uid | int >= 1000
+      - nas_server_smb_gid | int >= 1000
+      - nas_server_mounts | length > 0
+    fail_msg: >-
+      NAS serving requires a username, password, UID/GID at or above 1000, and
+      at least one VirtioFS mount.
+  no_log: true
+
+- name: Reject placeholder Samba passwords
+  ansible.builtin.assert:
+    that:
+      - nas_server_smb_password is not match('(?i)^replace')
+    fail_msg: Set a real SMB_PASSWORD in private SOPS before applying the NAS role.
+  no_log: true
+
+- name: Validate NAS mounts
+  ansible.builtin.assert:
+    that:
+      - item.mapping | length > 0
+      - item.path is match('^/')
+      - item.share | length > 0
+      - item.share is match('^[A-Za-z][A-Za-z0-9_]*$')
+      - "'volatile' not in item.mapping"
+      - "'volatile' not in item.path"
+      - "'volatile' not in item.share"
+    fail_msg: >-
+      NAS mount {{ item.share | default('unknown') }} must declare a mapping,
+      absolute path, and share name, and must not expose volatile datasets.
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.share | default(item.mapping) }}"
+
+- name: Require unique share names and guest paths
+  ansible.builtin.assert:
+    that:
+      - >-
+        (nas_server_mounts | map(attribute='share') | list | unique | length)
+        == (nas_server_mounts | length)
+      - >-
+        (nas_server_mounts | map(attribute='path') | list | unique | length)
+        == (nas_server_mounts | length)
+      - >-
+        (nas_server_mounts | map(attribute='mapping') | list | unique | length)
+        == (nas_server_mounts | length)
+    fail_msg: NAS share names, guest paths, and mapping IDs must be unique.
+
+- name: Stop retired custom NAS monitors
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ nas_server_retired_units }}"
+  failed_when: false
+
+- name: Remove retired custom NAS files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ nas_server_retired_files }}"
+  notify: Reload systemd
+
+- name: Remove node exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: absent
+
+- name: Install NAS packages
+  ansible.builtin.apt:
+    name: "{{ nas_server_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create homelab and share directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ ['/etc/homelab'] + (nas_server_mounts | map(attribute='path') | list) }}"
+
+- name: Install persistent VirtioFS mounts
+  ansible.builtin.blockinfile:
+    path: /etc/fstab
+    marker: "# {mark} homelab nas virtiofs"
+    block: |
+      {% for mount in nas_server_mounts %}
+      {{ mount.mapping }} {{ mount.path }} virtiofs {{ 'ro' if mount.read_only | default(false) else 'rw' }},_netdev,x-systemd.device-timeout=60 0 0
+      {% endfor %}
+
+- name: Inspect required VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - "{{ item.path }}"
+  register: nas_server_findmnt
+  changed_when: false
+  failed_when: false
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Mount required VirtioFS filesystems
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ item.item.path }}"
+  register: nas_server_mount
+  changed_when: nas_server_mount.rc == 0
+  when: item.rc != 0
+  loop: "{{ nas_server_findmnt.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Re-inspect required VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - FSTYPE,SOURCE
+      - "{{ item.path }}"
+  register: nas_server_mounted
+  changed_when: false
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Require VirtioFS mountpoints
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - (item.stdout.split() | length) >= 2
+      - item.stdout.split()[0] == "virtiofs"
+      - item.stdout.split()[1] == item.item.mapping
+    fail_msg: >-
+      {{ item.item.path }} must be VirtioFS mapping {{ item.item.mapping }}.
+  loop: "{{ nas_server_mounted.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Create the household group with a stable GID
+  ansible.builtin.group:
+    name: "{{ nas_server_smb_username }}"
+    gid: "{{ nas_server_smb_gid | int }}"
+    system: false
+
+- name: Create the UNIX Samba account with a stable UID
+  ansible.builtin.user:
+    name: "{{ nas_server_smb_username }}"
+    uid: "{{ nas_server_smb_uid | int }}"
+    group: "{{ nas_server_smb_username }}"
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+    system: false
+
+- name: Set share directory ownership
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ nas_server_smb_uid | string }}"
+    group: "{{ nas_server_smb_gid | string }}"
+    mode: "0775"
+    state: directory
+  loop: "{{ nas_server_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install expected NAS configuration
+  ansible.builtin.copy:
+    dest: /etc/homelab/nas-expected.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ nas_server_expected | to_nice_json }}"
+  vars:
+    nas_server_expected:
+      schema_version: 2
+      mounts: "{{ nas_server_mounts }}"
+      smb_conf: "{{ nas_server_smb_conf }}"
+      smb_username: "{{ nas_server_smb_username }}"
+      smb_uid: "{{ nas_server_smb_uid | int }}"
+      smb_gid: "{{ nas_server_smb_gid | int }}"
+
+- name: Discover Samba accounts
+  ansible.builtin.command:
+    argv:
+      - pdbedit
+      - -L
+  register: nas_server_pdbedit
+  changed_when: false
+
+- name: Create or update the Samba password
+  ansible.builtin.command:
+    argv:
+      - smbpasswd
+      - -a
+      - -s
+      - "{{ nas_server_smb_username }}"
+    stdin: "{{ nas_server_smb_password }}\n{{ nas_server_smb_password }}\n"
+  no_log: true
+  changed_when: >-
+    nas_server_smb_username not in nas_server_pdbedit.stdout
+
+- name: Install Samba configuration
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: "{{ nas_server_smb_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Samba
+
+- name: Inspect installed services
+  ansible.builtin.service_facts:
+
+- name: Disable NetBIOS
+  when: "'nmbd.service' in ansible_facts.services"
+  ansible.builtin.systemd_service:
+    name: nmbd.service
+    enabled: false
+    state: stopped
+
+- name: Enable Samba
+  ansible.builtin.systemd_service:
+    name: smbd.service
+    enabled: true
+    state: started
+
+- name: Apply pending NAS service changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Inspect Samba configuration
+  ansible.builtin.command:
+    argv:
+      - testparm
+      - -s
+  register: nas_server_testparm
+  changed_when: false
+
+- name: Require SMB3 without guest access
+  ansible.builtin.assert:
+    that:
+      - "'server min protocol = SMB3' in nas_server_testparm.stdout"
+      - "'map to guest = Never' in nas_server_testparm.stdout"
+      - "'smbd profiling level = count' in nas_server_testparm.stdout"
+      - >-
+        'nmbd.service' not in ansible_facts.services
+        or ansible_facts.services['nmbd.service'].state != 'running'
+    fail_msg: Samba must be SMB3-only with guest access and NetBIOS disabled.
+
+- name: Require smbd to be active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - smbd.service
+  register: nas_server_smbd
+  changed_when: false
+  failed_when: nas_server_smbd.stdout != "active"
+
+- name: Run SMB integration tests
+  when:
+    - nas_server_smb_integration_test | bool
+    - not ansible_check_mode
+  ansible.builtin.include_tasks: smb_probe.yml
