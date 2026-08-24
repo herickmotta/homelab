@@ -196,6 +196,10 @@ site:
     model: bundled
     # Stacked dual-lens example: one RTSP pull per device, ffmpeg crops into
     # Frigate cameras. Combined streams are go2rtc-only. Fictional IPs.
+    # Software crops (CPU). When gpu_enabled, use the role templates instead:
+    #   ffmpeg:porch_combined#video=h264_vaapi_crop_top#input=vaapi_rtsp
+    #   ffmpeg:porch_combined#video=h264_vaapi_crop_bottom#input=vaapi_rtsp
+    # Do not add #hardware on a #raw=-vf crop line; go2rtc drops the crop.
     go2rtc_streams:
       porch_combined:
         - "rtsp://camera:{FRIGATE_CAM_PASS_URL}@192.0.2.80:554/user=camera&password={FRIGATE_CAM_PASS_URL}&channel=1&stream=0.sdp?"
