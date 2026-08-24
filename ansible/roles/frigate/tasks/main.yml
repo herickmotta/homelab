@@ -18,6 +18,7 @@
       - frigate_cameras | length > 0
       - frigate_openvino_device in ['GPU', 'CPU']
       - frigate_proxy_default_role in ['admin', 'viewer']
+      - not (frigate_gpu_hw_decode | bool) or (frigate_gpu_enabled | bool)
     fail_msg: Frigate requires a pinned image, media path, JWT secret, and at least one camera definition.
   no_log: true
 
@@ -205,12 +206,16 @@
             and 'CAP_PERFMON' in (frigate_compose_slurp.content | b64decode)
             and 'h264_vaapi_crop_top' in (frigate_config_slurp.content | b64decode)
             and 'h264_vaapi_crop_bottom' in (frigate_config_slurp.content | b64decode)
-            and 'vaapi_rtsp' in (frigate_config_slurp.content | b64decode))
+            and 'vaapi_rtsp' in (frigate_config_slurp.content | b64decode)
+            and (('-hwaccel vaapi' in (frigate_config_slurp.content | b64decode))
+                 == (frigate_gpu_hw_decode | bool))
+            and ((not (frigate_gpu_hw_decode | bool))
+                 or ('hwdownload' in (frigate_config_slurp.content | b64decode))))
     fail_msg: >-
       Generated Frigate config must disable MQTT, track person/cat only, set an
       OpenVINO or YOLO model path, publish 8971 without 5000, and when GPU is
       enabled map /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg
-      templates.
+      templates. Hardware decode must add -hwaccel vaapi and hwdownload.
 
 - name: Start Frigate Compose project
   ansible.builtin.command:

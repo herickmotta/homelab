@@ -25,6 +25,8 @@ argument_specs:
         type: bool
       frigate_gpu_render_node:
         type: str
+      frigate_gpu_hw_decode:
+        type: bool
       frigate_openvino_device:
         type: str
       frigate_jwt_secret:
