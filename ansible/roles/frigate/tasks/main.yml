@@ -67,7 +67,12 @@
     that:
       - item.value | length > 0
       - item.value is not match('(?i)^replace')
-    fail_msg: Camera environment {{ item.key }} is empty or still a REPLACE placeholder.
+      # go2rtc uses Go url.Parse; a lone % (for example %A) is not a valid escape.
+      - item.value is match('^([^%]|%[0-9A-Fa-f]{2})+$')
+    fail_msg: >-
+      Camera environment {{ item.key }} is empty, still a REPLACE placeholder,
+      or contains an incomplete percent-escape. Encode the raw password with
+      urllib.parse.quote(..., safe='').
   loop: "{{ frigate_camera_env | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
@@ -185,9 +190,16 @@
       - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
       - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
       - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
+      - (frigate_config_slurp.content | b64decode | from_yaml).model.path | length > 0
+      - >-
+        (frigate_model != 'bundled')
+        or ((frigate_config_slurp.content | b64decode | from_yaml).model.path
+            == '/openvino-model/ssdlite_mobilenet_v2.xml')
       - "'5000:5000' not in (frigate_compose_slurp.content | b64decode)"
       - "'8971' in (frigate_compose_slurp.content | b64decode)"
-    fail_msg: Generated Frigate config must disable MQTT, track person/cat only, and publish 8971 without 5000.
+    fail_msg: >-
+      Generated Frigate config must disable MQTT, track person/cat only, set an
+      OpenVINO or YOLO model path, and publish 8971 without 5000.
 
 - name: Start Frigate Compose project
   ansible.builtin.command:

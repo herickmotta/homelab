@@ -27,6 +27,15 @@ model:
   input_dtype: float
   path: /config/model_cache/{{ frigate_yolov9_filename }}
   labelmap_path: /labelmap/coco-80.txt
+{% else %}
+{# Frigate 0.17 OpenVINO requires an explicit model.path; omitting it crash-loops. #}
+model:
+  width: 300
+  height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
 {% endif %}
 
 objects:
