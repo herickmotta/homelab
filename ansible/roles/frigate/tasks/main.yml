@@ -88,6 +88,18 @@
         == (frigate_cameras | length)
     fail_msg: Frigate camera names must be unique.
 
+- name: Require tracked object labels
+  ansible.builtin.assert:
+    that:
+      - frigate_objects_track | length > 0
+      - >-
+        (frigate_objects_track | unique | length)
+        == (frigate_objects_track | length)
+      - "'package' not in frigate_objects_track"
+    fail_msg: >-
+      frigate_objects_track must be a unique COCO-80 list. Generic models have
+      no package label.
+
 - name: Reject package tracking in generated config
   ansible.builtin.assert:
     that:
@@ -228,7 +240,7 @@
       - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
       - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
       - (frigate_config_slurp.content | b64decode | from_yaml).proxy.default_role == frigate_proxy_default_role
-      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
+      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == frigate_objects_track
       - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
       - >-
         (frigate_classifications | length == 0)
@@ -256,11 +268,11 @@
             and ((not (frigate_gpu_hw_decode | bool))
                  or ('hwdownload' in (frigate_config_slurp.content | b64decode))))
     fail_msg: >-
-      Generated Frigate config must disable MQTT, track person/cat only, emit
-      configured classification models, set an OpenVINO or YOLO model path,
-      publish 8971 without 5000, and when GPU is enabled map /dev/dri with
-      CAP_PERFMON and emit VAAPI crop ffmpeg templates. Hardware decode must
-      add -hwaccel vaapi and hwdownload.
+      Generated Frigate config must disable MQTT, track the configured COCO
+      labels without package, emit configured classification models, set an
+      OpenVINO or YOLO model path, publish 8971 without 5000, and when GPU is
+      enabled map /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg
+      templates. Hardware decode must add -hwaccel vaapi and hwdownload.
 
 - name: Start Frigate Compose project
   ansible.builtin.command:

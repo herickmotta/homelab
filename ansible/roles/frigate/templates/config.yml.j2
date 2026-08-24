@@ -43,8 +43,9 @@ model:
 
 objects:
   track:
-    - person
-    - cat
+{% for label in frigate_objects_track %}
+    - "{{ label }}"
+{% endfor %}
 
 record:
   enabled: true
@@ -113,10 +114,13 @@ cameras:
       width: {{ camera.detect_width | default(frigate_detect_width) }}
       height: {{ camera.detect_height | default(frigate_detect_height) }}
       fps: {{ camera.detect_fps | default(frigate_detect_fps) }}
+{% if camera.objects is defined and camera.objects | length > 0 %}
     objects:
       track:
-        - person
-        - cat
+{% for label in camera.objects %}
+        - "{{ label }}"
+{% endfor %}
+{% endif %}
 {% if camera.zones is defined and camera.zones | length > 0 %}
     zones:
 {% for zone in camera.zones %}

@@ -194,6 +194,9 @@ site:
     media_path: /mnt/frigate
     gpu_enabled: false
     model: bundled
+    objects_track:
+      - person
+      - cat
     # Stacked dual-lens example: one RTSP pull per device, ffmpeg crops into
     # Frigate cameras. Combined streams are go2rtc-only. Fictional IPs.
     # Software crops (CPU). When gpu_enabled, use the role templates instead:
