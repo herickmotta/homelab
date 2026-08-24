@@ -30,6 +30,8 @@ argument_specs:
       frigate_jwt_secret:
         type: str
         required: true
+      frigate_auth_enabled:
+        type: bool
       frigate_model:
         type: str
         choices:

@@ -3,7 +3,7 @@ mqtt:
   enabled: false
 
 auth:
-  enabled: true
+  enabled: {{ frigate_auth_enabled | bool | lower }}
 
 tls:
   enabled: false
