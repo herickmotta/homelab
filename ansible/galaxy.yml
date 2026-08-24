@@ -1,7 +1,7 @@
 ---
 namespace: herickmotta
 name: homelab
-version: 0.6.4
+version: 0.6.5
 readme: README.md
 authors:
   - Herick Motta
