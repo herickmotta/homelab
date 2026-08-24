@@ -22,3 +22,13 @@ output "virtiofs_mappings" {
   description = "VirtioFS mapping identifiers keyed by stable logical guest identity."
   value       = { for key, guest in module.guest : key => guest.virtiofs_mappings }
 }
+
+output "pci_mapping_ids" {
+  description = "Proxmox PCI mapping identifiers managed by this module."
+  value       = { for key, mapping in proxmox_hardware_mapping_pci.this : key => mapping.id }
+}
+
+output "hostpci_mappings" {
+  description = "PCI mapping identifiers keyed by stable logical guest identity."
+  value       = { for key, guest in module.guest : key => guest.hostpci_mappings }
+}

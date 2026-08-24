@@ -10,6 +10,11 @@ site:
     node_name: pve-example
     bridge: vmbr0
     datastore: local-lvm
+    pci_mappings:
+      example-igpu:
+        id: "8086:0000"
+        path: "0000:00:02.0"
+        comment: Fictional Intel iGPU mapping
 
   # Brownfield machines. OpenTofu does not create these; keep them out of guests.
   hosts:
@@ -50,6 +55,37 @@ site:
       startup:
         order: 1
         up_delay: 15
+      proxy_routes:
+        - hostname: adguard
+          upstream: 127.0.0.1:3000
+        - hostname: frigate
+          upstream: 192.0.2.15:8971
+
+    application_runtime:
+      hostname: apps-example
+      vm_id: 115
+      ipv4: 192.0.2.15
+      groups:
+        - homelab_guest
+        - application_runtime
+        - frigate
+      cores: 4
+      cpu_type: host
+      memory_mb: 8192
+      disk_gb: 64
+      machine: q35
+      tags:
+        - apps
+      startup:
+        order: 3
+      virtiofs:
+        - mapping: example-frigate
+      hostpci:
+        - mapping: example-igpu
+          pcie: true
+      virtiofs_mounts:
+        - mapping: example-frigate
+          path: /mnt/frigate
 
     nas_gateway:
       hostname: nas-example
@@ -115,6 +151,7 @@ site:
         pool: volatile
         dataset: volatile/frigate
         mountpoint: /srv/example/volatile/frigate
+        mapping_id: example-frigate
         class: disposable
       cache:
         pool: volatile
@@ -152,3 +189,32 @@ site:
           path: /srv/media
           share: media
           read_only: false
+
+  frigate:
+    media_path: /mnt/frigate
+    gpu_enabled: false
+    model: bundled
+    # Stacked dual-lens example: one RTSP pull per device, ffmpeg crops into
+    # Frigate cameras. Combined streams are go2rtc-only. Fictional IPs.
+    go2rtc_streams:
+      porch_combined:
+        - "rtsp://camera:{FRIGATE_CAM_PASS_URL}@192.0.2.80:554/user=camera&password={FRIGATE_CAM_PASS_URL}&channel=1&stream=0.sdp?"
+      porch_top:
+        - "ffmpeg:porch_combined#video=h264#raw=-vf crop=iw:ih/2:0:0"
+      porch_bottom:
+        - "ffmpeg:porch_combined#video=h264#raw=-vf crop=iw:ih/2:0:ih/2"
+      yard_combined:
+        - "rtsp://camera:{FRIGATE_CAM_PASS_URL}@192.0.2.81:554/user=camera&password={FRIGATE_CAM_PASS_URL}&channel=1&stream=0.sdp?"
+      yard_top:
+        - "ffmpeg:yard_combined#video=h264#raw=-vf crop=iw:ih/2:0:0"
+      yard_bottom:
+        - "ffmpeg:yard_combined#video=h264#raw=-vf crop=iw:ih/2:0:ih/2"
+    cameras:
+      - name: porch_top
+        enabled: false
+      - name: porch_bottom
+        enabled: false
+      - name: yard_top
+        enabled: false
+      - name: yard_bottom
+        enabled: false

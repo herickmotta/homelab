@@ -64,6 +64,45 @@ variable "agent_timeout" {
   default     = "15m"
 }
 
+variable "pci_mappings" {
+  description = <<-EOT
+    Proxmox PCI mappings keyed by stable mapping identifier. Empty by default.
+    path is the host PCI address (for example 0000:00:02.0) on node_name. id
+    is the PCI vendor:device pair. Guests attach mappings through hostpci[].mapping.
+    Incomplete mappings (empty path) must not be passed in; filter them at the
+    site root so existing guests stay unchanged.
+  EOT
+  type = map(object({
+    id           = string
+    path         = string
+    comment      = optional(string)
+    iommu_group  = optional(number)
+    subsystem_id = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for key in keys(var.pci_mappings) : can(regex("^[A-Za-z][A-Za-z0-9._-]*$", key))
+    ])
+    error_message = "PCI mapping keys must start with a letter."
+  }
+
+  validation {
+    condition = alltrue([
+      for mapping in values(var.pci_mappings) : can(regex("^[0-9a-fA-F]{4}:[0-9a-fA-F]{4}$", mapping.id))
+    ])
+    error_message = "PCI mapping id must be a vendor:device pair such as 8086:4c8a."
+  }
+
+  validation {
+    condition = alltrue([
+      for mapping in values(var.pci_mappings) : can(regex("^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\\.[0-7]$", mapping.path))
+    ])
+    error_message = "PCI mapping path must be a PCI address such as 0000:00:02.0."
+  }
+}
+
 variable "directory_mappings" {
   description = <<-EOT
     Proxmox directory mappings keyed by stable mapping identifier. Empty by
@@ -124,6 +163,14 @@ variable "guests" {
       expose_acl   = optional(bool, false)
       expose_xattr = optional(bool, false)
     })), [])
+    machine = optional(string)
+    hostpci = optional(list(object({
+      mapping = string
+      device  = optional(string)
+      pcie    = optional(bool, true)
+      rombar  = optional(bool, true)
+      xvga    = optional(bool, false)
+    })), [])
   }))
 
   validation {
@@ -153,5 +200,22 @@ variable "guests" {
       length(distinct([for share in guest.virtiofs : share.mapping])) == length(guest.virtiofs)
     ])
     error_message = "Each guest must use unique VirtioFS mapping identifiers."
+  }
+
+  validation {
+    condition = alltrue([
+      for guest in values(var.guests) :
+      guest.machine == null || can(regex("^[A-Za-z0-9.+-]+$", guest.machine))
+    ])
+    error_message = "Guest machine must be a QEMU machine identifier such as q35."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for guest in values(var.guests) : [
+        for device in guest.hostpci : can(regex("^[A-Za-z][A-Za-z0-9._-]*$", device.mapping))
+      ]
+    ]))
+    error_message = "Each guest hostpci mapping identifier must start with a letter."
   }
 }

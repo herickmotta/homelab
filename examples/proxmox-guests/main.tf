@@ -28,14 +28,30 @@ module "example" {
       }
     }
 
-    media = {
-      name      = "media-example"
-      vm_id     = 113
-      ipv4      = "192.0.2.13"
+    application_runtime = {
+      name      = "apps-example"
+      vm_id     = 115
+      ipv4      = "192.0.2.15"
       cores     = 4
+      cpu_type  = "host"
       memory_mb = 8192
-      disk_gb   = 32
-      tags      = ["media"]
+      disk_gb   = 64
+      machine   = "q35"
+      tags      = ["apps"]
+      startup = {
+        order = 3
+      }
+      virtiofs = [
+        {
+          mapping = "example-frigate"
+        }
+      ]
+      hostpci = [
+        {
+          mapping = "example-igpu"
+          pcie    = true
+        }
+      ]
     }
 
     nas_gateway = {
@@ -70,6 +86,18 @@ module "example" {
     example-media = {
       path    = "/srv/example/iron/media"
       comment = "Fictional media dataset"
+    }
+    example-frigate = {
+      path    = "/srv/example/volatile/frigate"
+      comment = "Fictional disposable camera footage"
+    }
+  }
+
+  pci_mappings = {
+    example-igpu = {
+      id      = "8086:0000"
+      path    = "0000:00:02.0"
+      comment = "Fictional Intel iGPU mapping"
     }
   }
 }

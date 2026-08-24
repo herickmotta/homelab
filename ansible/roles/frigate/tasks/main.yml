@@ -1,0 +1,201 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require Frigate inputs
+  ansible.builtin.assert:
+    that:
+      - frigate_image | length > 0
+      - frigate_install_dir is match('^/')
+      - frigate_media_path is match('^/')
+      - frigate_jwt_secret | length >= 32
+      - frigate_jwt_secret is not match('(?i)^replace')
+      - frigate_model in ['bundled', 'yolov9s320']
+      - frigate_cameras | length > 0
+      - frigate_openvino_device in ['GPU', 'CPU']
+    fail_msg: Frigate requires a pinned image, media path, JWT secret, and at least one camera definition.
+  no_log: true
+
+- name: Require go2rtc streams
+  ansible.builtin.assert:
+    that:
+      - frigate_go2rtc_streams is mapping
+      - frigate_go2rtc_streams | length > 0
+    fail_msg: Frigate requires at least one go2rtc stream definition.
+
+- name: Validate go2rtc stream names
+  ansible.builtin.assert:
+    that:
+      - item.key | length > 0
+      - item.key is match('^[a-z][a-z0-9_]*$')
+      - item.value is sequence
+      - item.value | length > 0
+    fail_msg: go2rtc stream {{ item.key | default('unknown') }} needs a name and a non-empty source list.
+  loop: "{{ frigate_go2rtc_streams | dict2items }}"
+  loop_control:
+    label: "{{ item.key | default('unknown') }}"
+
+- name: Validate go2rtc stream sources
+  ansible.builtin.assert:
+    that:
+      - item.1 | length > 0
+    fail_msg: go2rtc stream {{ item.0.key }} has an empty source.
+  loop: "{{ frigate_go2rtc_streams | dict2items | subelements('value') }}"
+  loop_control:
+    label: "{{ item.0.key }}"
+
+- name: Validate camera definitions
+  ansible.builtin.assert:
+    that:
+      - item.name | length > 0
+      - item.name is match('^[a-z][a-z0-9_]*$')
+      - (item.detect_stream | default(item.name)) in frigate_go2rtc_streams
+      - (item.record_stream | default(item.name)) in frigate_go2rtc_streams
+    fail_msg: >-
+      Camera {{ item.name | default('unknown') }} needs a name and
+      detect/record streams that exist in frigate_go2rtc_streams.
+  loop: "{{ frigate_cameras }}"
+  loop_control:
+    label: "{{ item.name | default('unknown') }}"
+
+- name: Require camera environment values
+  ansible.builtin.assert:
+    that:
+      - item.value | length > 0
+      - item.value is not match('(?i)^replace')
+    fail_msg: Camera environment {{ item.key }} is empty or still a REPLACE placeholder.
+  loop: "{{ frigate_camera_env | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  no_log: true
+
+- name: Require unique camera names
+  ansible.builtin.assert:
+    that:
+      - >-
+        (frigate_cameras | map(attribute='name') | list | unique | length)
+        == (frigate_cameras | length)
+    fail_msg: Frigate camera names must be unique.
+
+- name: Reject package tracking in generated config
+  ansible.builtin.assert:
+    that:
+      - "'package' not in (item.objects | default([]))"
+    fail_msg: Generic COCO models have no package label; omit it from camera {{ item.name }}.
+  loop: "{{ frigate_cameras }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create Frigate directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0750"
+  loop:
+    - "{{ frigate_install_dir }}"
+    - "{{ frigate_install_dir }}/config"
+    - "{{ frigate_install_dir }}/config/model_cache"
+    - "{{ frigate_media_path }}"
+
+- name: Install JWT secret file
+  ansible.builtin.copy:
+    dest: "{{ frigate_install_dir }}/config/.jwt_secret"
+    content: "{{ frigate_jwt_secret }}\n"
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Recreate Frigate compose
+
+- name: Copy YOLOv9 ONNX when provided
+  ansible.builtin.copy:
+    src: "{{ frigate_yolov9_src }}"
+    dest: "{{ frigate_install_dir }}/config/model_cache/{{ frigate_yolov9_filename }}"
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0644"
+  when:
+    - frigate_model == 'yolov9s320'
+    - frigate_yolov9_src | length > 0
+
+- name: Require YOLOv9 ONNX for that detector
+  ansible.builtin.stat:
+    path: "{{ frigate_install_dir }}/config/model_cache/{{ frigate_yolov9_filename }}"
+  register: frigate_yolov9_stat
+  when: frigate_model == 'yolov9s320'
+
+- name: Fail if YOLOv9 was requested without a model file
+  ansible.builtin.assert:
+    that:
+      - frigate_yolov9_stat.stat.exists
+    fail_msg: >-
+      frigate_model=yolov9s320 needs
+      {{ frigate_install_dir }}/config/model_cache/{{ frigate_yolov9_filename }}.
+      Export it with scripts/export-yolov9-s-320.sh and set frigate_yolov9_src.
+  when: frigate_model == 'yolov9s320'
+
+- name: Install Frigate Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ frigate_install_dir }}/compose.yaml"
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0644"
+  notify: Recreate Frigate compose
+
+- name: Install Frigate environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ frigate_install_dir }}/.env"
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Recreate Frigate compose
+
+- name: Install Frigate configuration
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ frigate_install_dir }}/config/config.yml"
+    owner: "{{ frigate_owner }}"
+    group: "{{ frigate_group }}"
+    mode: "0640"
+  notify: Recreate Frigate compose
+
+- name: Load generated Frigate configuration
+  ansible.builtin.slurp:
+    src: "{{ frigate_install_dir }}/config/config.yml"
+  register: frigate_config_slurp
+
+- name: Load generated Compose file
+  ansible.builtin.slurp:
+    src: "{{ frigate_install_dir }}/compose.yaml"
+  register: frigate_compose_slurp
+
+- name: Assert generated Frigate YAML
+  ansible.builtin.assert:
+    that:
+      - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
+      - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool
+      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
+      - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
+      - "'5000:5000' not in (frigate_compose_slurp.content | b64decode)"
+      - "'8971' in (frigate_compose_slurp.content | b64decode)"
+    fail_msg: Generated Frigate config must disable MQTT, track person/cat only, and publish 8971 without 5000.
+
+- name: Start Frigate Compose project
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ frigate_install_dir }}"
+  register: frigate_compose_up
+  changed_when: >-
+    frigate_compose_up.rc == 0
+    and ('Started' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout)
+         or 'Recreated' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout)
+         or 'Created' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout))

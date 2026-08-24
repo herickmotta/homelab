@@ -1,0 +1,6 @@
+---
+- name: Recreate Frigate compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ frigate_install_dir }}"
+  changed_when: true

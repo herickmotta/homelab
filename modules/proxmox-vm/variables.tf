@@ -127,6 +127,60 @@ variable "startup" {
   }
 }
 
+variable "machine" {
+  description = <<-EOT
+    Optional QEMU machine type. Null leaves the provider default (pc) so
+    existing guests are unchanged. Set q35 when a guest needs PCIe hostpci.
+  EOT
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.machine == null || can(regex("^[A-Za-z0-9.+-]+$", var.machine))
+    error_message = "machine must be a QEMU machine identifier such as q35."
+  }
+}
+
+variable "hostpci" {
+  description = <<-EOT
+    Optional PCI devices attached through Proxmox resource mappings. Empty by
+    default. mapping must already exist as a Proxmox PCI mapping. Raw PCI
+    addresses (id) are not accepted so API-token auth keeps working. xvga
+    stays false so the existing serial VGA console is unchanged.
+  EOT
+  type = list(object({
+    mapping = string
+    device  = optional(string)
+    pcie    = optional(bool, true)
+    rombar  = optional(bool, true)
+    xvga    = optional(bool, false)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for device in var.hostpci : can(regex("^[A-Za-z][A-Za-z0-9._-]*$", device.mapping))
+    ])
+    error_message = "Each hostpci mapping identifier must start with a letter."
+  }
+
+  validation {
+    condition = length(distinct([
+      for device in var.hostpci : device.mapping
+    ])) == length(var.hostpci)
+    error_message = "hostpci mapping identifiers on a VM must be unique."
+  }
+
+  validation {
+    condition = alltrue([
+      for device in var.hostpci :
+      device.device == null || can(regex("^hostpci[0-9]+$", device.device))
+    ])
+    error_message = "hostpci.device must be omitted or match hostpciN."
+  }
+}
+
 variable "virtiofs" {
   description = <<-EOT
     VirtioFS directory mappings attached to this VM. Empty by default so

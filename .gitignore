@@ -42,6 +42,9 @@ id_ecdsa
 .idea/
 .vscode/
 
+# Generated detector models (export locally, do not commit)
+.cache/
+
 # Local Ansible collection installs/builds
 .ansible/
 collections/

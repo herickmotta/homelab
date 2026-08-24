@@ -1,0 +1,64 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy a pinned Frigate Compose project
+    options:
+      frigate_install_dir:
+        type: str
+      frigate_owner:
+        type: str
+      frigate_group:
+        type: str
+      frigate_image:
+        type: str
+      frigate_tz:
+        type: str
+      frigate_port:
+        type: int
+      frigate_shm_size:
+        type: str
+      frigate_cache_size_mb:
+        type: int
+      frigate_media_path:
+        type: str
+      frigate_gpu_enabled:
+        type: bool
+      frigate_gpu_render_node:
+        type: str
+      frigate_openvino_device:
+        type: str
+      frigate_jwt_secret:
+        type: str
+        required: true
+      frigate_model:
+        type: str
+        choices:
+          - bundled
+          - yolov9s320
+      frigate_yolov9_filename:
+        type: str
+      frigate_yolov9_src:
+        type: str
+      frigate_detect_width:
+        type: int
+      frigate_detect_height:
+        type: int
+      frigate_detect_fps:
+        type: int
+      frigate_record_days:
+        type: int
+      frigate_alert_days:
+        type: int
+      frigate_detection_days:
+        type: int
+      frigate_snapshot_days:
+        type: int
+      frigate_go2rtc_streams:
+        type: dict
+        required: true
+      frigate_cameras:
+        type: list
+        elements: dict
+        required: true
+      frigate_camera_env:
+        type: dict

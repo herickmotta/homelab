@@ -17,3 +17,8 @@ output "virtiofs_mappings" {
   description = "VirtioFS directory mapping identifiers attached to this VM."
   value       = [for share in var.virtiofs : share.mapping]
 }
+
+output "hostpci_mappings" {
+  description = "PCI resource mapping identifiers attached to this VM."
+  value       = [for device in var.hostpci : device.mapping]
+}

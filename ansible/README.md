@@ -7,7 +7,16 @@ Roles:
 - `herickmotta.homelab.guest_base`: Ubuntu guest baseline with Docker,
   Compose, and qemu-guest-agent.
 - `herickmotta.homelab.network_plane`: AdGuard Home, Caddy DNS-01, and
-  Tailscale subnet routing on a dedicated guest.
+  Tailscale subnet routing on a dedicated guest. Caddy routes are a typed
+  hostname-to-upstream list; AdGuard remains the default route.
+- `herickmotta.homelab.application_runtime`: VirtioFS mounts on the shared
+  application VM, including disposable datasets. Optional assert that the
+  Intel render node exists after iGPU passthrough.
+- `herickmotta.homelab.frigate`: pinned Frigate Compose project with
+  OpenVINO, authenticated port 8971 only, and optional generic YOLOv9s-320.
+  Export the ONNX on a workstation with
+  [`scripts/export-yolov9-s-320.sh`](../scripts/export-yolov9-s-320.sh); do not
+  commit the binary.
 - `herickmotta.homelab.proxmox_host_power`: persistent Linux CPU power
   policy and passive power/thermal telemetry tools for a Proxmox host. The
   policy is reapplied by `systemd-tmpfiles` during boot and each Ansible run;

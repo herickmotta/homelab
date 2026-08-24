@@ -13,3 +13,8 @@ network_plane_adguard_user: admin
 network_plane_adguard_querylog_hours: 168
 network_plane_adguard_statistics_hours: 168
 network_plane_adguard_filter_refresh_hours: 24
+
+# AdGuard stays the default route. Extra LAN upstreams are appended by the site.
+network_plane_proxy_routes:
+  - hostname: adguard
+    upstream: 127.0.0.1:3000

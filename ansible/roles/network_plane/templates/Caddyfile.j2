@@ -7,10 +7,12 @@
 		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 	}
 
-	@adguard host adguard.{{ network_plane_domain }}
-	handle @adguard {
-		reverse_proxy 127.0.0.1:3000
+{% for route in network_plane_proxy_routes %}
+	@{{ route.hostname }} host {{ route.hostname }}.{{ network_plane_domain }}
+	handle @{{ route.hostname }} {
+		reverse_proxy {{ route.upstream }}
 	}
+{% endfor %}
 
 	handle {
 		abort
