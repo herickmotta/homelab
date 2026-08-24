@@ -9,7 +9,7 @@ services:
       - "{{ frigate_port }}:8971"
 {% if frigate_gpu_enabled | bool %}
     devices:
-      - "{{ frigate_gpu_render_node }}:{{ frigate_gpu_render_node }}"
+      - /dev/dri:/dev/dri
 {% endif %}
     volumes:
       - ./config:/config
