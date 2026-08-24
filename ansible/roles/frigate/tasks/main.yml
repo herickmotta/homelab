@@ -199,9 +199,13 @@
             == '/openvino-model/ssdlite_mobilenet_v2.xml')
       - "'5000:5000' not in (frigate_compose_slurp.content | b64decode)"
       - "'8971' in (frigate_compose_slurp.content | b64decode)"
+      - >-
+        (not (frigate_gpu_enabled | bool))
+        or ('/dev/dri:/dev/dri' in (frigate_compose_slurp.content | b64decode))
     fail_msg: >-
       Generated Frigate config must disable MQTT, track person/cat only, set an
-      OpenVINO or YOLO model path, and publish 8971 without 5000.
+      OpenVINO or YOLO model path, publish 8971 without 5000, and map /dev/dri
+      when GPU is enabled.
 
 - name: Start Frigate Compose project
   ansible.builtin.command:

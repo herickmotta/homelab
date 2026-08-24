@@ -92,6 +92,38 @@
   loop_control:
     label: "{{ item.path }}"
 
+- name: Install Intel GPU kernel modules
+  ansible.builtin.apt:
+    name:
+      - "linux-modules-extra-{{ ansible_facts['kernel'] }}"
+      - linux-firmware
+    state: present
+    update_cache: true
+  when: application_runtime_require_gpu | bool
+
+- name: Persist i915 across reboot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/i915.conf
+    content: "i915\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: application_runtime_require_gpu | bool
+
+- name: Load i915
+  ansible.builtin.command:
+    argv:
+      - modprobe
+      - i915
+  changed_when: false
+  when: application_runtime_require_gpu | bool
+
+- name: Wait for the Intel render node
+  ansible.builtin.wait_for:
+    path: "{{ application_runtime_gpu_render_node }}"
+    timeout: 30
+  when: application_runtime_require_gpu | bool
+
 - name: Check for the Intel render node
   ansible.builtin.stat:
     path: "{{ application_runtime_gpu_render_node }}"
