@@ -10,6 +10,8 @@ services:
 {% if frigate_gpu_enabled | bool %}
     devices:
       - /dev/dri:/dev/dri
+    cap_add:
+      - CAP_PERFMON
 {% endif %}
     volumes:
       - ./config:/config
