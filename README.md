@@ -47,6 +47,8 @@ flowchart TB
   subgraph apps["Application guest"]
     compose["Compose projects"]
     frigate["Frigate OpenVINO GPU"]
+    mqtt["Mosquitto localhost"]
+    ha["Home Assistant"]
   end
 
   subgraph cameras["Cameras"]
@@ -59,7 +61,10 @@ flowchart TB
   dns -->|"lab names"| proxy
   proxy -->|"AdGuard UI"| dns
   proxy -->|"Frigate UI"| frigate
+  proxy -->|"Home Assistant"| ha
   stacked -->|"go2rtc VAAPI crops"| frigate
+  ha --> mqtt
+  frigate --> mqtt
 
   durable --> virtio
   virtio --> smb
@@ -68,14 +73,16 @@ flowchart TB
   disposable -->|"VirtioFS footage"| frigate
   igpu -->|"hostpci mapping"| apps
   compose --> frigate
+  compose --> mqtt
+  compose --> ha
 ```
 
 How traffic and data move:
 
 - LAN DHCP points at AdGuard. AdGuard filters ads and answers lab names.
   Caddy terminates TLS and proxies to services. AdGuard stays on the
-  network-plane guest; Frigate and later apps run on the application guest
-  and receive names the same way.
+  network-plane guest; Frigate, Home Assistant, and later apps run on the
+  application guest and receive names the same way.
 - Tailscale on that guest advertises the LAN. Remote devices join the tailnet
   and reach DNS and SMB without a second exposure path. Cloudflare is used
   for DNS-01 certificates, not as a public reverse proxy for the LAN.
@@ -111,11 +118,12 @@ stay in the private site repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.6.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.7.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
-`proxmox_host_power`, `proxmox_host_storage`, `nas_server`, and
-`netdata_agent`. Site repositories pin a full commit SHA, not a moving tag;
-`v0.1.0` is the earlier single-VM module only.
+`mqtt_broker`, `homeassistant`, `proxmox_host_power`,
+`proxmox_host_storage`, `nas_server`, and `netdata_agent`. Site repositories
+pin a full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM
+module only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
 implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale

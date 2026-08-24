@@ -36,3 +36,12 @@ frigate_cameras: []
 frigate_camera_env: {}
 # State/object classifiers. Crops come from the Frigate UI; do not invent them.
 frigate_classifications: {}
+# Optional MQTT for Home Assistant. Off keeps generated config mqtt.enabled false.
+frigate_mqtt_enabled: false
+frigate_mqtt_host: mosquitto
+frigate_mqtt_port: 1883
+frigate_mqtt_user: ""
+frigate_mqtt_password: ""
+frigate_mqtt_network: mqtt
+# Publish Frigate's unauthenticated API on loopback only (HA on host network).
+frigate_loopback_api: false

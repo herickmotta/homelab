@@ -1,0 +1,26 @@
+# Managed by herickmotta.homelab.mqtt_broker.
+services:
+  mosquitto:
+    image: "{{ mqtt_broker_image }}"
+    container_name: "{{ mqtt_broker_container_name }}"
+    restart: unless-stopped
+    user: "{{ mqtt_broker_uid }}:{{ mqtt_broker_gid }}"
+    ports:
+      - "127.0.0.1:{{ mqtt_broker_port }}:{{ mqtt_broker_port }}"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/password.txt:/mosquitto/config/password.txt:ro
+      - ./data:/mosquitto/data
+    networks:
+      - mqtt
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      homelab.role: mqtt_broker
+
+networks:
+  mqtt:
+    name: "{{ mqtt_broker_network }}"

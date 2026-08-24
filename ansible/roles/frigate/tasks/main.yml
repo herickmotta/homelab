@@ -19,6 +19,11 @@
       - frigate_openvino_device in ['GPU', 'CPU']
       - frigate_proxy_default_role in ['admin', 'viewer']
       - not (frigate_gpu_hw_decode | bool) or (frigate_gpu_enabled | bool)
+      - not (frigate_mqtt_enabled | bool) or (frigate_mqtt_host | length > 0)
+      - not (frigate_mqtt_enabled | bool) or (frigate_mqtt_user | length > 0)
+      - not (frigate_mqtt_enabled | bool) or (frigate_mqtt_password | length >= 16)
+      - not (frigate_mqtt_enabled | bool) or (frigate_mqtt_password is not match('(?i)^replace'))
+      - not (frigate_mqtt_enabled | bool) or (frigate_mqtt_network | length > 0)
     fail_msg: Frigate requires a pinned image, media path, JWT secret, and at least one camera definition.
   no_log: true
 
@@ -223,7 +228,13 @@
 - name: Assert generated Frigate YAML
   ansible.builtin.assert:
     that:
-      - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
+      - >-
+        (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool
+        == (frigate_mqtt_enabled | bool)
+      - >-
+        (not (frigate_mqtt_enabled | bool))
+        or ((frigate_config_slurp.content | b64decode | from_yaml).mqtt.host
+            == frigate_mqtt_host)
       - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
       - (frigate_config_slurp.content | b64decode | from_yaml).proxy.default_role == frigate_proxy_default_role
       - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == frigate_objects_track
@@ -240,8 +251,18 @@
         (frigate_model != 'bundled')
         or ((frigate_config_slurp.content | b64decode | from_yaml).model.path
             == '/openvino-model/ssdlite_mobilenet_v2.xml')
-      - "'5000:5000' not in (frigate_compose_slurp.content | b64decode)"
+      - "'0.0.0.0:5000' not in (frigate_compose_slurp.content | b64decode)"
+      - >-
+        (frigate_loopback_api | bool)
+        == ('127.0.0.1:5000:5000' in (frigate_compose_slurp.content | b64decode))
+      - >-
+        (frigate_loopback_api | bool)
+        or ('5000:5000' not in (frigate_compose_slurp.content | b64decode))
       - "'8971' in (frigate_compose_slurp.content | b64decode)"
+      - >-
+        (not (frigate_mqtt_enabled | bool))
+        or ('external: true' in (frigate_compose_slurp.content | b64decode)
+            and frigate_mqtt_network in (frigate_compose_slurp.content | b64decode))
       - >-
         (not (frigate_gpu_enabled | bool))
         or ('/dev/dri:/dev/dri' in (frigate_compose_slurp.content | b64decode)
@@ -254,11 +275,12 @@
             and ((not (frigate_gpu_hw_decode | bool))
                  or ('hwdownload' in (frigate_config_slurp.content | b64decode))))
     fail_msg: >-
-      Generated Frigate config must disable MQTT, track the configured COCO
-      labels without package, emit configured classification models, set an
-      OpenVINO or YOLO model path, publish 8971 without 5000, and when GPU is
-      enabled map /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg
-      templates. Hardware decode must add -hwaccel vaapi and hwdownload.
+      Generated Frigate config must match mqtt.enabled, track the configured
+      COCO labels without package, emit configured classification models, set
+      an OpenVINO or YOLO model path, publish 8971, keep LAN 5000 closed
+      (loopback 5000 only when requested), and when GPU is enabled map
+      /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg templates.
+      Hardware decode must add -hwaccel vaapi and hwdownload.
 
 - name: Start Frigate Compose project
   ansible.builtin.command:

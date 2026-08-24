@@ -7,6 +7,9 @@ services:
     env_file: .env
     ports:
       - "{{ frigate_port }}:8971"
+{% if frigate_loopback_api | bool %}
+      - "127.0.0.1:5000:5000"
+{% endif %}
 {% if frigate_gpu_enabled | bool %}
     devices:
       - /dev/dri:/dev/dri
@@ -32,5 +35,17 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+{% if frigate_mqtt_enabled | bool %}
+    networks:
+      - default
+      - mqtt
+{% endif %}
     labels:
       homelab.role: frigate
+{% if frigate_mqtt_enabled | bool %}
+
+networks:
+  mqtt:
+    name: "{{ frigate_mqtt_network }}"
+    external: true
+{% endif %}

@@ -17,9 +17,17 @@ Roles:
   GPU sites can set `frigate_gpu_hw_decode` for VAAPI HEVC decode before the
   CPU crop; encode stays `h264_vaapi`. Optional `frigate_classifications` emits
   Frigate 0.17 state models; copy crops from the UI, do not invent them.
-  Export the ONNX on a workstation with
+  Optional MQTT and loopback-only port 5000 support Home Assistant on the same
+  guest. Export the ONNX on a workstation with
   [`scripts/export-yolov9-s-320.sh`](../scripts/export-yolov9-s-320.sh); do not
   commit the binary.
+- `herickmotta.homelab.mqtt_broker`: Eclipse Mosquitto published on
+  `127.0.0.1` only. Frigate joins the named Docker network; Home Assistant
+  (host network) uses localhost.
+- `herickmotta.homelab.homeassistant`: pinned Home Assistant Container with
+  host networking and git-owned `configuration.yaml` (`http` trusted proxies).
+  `.storage` stays on disk. MQTT broker settings are pasted in the UI from
+  the role env file.
 - `herickmotta.homelab.proxmox_host_power`: persistent Linux CPU power
   policy and passive power/thermal telemetry tools for a Proxmox host. The
   policy is reapplied by `systemd-tmpfiles` during boot and each Ansible run;

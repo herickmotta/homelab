@@ -1,0 +1,105 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require Home Assistant inputs
+  ansible.builtin.assert:
+    that:
+      - homeassistant_image | length > 0
+      - homeassistant_install_dir is match('^/')
+      - homeassistant_name | length > 0
+      - homeassistant_tz | length > 0
+      - homeassistant_trusted_proxies | length > 0
+      - homeassistant_mqtt_broker | length > 0
+      - homeassistant_mqtt_user | length > 0
+      - homeassistant_mqtt_password | length >= 16
+      - homeassistant_mqtt_password is not match('(?i)^replace')
+    fail_msg: >-
+      Home Assistant needs a pinned image, install dir, trusted proxies, and a
+      real MQTT password (for the env file the operator pastes into the UI).
+  no_log: true
+
+- name: Validate trusted proxies
+  ansible.builtin.assert:
+    that:
+      - item | length > 0
+    fail_msg: homeassistant_trusted_proxies must not contain empty entries.
+  loop: "{{ homeassistant_trusted_proxies }}"
+
+- name: Create Home Assistant directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ homeassistant_owner }}"
+    group: "{{ homeassistant_group }}"
+    mode: "0750"
+  loop:
+    - "{{ homeassistant_install_dir }}"
+    - "{{ homeassistant_install_dir }}/config"
+
+- name: Install Home Assistant Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ homeassistant_install_dir }}/compose.yaml"
+    owner: "{{ homeassistant_owner }}"
+    group: "{{ homeassistant_group }}"
+    mode: "0644"
+  notify: Recreate Home Assistant compose
+
+- name: Install Home Assistant environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ homeassistant_install_dir }}/.env"
+    owner: "{{ homeassistant_owner }}"
+    group: "{{ homeassistant_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Recreate Home Assistant compose
+
+- name: Install Home Assistant configuration
+  ansible.builtin.template:
+    src: configuration.yaml.j2
+    dest: "{{ homeassistant_install_dir }}/config/configuration.yaml"
+    owner: "{{ homeassistant_owner }}"
+    group: "{{ homeassistant_group }}"
+    mode: "0640"
+  notify: Recreate Home Assistant compose
+
+- name: Load generated Home Assistant files
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - "{{ homeassistant_install_dir }}/compose.yaml"
+    - "{{ homeassistant_install_dir }}/config/configuration.yaml"
+  register: homeassistant_slurps
+
+- name: Assert generated Home Assistant YAML
+  ansible.builtin.assert:
+    that:
+      - "'network_mode: host' in (homeassistant_slurps.results[0].content | b64decode)"
+      - "'8123:8123' not in (homeassistant_slurps.results[0].content | b64decode)"
+      - "'homelab.role: homeassistant' in (homeassistant_slurps.results[0].content | b64decode)"
+      - >-
+        (homeassistant_slurps.results[1].content | b64decode | from_yaml)
+        .http.use_x_forwarded_for | bool
+      - >-
+        (homeassistant_slurps.results[1].content | b64decode | from_yaml)
+        .http.trusted_proxies == homeassistant_trusted_proxies
+    fail_msg: >-
+      Home Assistant must use host networking without publishing 8123, set
+      trusted proxies, and leave .storage unmanaged.
+
+- name: Start Home Assistant Compose project
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ homeassistant_install_dir }}"
+  register: homeassistant_compose_up
+  changed_when: >-
+    homeassistant_compose_up.rc == 0
+    and ('Started' in (homeassistant_compose_up.stderr ~ homeassistant_compose_up.stdout)
+         or 'Recreated' in (homeassistant_compose_up.stderr ~ homeassistant_compose_up.stdout)
+         or 'Created' in (homeassistant_compose_up.stderr ~ homeassistant_compose_up.stdout))
