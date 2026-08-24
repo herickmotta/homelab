@@ -142,7 +142,7 @@ changing.
 | File | Owns |
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Public contract: purpose, boundary, workflow, this map |
-| [README.md](README.md) | What this repository ships and how a site repo consumes it |
+| [README.md](README.md) | What this repository ships, how a site repo consumes it, and the **running-system mermaid** |
 | [docs/public-private-separation.md](docs/public-private-separation.md) | Canonical public/private contract and promotion |
 | [docs/persistent-storage.md](docs/persistent-storage.md) | Public storage and NAS architecture |
 | [ansible/README.md](ansible/README.md) | Collection role index |
@@ -154,9 +154,19 @@ changing.
 | --- | --- |
 | Boundary, promotion, or public/private rules | this file and `docs/public-private-separation.md` |
 | New or removed module, role, or shipped capability | `README.md` (what ships) and `ansible/README.md` if a role changed |
-| Storage architecture | `docs/persistent-storage.md` |
+| Guest, GPU/PCI, proxy, camera, or data-path topology | README Architecture mermaid (mandatory) |
+| Storage architecture | `docs/persistent-storage.md` plus the README mermaid if the data path changed |
 | Typed public API | module variables / role argument specs, examples, and the README that describes them |
 | Live leftovers, pins, or household topology | nothing here; that belongs in the private site repository |
 
 Do not copy private proven-slice narratives, leftover lists, or a specific
 private repository name into this repository.
+
+### Visual architecture
+
+This file is the shared contract across workstations. Do not put this in
+`.cursor/rules`.
+
+A guest, GPU/PCI, proxy, camera, or data-path change is not documented until
+the README Architecture mermaid shows it. A text-only README update is not
+enough. If the diagram would still be true without the new path, it is stale.

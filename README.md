@@ -46,7 +46,11 @@ flowchart TB
 
   subgraph apps["Application guest"]
     compose["Compose projects"]
-    frigate["Frigate"]
+    frigate["Frigate OpenVINO GPU"]
+  end
+
+  subgraph cameras["Cameras"]
+    stacked["Stacked dual-lens RTSP"]
   end
 
   away -->|"mesh VPN"| mesh
@@ -55,12 +59,13 @@ flowchart TB
   dns -->|"lab names"| proxy
   proxy -->|"AdGuard UI"| dns
   proxy -->|"Frigate UI"| frigate
+  stacked -->|"go2rtc VAAPI crops"| frigate
 
   durable --> virtio
   virtio --> smb
   lan --> smb
   mesh --> smb
-  disposable -->|"VirtioFS"| frigate
+  disposable -->|"VirtioFS footage"| frigate
   igpu -->|"hostpci mapping"| apps
   compose --> frigate
 ```

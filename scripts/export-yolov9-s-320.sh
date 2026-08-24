@@ -12,11 +12,17 @@ UV_IMAGE="${UV_IMAGE:-ghcr.io/astral-sh/uv:0.8.0}"
 ONNX_VERSION="${ONNX_VERSION:-1.18.0}"
 ONNX_SIMPLIFIER="${ONNX_SIMPLIFIER:-0.4.36}"
 
+if command -v sha256sum >/dev/null 2>&1; then
+  hash_file() { sha256sum "$1"; }
+else
+  hash_file() { shasum -a 256 "$1"; }
+fi
+
 mkdir -p "${OUT_DIR}"
 
 if [[ -f "${OUT_FILE}" ]]; then
   echo "exists ${OUT_FILE}"
-  sha256sum "${OUT_FILE}"
+  hash_file "${OUT_FILE}"
   exit 0
 fi
 
@@ -50,7 +56,7 @@ RUN uv pip install --system -r requirements.txt \
   && uv pip install --system \
     "onnx==${ONNX_VERSION}" \
     onnxruntime \
-    "onnx-simplifier==${ONNX_SIMPLIFIER}" \
+    "onnxsim==${ONNX_SIMPLIFIER}" \
     onnxscript
 ADD https://github.com/WongKinYiu/yolov9/releases/download/v0.1/yolov9-${MODEL_SIZE}-converted.pt \
   yolov9-${MODEL_SIZE}.pt
@@ -73,6 +79,6 @@ if [[ -f "${OUT_DIR}/yolov9-${MODEL_SIZE}-${IMG_SIZE}.onnx" && ! -f "${OUT_FILE}
 fi
 
 test -f "${OUT_FILE}"
-sha256sum "${OUT_FILE}" | tee "${OUT_FILE}.sha256"
+hash_file "${OUT_FILE}" | tee "${OUT_FILE}.sha256"
 echo "YOLOv9s-320 ONNX written to ${OUT_FILE}"
 echo "Copy it onto the Frigate guest and set frigate_model=yolov9s320."
