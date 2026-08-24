@@ -125,25 +125,11 @@
   when: frigate_classifications | length > 0
 
 - name: Validate classification camera crops
-  ansible.builtin.assert:
-    that:
-      - item.1.key in (frigate_cameras | map(attribute='name') | list)
-      - item.1.value.crop is sequence
-      - item.1.value.crop | length == 4
-      - item.1.value.crop | select('number') | list | length == 4
-      - item.1.value.crop | min >= 0
-      - item.1.value.crop | max <= 1
-      - item.1.value.crop[0] < item.1.value.crop[2]
-      - item.1.value.crop[1] < item.1.value.crop[3]
-    fail_msg: >-
-      Classification {{ item.0.key }} on {{ item.1.key }} needs a known camera
-      and a normalized crop [x1, y1, x2, y2] copied from the Frigate UI.
-  loop: "{{
-      frigate_classifications | dict2items
-      | subelements('value.state_config.cameras')
-    }}"
+  ansible.builtin.include_tasks: validate_classification_crop.yml
+  loop: "{{ frigate_classifications | dict2items }}"
   loop_control:
-    label: "{{ item.0.key }}/{{ item.1.key }}"
+    loop_var: classification_model
+    label: "{{ classification_model.key }}"
   when: frigate_classifications | length > 0
 
 - name: Create Frigate directories

@@ -1,0 +1,19 @@
+---
+- name: Validate crops for one classification model
+  ansible.builtin.assert:
+    that:
+      - item.key in (frigate_cameras | map(attribute='name') | list)
+      - item.value.crop is sequence
+      - item.value.crop | length == 4
+      - item.value.crop | select('number') | list | length == 4
+      - item.value.crop | min >= 0
+      - item.value.crop | max <= 1
+      - item.value.crop[0] < item.value.crop[2]
+      - item.value.crop[1] < item.value.crop[3]
+    fail_msg: >-
+      Classification {{ classification_model.key }} on {{ item.key }} needs a
+      known camera and a normalized crop [x1, y1, x2, y2] copied from the
+      Frigate UI.
+  loop: "{{ classification_model.value.state_config.cameras | dict2items }}"
+  loop_control:
+    label: "{{ classification_model.key }}/{{ item.key }}"
