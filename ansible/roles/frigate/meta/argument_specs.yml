@@ -32,6 +32,11 @@ argument_specs:
         required: true
       frigate_auth_enabled:
         type: bool
+      frigate_proxy_default_role:
+        type: str
+        choices:
+          - admin
+          - viewer
       frigate_model:
         type: str
         choices:

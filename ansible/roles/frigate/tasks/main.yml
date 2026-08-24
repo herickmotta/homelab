@@ -17,6 +17,7 @@
       - frigate_model in ['bundled', 'yolov9s320']
       - frigate_cameras | length > 0
       - frigate_openvino_device in ['GPU', 'CPU']
+      - frigate_proxy_default_role in ['admin', 'viewer']
     fail_msg: Frigate requires a pinned image, media path, JWT secret, and at least one camera definition.
   no_log: true
 
@@ -188,6 +189,7 @@
     that:
       - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
       - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
+      - (frigate_config_slurp.content | b64decode | from_yaml).proxy.default_role == frigate_proxy_default_role
       - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
       - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
       - (frigate_config_slurp.content | b64decode | from_yaml).model.path | length > 0
