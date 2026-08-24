@@ -5,6 +5,9 @@ mqtt:
 auth:
   enabled: {{ frigate_auth_enabled | bool | lower }}
 
+proxy:
+  default_role: {{ frigate_proxy_default_role }}
+
 tls:
   enabled: false
 

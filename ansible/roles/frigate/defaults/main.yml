@@ -13,6 +13,8 @@ frigate_gpu_render_node: /dev/dri/renderD128
 frigate_openvino_device: GPU
 frigate_jwt_secret: ""
 frigate_auth_enabled: true
+# Port 8971 still enforces roles when login is off. viewer cannot see metrics.
+frigate_proxy_default_role: viewer
 frigate_model: bundled
 frigate_yolov9_filename: yolov9-s-320.onnx
 frigate_yolov9_src: ""
