@@ -182,7 +182,7 @@
   ansible.builtin.assert:
     that:
       - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
-      - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool
+      - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
       - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
       - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
       - "'5000:5000' not in (frigate_compose_slurp.content | b64decode)"

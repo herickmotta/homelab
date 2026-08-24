@@ -12,6 +12,7 @@ frigate_gpu_enabled: true
 frigate_gpu_render_node: /dev/dri/renderD128
 frigate_openvino_device: GPU
 frigate_jwt_secret: ""
+frigate_auth_enabled: true
 frigate_model: bundled
 frigate_yolov9_filename: yolov9-s-320.onnx
 frigate_yolov9_src: ""
