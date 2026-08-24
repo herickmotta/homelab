@@ -71,3 +71,5 @@ argument_specs:
         required: true
       frigate_camera_env:
         type: dict
+      frigate_classifications:
+        type: dict

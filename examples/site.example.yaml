@@ -224,3 +224,12 @@ site:
         enabled: false
       - name: yard_bottom
         enabled: false
+    # Crops are normalized [x1, y1, x2, y2] from the Frigate UI. Do not invent them.
+    classifications:
+      porch_gate:
+        threshold: 0.8
+        state_config:
+          motion: true
+          cameras:
+            porch_bottom:
+              crop: [0.10, 0.40, 0.35, 0.90]

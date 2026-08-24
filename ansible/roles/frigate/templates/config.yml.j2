@@ -139,5 +139,26 @@ cameras:
 {% endif %}
 {% endfor %}
 
-# Local classifiers (visitor_type, gate state, cat_identity) stay omitted until
-# the Frigate UI has enough labeled examples. Do not invent polygons here.
+{% if frigate_classifications | length > 0 %}
+classification:
+  custom:
+{% for model_name, model in frigate_classifications.items() %}
+    {{ model_name }}:
+      enabled: {{ model.enabled | default(true) | bool | lower }}
+      name: {{ model.name | default(model_name) }}
+      threshold: {{ model.threshold | default(0.8) }}
+      state_config:
+        motion: {{ model.state_config.motion | default(true) | bool | lower }}
+{% if model.state_config.interval is defined %}
+        interval: {{ model.state_config.interval }}
+{% endif %}
+        cameras:
+{% for camera_name, camera in model.state_config.cameras.items() %}
+          {{ camera_name }}:
+            crop:
+{% for value in camera.crop %}
+              - {{ value }}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% endif %}

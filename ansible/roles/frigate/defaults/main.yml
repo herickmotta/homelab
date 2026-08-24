@@ -31,3 +31,5 @@ frigate_snapshot_days: 30
 frigate_go2rtc_streams: {}
 frigate_cameras: []
 frigate_camera_env: {}
+# State/object classifiers. Crops come from the Frigate UI; do not invent them.
+frigate_classifications: {}

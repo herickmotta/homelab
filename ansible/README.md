@@ -15,7 +15,9 @@ Roles:
 - `herickmotta.homelab.frigate`: pinned Frigate Compose project with
   OpenVINO, authenticated port 8971 only, and optional generic YOLOv9s-320.
   GPU sites can set `frigate_gpu_hw_decode` for VAAPI HEVC decode before the
-  CPU crop; encode stays `h264_vaapi`. Export the ONNX on a workstation with
+  CPU crop; encode stays `h264_vaapi`. Optional `frigate_classifications` emits
+  Frigate 0.17 state models; copy crops from the UI, do not invent them.
+  Export the ONNX on a workstation with
   [`scripts/export-yolov9-s-320.sh`](../scripts/export-yolov9-s-320.sh); do not
   commit the binary.
 - `herickmotta.homelab.proxmox_host_power`: persistent Linux CPU power
