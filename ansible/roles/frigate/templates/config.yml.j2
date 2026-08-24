@@ -66,9 +66,15 @@ snapshots:
 go2rtc:
 {% if frigate_gpu_enabled | bool %}
   ffmpeg:
+{% if frigate_gpu_hw_decode | bool %}
+    vaapi_rtsp: "-init_hw_device vaapi=va:{{ frigate_gpu_render_node }} -filter_hw_device va -hwaccel vaapi -hwaccel_device va -hwaccel_output_format vaapi -fflags nobuffer -flags low_delay -timeout 5000000 -user_agent go2rtc/ffmpeg -rtsp_flags prefer_tcp -i {{ '{input}' }}"
+    h264_vaapi_crop_top: "-vf hwdownload,format=nv12,crop=iw:ih/2:0:0,hwupload -c:v h264_vaapi -g 50 -bf 0 -profile:v high -level:v 4.1 -sei:v 0"
+    h264_vaapi_crop_bottom: "-vf hwdownload,format=nv12,crop=iw:ih/2:0:ih/2,hwupload -c:v h264_vaapi -g 50 -bf 0 -profile:v high -level:v 4.1 -sei:v 0"
+{% else %}
     vaapi_rtsp: "-init_hw_device vaapi=va:{{ frigate_gpu_render_node }} -filter_hw_device va -fflags nobuffer -flags low_delay -timeout 5000000 -user_agent go2rtc/ffmpeg -rtsp_flags prefer_tcp -i {{ '{input}' }}"
     h264_vaapi_crop_top: "-vf format=nv12,crop=iw:ih/2:0:0,hwupload -c:v h264_vaapi -g 50 -bf 0 -profile:v high -level:v 4.1 -sei:v 0"
     h264_vaapi_crop_bottom: "-vf format=nv12,crop=iw:ih/2:0:ih/2,hwupload -c:v h264_vaapi -g 50 -bf 0 -profile:v high -level:v 4.1 -sei:v 0"
+{% endif %}
 {% endif %}
   streams:
 {% for stream_name, sources in frigate_go2rtc_streams.items() %}

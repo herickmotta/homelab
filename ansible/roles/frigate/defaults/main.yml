@@ -10,6 +10,9 @@ frigate_cache_size_mb: 1024
 frigate_media_path: /mnt/frigate
 frigate_gpu_enabled: true
 frigate_gpu_render_node: /dev/dri/renderD128
+# VAAPI HEVC decode before the CPU crop. Off by default: camera bitstreams
+# vary, and a failed hwaccel path blacks the streams. Encode stays h264_vaapi.
+frigate_gpu_hw_decode: false
 frigate_openvino_device: GPU
 frigate_jwt_secret: ""
 frigate_auth_enabled: true
