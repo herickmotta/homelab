@@ -65,10 +65,6 @@ snapshots:
 
 go2rtc:
 {% if frigate_gpu_enabled | bool %}
-  {# Named ffmpeg templates for stacked dual-lens crops. Do not use
-     #hardware with #raw=-vf crop; go2rtc then drops the crop. HEVC
-     stacked decode stays on CPU; h264_vaapi encodes the cropped half.
-     {input} is a go2rtc placeholder, not a Frigate env substitution. #}
   ffmpeg:
     vaapi_rtsp: "-init_hw_device vaapi=va:{{ frigate_gpu_render_node }} -filter_hw_device va -fflags nobuffer -flags low_delay -timeout 5000000 -user_agent go2rtc/ffmpeg -rtsp_flags prefer_tcp -i {{ '{input}' }}"
     h264_vaapi_crop_top: "-vf format=nv12,crop=iw:ih/2:0:0,hwupload -c:v h264_vaapi -g 50 -bf 0 -profile:v high -level:v 4.1 -sei:v 0"
