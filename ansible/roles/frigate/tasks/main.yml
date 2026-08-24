@@ -88,6 +88,18 @@
         == (frigate_cameras | length)
     fail_msg: Frigate camera names must be unique.
 
+- name: Require tracked object labels
+  ansible.builtin.assert:
+    that:
+      - frigate_objects_track | length > 0
+      - >-
+        (frigate_objects_track | unique | length)
+        == (frigate_objects_track | length)
+      - "'package' not in frigate_objects_track"
+    fail_msg: >-
+      frigate_objects_track must be a unique COCO-80 list. Generic models have
+      no package label.
+
 - name: Reject package tracking in generated config
   ansible.builtin.assert:
     that:
@@ -96,6 +108,43 @@
   loop: "{{ frigate_cameras }}"
   loop_control:
     label: "{{ item.name }}"
+
+- name: Validate classification model names
+  ansible.builtin.assert:
+    that:
+      - item.key | length > 0
+      - item.key is match('^[a-z][a-z0-9_]*$')
+      - item.value is mapping
+      - item.value.state_config is mapping
+      - item.value.state_config.cameras is mapping
+      - item.value.state_config.cameras | length > 0
+    fail_msg: Classification {{ item.key | default('unknown') }} needs a name and state_config.cameras.
+  loop: "{{ frigate_classifications | dict2items }}"
+  loop_control:
+    label: "{{ item.key | default('unknown') }}"
+  when: frigate_classifications | length > 0
+
+- name: Validate classification camera crops
+  ansible.builtin.assert:
+    that:
+      - item.1.key in (frigate_cameras | map(attribute='name') | list)
+      - item.1.value.crop is sequence
+      - item.1.value.crop | length == 4
+      - item.1.value.crop | select('number') | list | length == 4
+      - item.1.value.crop | min >= 0
+      - item.1.value.crop | max <= 1
+      - item.1.value.crop[0] < item.1.value.crop[2]
+      - item.1.value.crop[1] < item.1.value.crop[3]
+    fail_msg: >-
+      Classification {{ item.0.key }} on {{ item.1.key }} needs a known camera
+      and a normalized crop [x1, y1, x2, y2] copied from the Frigate UI.
+  loop: "{{
+      frigate_classifications | dict2items
+      | subelements('value.state_config.cameras')
+    }}"
+  loop_control:
+    label: "{{ item.0.key }}/{{ item.1.key }}"
+  when: frigate_classifications | length > 0
 
 - name: Create Frigate directories
   ansible.builtin.file:
@@ -191,8 +240,15 @@
       - (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool == false
       - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
       - (frigate_config_slurp.content | b64decode | from_yaml).proxy.default_role == frigate_proxy_default_role
-      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == ['person', 'cat']
+      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == frigate_objects_track
       - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
+      - >-
+        (frigate_classifications | length == 0)
+        or (
+          ((frigate_config_slurp.content | b64decode | from_yaml)
+           .classification.custom.keys() | list | sort)
+          == (frigate_classifications.keys() | list | sort)
+        )
       - (frigate_config_slurp.content | b64decode | from_yaml).model.path | length > 0
       - >-
         (frigate_model != 'bundled')
@@ -212,7 +268,8 @@
             and ((not (frigate_gpu_hw_decode | bool))
                  or ('hwdownload' in (frigate_config_slurp.content | b64decode))))
     fail_msg: >-
-      Generated Frigate config must disable MQTT, track person/cat only, set an
+      Generated Frigate config must disable MQTT, track the configured COCO
+      labels without package, emit configured classification models, set an
       OpenVINO or YOLO model path, publish 8971 without 5000, and when GPU is
       enabled map /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg
       templates. Hardware decode must add -hwaccel vaapi and hwdownload.

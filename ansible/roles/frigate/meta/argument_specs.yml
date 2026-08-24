@@ -62,6 +62,9 @@ argument_specs:
         type: int
       frigate_snapshot_days:
         type: int
+      frigate_objects_track:
+        type: list
+        elements: str
       frigate_go2rtc_streams:
         type: dict
         required: true
@@ -70,4 +73,6 @@ argument_specs:
         elements: dict
         required: true
       frigate_camera_env:
+        type: dict
+      frigate_classifications:
         type: dict
