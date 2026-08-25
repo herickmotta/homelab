@@ -60,6 +60,8 @@ site:
           upstream: 127.0.0.1:3000
         - hostname: frigate
           upstream: 192.0.2.15:8971
+        - hostname: ha
+          upstream: 192.0.2.15:8123
 
     application_runtime:
       hostname: apps-example
@@ -69,6 +71,8 @@ site:
         - homelab_guest
         - application_runtime
         - frigate
+        - mqtt_broker
+        - homeassistant
       cores: 4
       cpu_type: host
       memory_mb: 8192
@@ -190,10 +194,24 @@ site:
           share: media
           read_only: false
 
+  mqtt:
+    user: homelab
+    network: mqtt
+
+  homeassistant:
+    name: Home
+    external_url: https://ha.lab.example.test
+    trusted_proxies:
+      - 192.0.2.12
+      - 127.0.0.1
+
   frigate:
     media_path: /mnt/frigate
     gpu_enabled: false
     model: bundled
+    mqtt_enabled: true
+    mqtt_host: mosquitto
+    loopback_api: true
     objects_track:
       - person
       - cat

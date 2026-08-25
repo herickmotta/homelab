@@ -1,0 +1,144 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require Mosquitto credentials
+  ansible.builtin.assert:
+    that:
+      - mqtt_broker_image | length > 0
+      - mqtt_broker_install_dir is match('^/')
+      - mqtt_broker_container_name | length > 0
+      - mqtt_broker_network | length > 0
+      - mqtt_broker_user | length > 0
+      - mqtt_broker_password | length >= 16
+      - mqtt_broker_password is not match('(?i)^replace')
+      - mqtt_broker_port | int > 0
+    fail_msg: Mosquitto needs a pinned image, install dir, user, and a real password.
+  no_log: true
+
+- name: Create Mosquitto directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ mqtt_broker_install_dir }}"
+      owner: "{{ mqtt_broker_owner }}"
+      group: "{{ mqtt_broker_group }}"
+      mode: "0750"
+    - path: "{{ mqtt_broker_install_dir }}/config"
+      owner: "{{ mqtt_broker_owner }}"
+      group: "{{ mqtt_broker_group }}"
+      mode: "0750"
+    - path: "{{ mqtt_broker_install_dir }}/data"
+      owner: "{{ mqtt_broker_uid }}"
+      group: "{{ mqtt_broker_gid }}"
+      mode: "0750"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install Mosquitto configuration
+  ansible.builtin.template:
+    src: mosquitto.conf.j2
+    dest: "{{ mqtt_broker_install_dir }}/config/mosquitto.conf"
+    owner: "{{ mqtt_broker_owner }}"
+    group: "{{ mqtt_broker_group }}"
+    mode: "0644"
+  notify: Recreate Mosquitto compose
+
+- name: Install Mosquitto Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ mqtt_broker_install_dir }}/compose.yaml"
+    owner: "{{ mqtt_broker_owner }}"
+    group: "{{ mqtt_broker_group }}"
+    mode: "0644"
+  notify: Recreate Mosquitto compose
+
+- name: Remember MQTT credential fingerprint
+  ansible.builtin.copy:
+    dest: "{{ mqtt_broker_install_dir }}/config/.passwd.sha256"
+    content: "{{ (mqtt_broker_user ~ ':' ~ mqtt_broker_password) | hash('sha256') }}\n"
+    owner: "{{ mqtt_broker_owner }}"
+    group: "{{ mqtt_broker_group }}"
+    mode: "0600"
+  no_log: true
+  register: mqtt_broker_pw_meta
+
+- name: Pull the Mosquitto image
+  ansible.builtin.command:
+    cmd: docker pull {{ mqtt_broker_image }}
+  register: mqtt_broker_pull
+  changed_when: "'Downloaded newer image' in mqtt_broker_pull.stdout"
+  when: mqtt_broker_pw_meta.changed
+
+- name: Generate the Mosquitto password file
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --user
+      - "0"
+      - -v
+      - "{{ mqtt_broker_install_dir }}/config:/mosquitto/config"
+      - "{{ mqtt_broker_image }}"
+      - mosquitto_passwd
+      - -b
+      - -c
+      - /mosquitto/config/password.txt
+      - "{{ mqtt_broker_user }}"
+      - "{{ mqtt_broker_password }}"
+  no_log: true
+  when: mqtt_broker_pw_meta.changed
+  notify: Recreate Mosquitto compose
+
+- name: Restrict the Mosquitto password file
+  ansible.builtin.file:
+    path: "{{ mqtt_broker_install_dir }}/config/password.txt"
+    owner: "{{ mqtt_broker_uid }}"
+    group: "{{ mqtt_broker_gid }}"
+    mode: "0400"
+
+- name: Require the Mosquitto password file
+  ansible.builtin.stat:
+    path: "{{ mqtt_broker_install_dir }}/config/password.txt"
+  register: mqtt_broker_password_stat
+
+- name: Fail if the Mosquitto password file is missing
+  ansible.builtin.assert:
+    that:
+      - mqtt_broker_password_stat.stat.exists
+    fail_msg: Mosquitto password.txt was not created.
+
+- name: Load generated Mosquitto Compose file
+  ansible.builtin.slurp:
+    src: "{{ mqtt_broker_install_dir }}/compose.yaml"
+  register: mqtt_broker_compose_slurp
+
+- name: Assert Mosquitto publishes loopback only
+  ansible.builtin.assert:
+    that:
+      - >-
+        ('127.0.0.1:' ~ (mqtt_broker_port | string) ~ ':' ~ (mqtt_broker_port | string))
+        in (mqtt_broker_compose_slurp.content | b64decode)
+      - "'0.0.0.0:' not in (mqtt_broker_compose_slurp.content | b64decode)"
+      - "'homelab.role: mqtt_broker' in (mqtt_broker_compose_slurp.content | b64decode)"
+    fail_msg: Mosquitto must publish 127.0.0.1 only and must not bind 0.0.0.0.
+
+- name: Start Mosquitto Compose project
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ mqtt_broker_install_dir }}"
+  register: mqtt_broker_compose_up
+  changed_when: >-
+    mqtt_broker_compose_up.rc == 0
+    and ('Started' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout)
+         or 'Recreated' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout)
+         or 'Created' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout))

@@ -1,6 +1,15 @@
 # Managed by herickmotta.homelab.frigate. Camera credentials come from env.
 mqtt:
+{% if frigate_mqtt_enabled | bool %}
+  enabled: true
+  host: {{ frigate_mqtt_host }}
+  port: {{ frigate_mqtt_port }}
+  topic_prefix: frigate
+  user: {{ frigate_mqtt_user }}
+  password: "{FRIGATE_MQTT_PASSWORD}"
+{% else %}
   enabled: false
+{% endif %}
 
 auth:
   enabled: {{ frigate_auth_enabled | bool | lower }}

@@ -1,0 +1,6 @@
+---
+- name: Recreate Home Assistant compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ homeassistant_install_dir }}"
+  changed_when: true

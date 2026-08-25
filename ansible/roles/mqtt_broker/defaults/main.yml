@@ -1,0 +1,12 @@
+---
+mqtt_broker_install_dir: /opt/mosquitto
+mqtt_broker_owner: "{{ ansible_user }}"
+mqtt_broker_group: "{{ ansible_user }}"
+mqtt_broker_image: eclipse-mosquitto:2.1.2-alpine
+mqtt_broker_container_name: mosquitto
+mqtt_broker_network: mqtt
+mqtt_broker_port: 1883
+mqtt_broker_user: homelab
+mqtt_broker_password: ""
+mqtt_broker_uid: 1883
+mqtt_broker_gid: 1883

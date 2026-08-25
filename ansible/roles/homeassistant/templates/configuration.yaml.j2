@@ -1,0 +1,17 @@
+# Managed by herickmotta.homelab.homeassistant.
+default_config:
+
+homeassistant:
+  name: {{ homeassistant_name }}
+  time_zone: {{ homeassistant_tz }}
+{% if homeassistant_external_url | length > 0 %}
+  external_url: {{ homeassistant_external_url }}
+  internal_url: {{ homeassistant_internal_url | default(homeassistant_external_url, true) }}
+{% endif %}
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+{% for proxy in homeassistant_trusted_proxies %}
+    - {{ proxy }}
+{% endfor %}

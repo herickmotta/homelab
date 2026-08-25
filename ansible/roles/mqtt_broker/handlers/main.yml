@@ -1,0 +1,6 @@
+---
+- name: Recreate Mosquitto compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ mqtt_broker_install_dir }}"
+  changed_when: true

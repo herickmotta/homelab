@@ -1,0 +1,14 @@
+---
+homeassistant_install_dir: /opt/homeassistant
+homeassistant_owner: "{{ ansible_user }}"
+homeassistant_group: "{{ ansible_user }}"
+homeassistant_image: ghcr.io/home-assistant/home-assistant:2026.8.3
+homeassistant_name: Home
+homeassistant_tz: Etc/UTC
+homeassistant_external_url: ""
+homeassistant_internal_url: ""
+homeassistant_trusted_proxies: []
+homeassistant_mqtt_broker: 127.0.0.1
+homeassistant_mqtt_port: 1883
+homeassistant_mqtt_user: homelab
+homeassistant_mqtt_password: ""

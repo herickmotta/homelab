@@ -76,3 +76,17 @@ argument_specs:
         type: dict
       frigate_classifications:
         type: dict
+      frigate_mqtt_enabled:
+        type: bool
+      frigate_mqtt_host:
+        type: str
+      frigate_mqtt_port:
+        type: int
+      frigate_mqtt_user:
+        type: str
+      frigate_mqtt_password:
+        type: str
+      frigate_mqtt_network:
+        type: str
+      frigate_loopback_api:
+        type: bool
