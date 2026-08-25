@@ -93,11 +93,29 @@
       Home Assistant must use host networking without publishing 8123, set
       trusted proxies, and leave .storage unmanaged.
 
+- name: Pull the Home Assistant image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - pull
+      - "{{ homeassistant_image }}"
+  register: homeassistant_pull
+  async: 1800
+  poll: 15
+  changed_when: >-
+    'Downloaded newer image' in (homeassistant_pull.stdout | default(''))
+
 - name: Start Home Assistant Compose project
   ansible.builtin.command:
-    cmd: docker compose up -d
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
     chdir: "{{ homeassistant_install_dir }}"
   register: homeassistant_compose_up
+  async: 300
+  poll: 10
   changed_when: >-
     homeassistant_compose_up.rc == 0
     and ('Started' in (homeassistant_compose_up.stderr ~ homeassistant_compose_up.stdout)

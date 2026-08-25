@@ -73,10 +73,15 @@
 
 - name: Pull the Mosquitto image
   ansible.builtin.command:
-    cmd: docker pull {{ mqtt_broker_image }}
+    argv:
+      - docker
+      - pull
+      - "{{ mqtt_broker_image }}"
   register: mqtt_broker_pull
-  changed_when: "'Downloaded newer image' in mqtt_broker_pull.stdout"
-  when: mqtt_broker_pw_meta.changed
+  async: 600
+  poll: 15
+  changed_when: >-
+    'Downloaded newer image' in (mqtt_broker_pull.stdout | default(''))
 
 - name: Generate the Mosquitto password file
   ansible.builtin.command:
@@ -134,9 +139,15 @@
 
 - name: Start Mosquitto Compose project
   ansible.builtin.command:
-    cmd: docker compose up -d
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
     chdir: "{{ mqtt_broker_install_dir }}"
   register: mqtt_broker_compose_up
+  async: 300
+  poll: 10
   changed_when: >-
     mqtt_broker_compose_up.rc == 0
     and ('Started' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout)
