@@ -1,0 +1,154 @@
+# Managed by herickmotta.homelab.sentinel_monitoring.
+global:
+  scrape_interval: "{{ sentinel_monitoring_scrape_interval }}"
+  evaluation_interval: "{{ sentinel_monitoring_evaluation_interval }}"
+  external_labels:
+    site: "{{ sentinel_monitoring_site_label }}"
+    monitor: sentinel
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "{{ sentinel_monitoring_alertmanager_listen_address }}"
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_prometheus_listen_address }}"
+
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_alertmanager_listen_address }}"
+
+  - job_name: blackbox_exporter
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_blackbox_listen_address }}"
+
+  - job_name: sentinel
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_node_exporter_listen_address }}"
+
+{% if sentinel_monitoring_icmp_targets | length > 0 %}
+  - job_name: blackbox_icmp
+    metrics_path: /probe
+    params:
+      module:
+        - icmp_ipv4
+    static_configs:
+{% for target in sentinel_monitoring_icmp_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('none') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ sentinel_monitoring_blackbox_listen_address }}"
+{% endif %}
+
+{% if sentinel_monitoring_http_targets | length > 0 %}
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx
+    static_configs:
+{% for target in sentinel_monitoring_http_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('none') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ sentinel_monitoring_blackbox_listen_address }}"
+{% endif %}
+
+{% if sentinel_monitoring_tcp_targets | length > 0 %}
+  - job_name: blackbox_tcp
+    metrics_path: /probe
+    params:
+      module:
+        - tcp_connect
+    static_configs:
+{% for target in sentinel_monitoring_tcp_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('none') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ sentinel_monitoring_blackbox_listen_address }}"
+{% endif %}
+
+{% if sentinel_monitoring_pve_enabled | bool %}
+  - job_name: pve_exporter
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_pve_exporter_listen_address }}"
+
+  - job_name: pve
+    metrics_path: /pve
+    params:
+      module:
+        - default
+      cluster:
+        - "1"
+      node:
+        - "1"
+    static_configs:
+      - targets:
+          - "{{ sentinel_monitoring_pve_target }}"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ sentinel_monitoring_pve_exporter_listen_address }}"
+{% endif %}
+
+{% for target in sentinel_monitoring_metrics_targets %}
+  - job_name: "metrics_{{ target.name }}"
+    scheme: "{{ target.scheme | default('http') }}"
+    metrics_path: "{{ target.metrics_path | default('/metrics') }}"
+    static_configs:
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          dependency: "{{ target.dependency | default('none') }}"
+{% if target.keep_metrics | default([]) | length > 0 %}
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        action: keep
+        regex: "{{ target.keep_metrics | join('|') }}"
+{% endif %}
+{% endfor %}

@@ -1,0 +1,13 @@
+---
+github_actions_runner_user: gha
+github_actions_runner_group: gha
+github_actions_runner_install_dir: /opt/actions-runner
+github_actions_runner_version: 2.337.0
+github_actions_runner_archive_sha256: 70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613
+github_actions_runner_repository_url: ""
+github_actions_runner_registration_token: ""
+github_actions_runner_name: sentinel
+github_actions_runner_labels:
+  - sentinel
+github_actions_runner_work_dir: _work
+github_actions_runner_replace: true

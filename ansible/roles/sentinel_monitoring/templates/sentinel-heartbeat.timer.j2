@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule the Sentinel external heartbeat
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec={{ sentinel_monitoring_heartbeat_interval }}
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

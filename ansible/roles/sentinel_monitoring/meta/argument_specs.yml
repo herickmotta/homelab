@@ -1,0 +1,157 @@
+---
+argument_specs:
+  main:
+    short_description: Run the independent Sentinel Prometheus and alerting plane
+    options:
+      sentinel_monitoring_install_dir:
+        type: path
+        default: /opt/sentinel-monitoring
+      sentinel_monitoring_site_label:
+        type: str
+        default: homelab
+      sentinel_monitoring_scrape_interval:
+        type: str
+        default: 30s
+      sentinel_monitoring_evaluation_interval:
+        type: str
+        default: 30s
+      sentinel_monitoring_alert_for:
+        type: str
+        default: 2m
+      sentinel_monitoring_retention_time:
+        type: str
+        default: 72h
+      sentinel_monitoring_retention_size:
+        type: str
+        default: 10GB
+      sentinel_monitoring_prometheus_image:
+        type: str
+      sentinel_monitoring_alertmanager_image:
+        type: str
+      sentinel_monitoring_blackbox_image:
+        type: str
+      sentinel_monitoring_node_exporter_image:
+        type: str
+      sentinel_monitoring_pve_exporter_image:
+        type: str
+      sentinel_monitoring_prometheus_listen_address:
+        type: str
+      sentinel_monitoring_alertmanager_listen_address:
+        type: str
+      sentinel_monitoring_blackbox_listen_address:
+        type: str
+      sentinel_monitoring_node_exporter_listen_address:
+        type: str
+      sentinel_monitoring_pve_exporter_listen_address:
+        type: str
+      sentinel_monitoring_icmp_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          kind:
+            type: str
+            default: endpoint
+          dependency:
+            type: str
+            default: none
+      sentinel_monitoring_http_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          kind:
+            type: str
+            default: endpoint
+          dependency:
+            type: str
+            default: none
+      sentinel_monitoring_tcp_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          kind:
+            type: str
+            default: endpoint
+          dependency:
+            type: str
+            default: none
+      sentinel_monitoring_metrics_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          scheme:
+            type: str
+            choices:
+              - http
+              - https
+            default: http
+          metrics_path:
+            type: str
+            default: /metrics
+          keep_metrics:
+            type: list
+            elements: str
+          dependency:
+            type: str
+            default: none
+      sentinel_monitoring_pve_enabled:
+        type: bool
+        default: false
+      sentinel_monitoring_pve_target:
+        type: str
+      sentinel_monitoring_pve_user:
+        type: str
+      sentinel_monitoring_pve_token_name:
+        type: str
+      sentinel_monitoring_pve_token_value:
+        type: str
+      sentinel_monitoring_pve_verify_ssl:
+        type: bool
+        default: false
+      sentinel_monitoring_critical_guest_ids:
+        type: list
+        elements: int
+      sentinel_monitoring_email_destination:
+        type: str
+      sentinel_monitoring_smtp_host:
+        type: str
+      sentinel_monitoring_smtp_port:
+        type: int
+        default: 587
+      sentinel_monitoring_smtp_username:
+        type: str
+      sentinel_monitoring_smtp_password:
+        type: str
+      sentinel_monitoring_smtp_from:
+        type: str
+      sentinel_monitoring_smtp_require_tls:
+        type: bool
+        default: true
+      sentinel_monitoring_heartbeat_url:
+        type: str
+      sentinel_monitoring_heartbeat_interval:
+        type: str
+        default: 1min

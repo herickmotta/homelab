@@ -1,0 +1,38 @@
+---
+argument_specs:
+  main:
+    short_description: Install and register a GitHub Actions runner
+    options:
+      github_actions_runner_user:
+        type: str
+        default: gha
+      github_actions_runner_group:
+        type: str
+        default: gha
+      github_actions_runner_install_dir:
+        type: path
+        default: /opt/actions-runner
+      github_actions_runner_version:
+        type: str
+        default: 2.337.0
+      github_actions_runner_archive_sha256:
+        type: str
+        required: true
+      github_actions_runner_repository_url:
+        type: str
+        required: true
+      github_actions_runner_registration_token:
+        type: str
+      github_actions_runner_name:
+        type: str
+        default: sentinel
+      github_actions_runner_labels:
+        type: list
+        elements: str
+        required: true
+      github_actions_runner_work_dir:
+        type: str
+        default: _work
+      github_actions_runner_replace:
+        type: bool
+        default: true

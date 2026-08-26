@@ -39,6 +39,11 @@ flowchart TB
     igpu["Optional PCI mapping"]
   end
 
+  subgraph sentinel["Independent Sentinel host"]
+    runner["Reviewed apply runner"]
+    guard["Prometheus + Alertmanager<br/>Blackbox + PVE exporters"]
+  end
+
   subgraph nas["NAS guest"]
     virtio["VirtioFS mounts"]
     smb["SMB3 shares"]
@@ -56,6 +61,11 @@ flowchart TB
   end
 
   away -->|"mesh VPN"| mesh
+  runner -->|"OpenTofu + Ansible"| host
+  guard -->|"host and guest health"| host
+  guard -->|"service probes"| net
+  guard -->|"service probes"| nas
+  guard -->|"service probes"| apps
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
@@ -109,8 +119,10 @@ flowchart LR
 ```
 
 OpenTofu creates guests. cloud-init gets SSH and networking. Ansible configures
-the OS and renders application config from site inputs. Merge-and-apply details
-stay in the private site repository.
+the OS and renders application config from site inputs. The physical Sentinel
+survives a Proxmox outage, runs the reviewed apply path, and keeps only a small
+independent health window. Merge-and-apply details stay in the private site
+repository.
 
 ## What this repository ships
 
@@ -118,17 +130,21 @@ stay in the private site repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.7.1 ships
+under `examples/`. Collection `herickmotta.homelab` 0.8.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `proxmox_host_power`,
-`proxmox_host_storage`, `nas_server`, and `netdata_agent`. Site repositories
-pin a full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM
-module only.
+`proxmox_host_storage`, `nas_server`, `netdata_agent`, `sentinel_base`,
+`github_actions_runner`, and `sentinel_monitoring`. Site repositories pin a
+full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
+only.
 
 The collection owns the Ubuntu guest baseline and the complete network-plane
 implementation: AdGuard Home, Caddy with Cloudflare DNS-01, and Tailscale
 subnet routing. Its roles render the final Compose and application
 configuration from typed site inputs; consumers do not copy those files.
+It also owns the post-install Sentinel baseline and its bounded survival-plane
+monitoring stack. The operator still installs the physical OS and restores
+private keys. See [Independent Sentinel host](docs/sentinel.md).
 
 QEMU guest agent: `modules/proxmox-vm` sets `agent.enabled = true` and
 expects cloud-init vendor-data at

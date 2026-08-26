@@ -145,6 +145,7 @@ changing.
 | [README.md](README.md) | What this repository ships, how a site repo consumes it, and the **running-system mermaid** |
 | [docs/public-private-separation.md](docs/public-private-separation.md) | Canonical public/private contract and promotion |
 | [docs/persistent-storage.md](docs/persistent-storage.md) | Public storage and NAS architecture |
+| [docs/sentinel.md](docs/sentinel.md) | Independent Sentinel bootstrap, security, and monitoring boundaries |
 | [ansible/README.md](ansible/README.md) | Collection role index |
 | [examples/](examples/) | Fictional site shape |
 

@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: Herick Motta
+  description: Ubuntu baseline for an independent homelab Sentinel host
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []
