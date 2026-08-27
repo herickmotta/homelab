@@ -135,7 +135,7 @@ site:
           host: pve-example
         - name: sentinel
           address: 192.0.2.11:9100
-          host: watchdog
+          host: sentinel
       smartctl_address: 192.0.2.10:9633
       zfs_address: 192.0.2.10:9134
 
