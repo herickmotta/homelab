@@ -1,0 +1,37 @@
+---
+- name: Build the fictional observability inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional observability guest
+      ansible.builtin.add_host:
+        name: "{{ site.guests.observability.hostname }}"
+        ansible_host: "{{ site.guests.observability.ipv4 }}"
+        ansible_user: "{{ site.access.username }}"
+        groups:
+          - observability
+
+- name: Configure the fictional observability guest
+  hosts: observability
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.guest_base
+    - role: herickmotta.homelab.observability
+      vars:
+        observability_site_label: "{{ site.monitoring.observability.site_label }}"
+        observability_retention_time: "{{ site.monitoring.observability.retention_time }}"
+        observability_retention_size: "{{ site.monitoring.observability.retention_size }}"
+        observability_grafana_root_url: "{{ site.monitoring.observability.grafana_root_url }}"
+        observability_grafana_admin_password: "{{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
+        observability_metrics_targets: "{{ site.monitoring.observability.metrics_targets }}"
+        observability_pve_enabled: "{{ site.monitoring.observability.pve_exporter.enabled }}"
+        observability_pve_target: "{{ site.hypervisor.endpoint_ipv4 }}"
+        observability_pve_user: "{{ site.monitoring.observability.pve_exporter.user }}"
+        observability_pve_token_name: "{{ site.monitoring.observability.pve_exporter.token_name }}"
+        observability_pve_token_value: "{{ lookup('env', 'PVE_OBSERVE_TOKEN_VALUE') }}"
+        observability_pve_verify_ssl: "{{ site.monitoring.observability.pve_exporter.verify_ssl }}"

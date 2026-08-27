@@ -1,0 +1,93 @@
+---
+argument_specs:
+  main:
+    short_description: Run Prometheus and Grafana on the rich observability guest
+    options:
+      observability_install_dir:
+        type: path
+        default: /opt/observability
+      observability_site_label:
+        type: str
+        default: homelab
+      observability_scrape_interval:
+        type: str
+        default: 30s
+      observability_evaluation_interval:
+        type: str
+        default: 30s
+      observability_retention_time:
+        type: str
+        default: 15d
+      observability_retention_size:
+        type: str
+        default: 40GB
+      observability_prometheus_image:
+        type: str
+      observability_grafana_image:
+        type: str
+      observability_node_exporter_image:
+        type: str
+      observability_pve_exporter_image:
+        type: str
+      observability_prometheus_listen_address:
+        type: str
+      observability_node_exporter_listen_address:
+        type: str
+      observability_pve_exporter_listen_address:
+        type: str
+      observability_grafana_bind_ip:
+        type: str
+        default: 0.0.0.0
+      observability_grafana_http_port:
+        type: int
+        default: 3000
+      observability_grafana_scrape_address:
+        type: str
+      observability_grafana_admin_user:
+        type: str
+        default: admin
+      observability_grafana_admin_password:
+        type: str
+        required: true
+      observability_grafana_root_url:
+        type: str
+        required: true
+      observability_metrics_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          scheme:
+            type: str
+            choices:
+              - http
+              - https
+            default: http
+          metrics_path:
+            type: str
+            default: /metrics
+          keep_metrics:
+            type: list
+            elements: str
+          dependency:
+            type: str
+            default: none
+      observability_pve_enabled:
+        type: bool
+        default: false
+      observability_pve_target:
+        type: str
+      observability_pve_user:
+        type: str
+      observability_pve_token_name:
+        type: str
+      observability_pve_token_value:
+        type: str
+      observability_pve_verify_ssl:
+        type: bool
+        default: false

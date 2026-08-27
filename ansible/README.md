@@ -58,6 +58,11 @@ Roles:
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default.
+- `herickmotta.homelab.observability`: Prometheus and Grafana on a dedicated
+  Proxmox guest. Retention is longer than Sentinel. Grafana binds the guest
+  LAN for Caddy; Prometheus and exporters stay on loopback. Optional
+  read-only PVE exporter uses a token distinct from Sentinel. Alertmanager
+  stays on Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

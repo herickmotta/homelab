@@ -1,0 +1,6 @@
+---
+- name: Recreate observability compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate --remove-orphans
+    chdir: "{{ observability_install_dir }}"
+  changed_when: true
