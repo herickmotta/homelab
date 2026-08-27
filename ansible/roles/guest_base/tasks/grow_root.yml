@@ -1,0 +1,86 @@
+---
+# Expand the last GPT partition and the mounted root filesystem after
+# OpenTofu increases disk_gb. Ubuntu cloud images are partitioned ext4.
+# growpart is a no-op when the partition already fills the disk.
+- name: Discover the root filesystem source
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -nro
+      - SOURCE
+      - /
+  register: guest_base_root_source
+  changed_when: false
+
+- name: Discover the root block device
+  ansible.builtin.command:
+    argv:
+      - lsblk
+      - --json
+      - -ndo
+      - NAME,PKNAME,TYPE,FSTYPE
+      - "{{ guest_base_root_source.stdout }}"
+  register: guest_base_root_lsblk_raw
+  changed_when: false
+
+- name: Require a single root block device
+  ansible.builtin.assert:
+    that:
+      - (guest_base_root_lsblk_raw.stdout | from_json).blockdevices | length == 1
+    fail_msg: Could not identify the root block device to grow.
+
+- name: Parse the root block device
+  ansible.builtin.set_fact:
+    guest_base_root_device: "{{ (guest_base_root_lsblk_raw.stdout | from_json).blockdevices | first }}"
+
+- name: Skip growpart when root is not a partition
+  when: guest_base_root_device.type != "part"
+  ansible.builtin.debug:
+    msg: >-
+      Root device {{ guest_base_root_device.name }} type
+      {{ guest_base_root_device.type }} is not a partition; not running growpart.
+
+- name: Grow a partitioned root disk
+  when:
+    - guest_base_root_device.type == "part"
+    - guest_base_root_device.pkname | default("") | length > 0
+  block:
+    - name: Read the root partition number
+      ansible.builtin.slurp:
+        src: "/sys/class/block/{{ guest_base_root_device.name }}/partition"
+      register: guest_base_root_partnum
+
+    - name: Grow the root partition to fill the disk
+      ansible.builtin.command:
+        argv:
+          - growpart
+          - "/dev/{{ guest_base_root_device.pkname }}"
+          - "{{ guest_base_root_partnum.content | b64decode | trim }}"
+      register: guest_base_growpart
+      changed_when: "'CHANGED:' in (guest_base_growpart.stdout ~ guest_base_growpart.stderr)"
+      failed_when: >-
+        guest_base_growpart.rc != 0
+        and 'NOCHANGE:' not in (guest_base_growpart.stdout ~ guest_base_growpart.stderr)
+
+    - name: Grow an ext root filesystem
+      when: guest_base_root_device.fstype in ["ext2", "ext3", "ext4"]
+      ansible.builtin.command:
+        argv:
+          - resize2fs
+          - "{{ guest_base_root_source.stdout }}"
+      register: guest_base_resize2fs
+      changed_when: >-
+        'Nothing to do' not in (guest_base_resize2fs.stdout ~ guest_base_resize2fs.stderr)
+
+    - name: Grow an XFS root filesystem
+      when: guest_base_root_device.fstype == "xfs"
+      ansible.builtin.command:
+        argv:
+          - xfs_growfs
+          - /
+      register: guest_base_xfs_growfs
+      changed_when: >-
+        guest_base_xfs_growfs.rc == 0
+        and 'data blocks changed from' in (
+          guest_base_xfs_growfs.stdout ~ guest_base_xfs_growfs.stderr
+        )

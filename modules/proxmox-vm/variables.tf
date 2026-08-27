@@ -65,7 +65,10 @@ variable "memory_mb" {
 
 variable "disk_gb" {
   type        = number
-  description = "Boot disk size in GiB after import."
+  description = <<-EOT
+    Boot disk size in GiB after import. Increasing this value resizes the
+    existing disk. Do not decrease it; that can replace the disk.
+  EOT
   default     = 16
 }
 

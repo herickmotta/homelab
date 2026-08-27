@@ -5,7 +5,8 @@ Public Ansible collection for the homelab implementation.
 Roles:
 
 - `herickmotta.homelab.guest_base`: Ubuntu guest baseline with Docker,
-  Compose, and qemu-guest-agent.
+  Compose, qemu-guest-agent, and growpart so a later `disk_gb` increase
+  expands the root filesystem.
 - `herickmotta.homelab.network_plane`: AdGuard Home, Caddy DNS-01, and
   Tailscale subnet routing on a dedicated guest. Caddy routes are a typed
   hostname-to-upstream list; AdGuard remains the default route.
