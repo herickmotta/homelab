@@ -24,6 +24,14 @@
         label: "{{ item.key }}"
       when: "'host_metrics' in item.value.groups"
 
+    - name: Add the fictional Sentinel
+      ansible.builtin.add_host:
+        name: "{{ site.hosts.watchdog.hostname }}"
+        ansible_host: "{{ site.hosts.watchdog.ipv4 }}"
+        ansible_user: "{{ site.hosts.watchdog.ansible_user }}"
+        groups:
+          - sentinel
+
 - name: Configure hypervisor SMART and ZFS exporters
   hosts: proxmox_host
   become: true
@@ -45,7 +53,7 @@
             | list
           }}"
         host_metrics_systemd_units:
-          - smartd.service
+          - smartmontools.service
           - zfs-zed.service
 
 - name: Configure guest node exporters
@@ -58,3 +66,16 @@
     - role: herickmotta.homelab.host_metrics
       vars:
         host_metrics_listen_ip: "{{ ansible_host }}"
+
+- name: Configure the Sentinel Linux exporter for observe
+  hosts: sentinel
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.host_metrics
+      vars:
+        host_metrics_listen_ip: "{{ site.hosts.watchdog.ipv4 }}"
+        host_metrics_systemd_units:
+          - sentinel-monitoring.service

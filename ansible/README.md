@@ -50,7 +50,8 @@ Roles:
 - `herickmotta.homelab.sentinel_base`: converge a minimal x86_64 Ubuntu
   24.04 or 26.04 server into the independent Sentinel baseline. It creates
   separate deployment and Hermes identities, hardens SSH, bounds Docker logs,
-  and enables a host firewall.
+  and enables a host firewall. Optional extra TCP ports can be opened from
+  management CIDRs so observe can scrape a LAN node exporter.
 - `herickmotta.homelab.github_actions_runner`: install and register a
   repository-scoped Actions runner as a systemd service. The bootstrap archive
   and checksum are pinned; GitHub's default runner self-update remains enabled
@@ -63,8 +64,9 @@ Roles:
 - `herickmotta.homelab.observability`: Prometheus and Grafana on a dedicated
   Proxmox guest. Retention is longer than Sentinel. Grafana binds the guest
   LAN for Caddy; Prometheus stays on loopback. It scrapes guest node
-  exporters plus hypervisor SMART and ZFS. Optional read-only PVE exporter
-  uses a token distinct from Sentinel. Alertmanager stays on Sentinel.
+  exporters, the Sentinel host Linux exporter, and hypervisor SMART and ZFS.
+  The Homelab overview dashboard is the fleet/NAS view. Optional read-only PVE
+  exporter uses a token distinct from Sentinel. Alertmanager stays on Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

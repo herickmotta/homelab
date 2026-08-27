@@ -155,13 +155,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_systemd_unit_state{job=\"node\",name=~\"smartd.service|zfs-zed.service\",state=\"active\"}",
+          "expr": "node_systemd_unit_state{job=\"node\",name=~\"smartmontools.service|zfs-zed.service|smbd.service\",state=\"active\"}",
           "format": "table",
           "instant": true,
           "refId": "A"
         }
       ],
-      "title": "Required storage units on pve",
+      "title": "Required units",
       "transformations": [
         {
           "id": "organize",
