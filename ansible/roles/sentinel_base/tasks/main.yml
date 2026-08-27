@@ -220,6 +220,30 @@
     'Rule added' in sentinel_base_ufw_ssh.stdout
     or 'Rules updated' in sentinel_base_ufw_ssh.stdout
 
+- name: Allow extra TCP ports from management networks
+  when:
+    - sentinel_base_enable_firewall | bool
+    - sentinel_base_open_tcp_ports | length > 0
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - from
+      - "{{ item[0] }}"
+      - to
+      - any
+      - port
+      - "{{ item[1] | string }}"
+      - proto
+      - tcp
+  loop: "{{ sentinel_base_management_cidrs | product(sentinel_base_open_tcp_ports) | list }}"
+  loop_control:
+    label: "{{ item[0] }}:{{ item[1] }}"
+  register: sentinel_base_ufw_extra
+  changed_when: >-
+    'Rule added' in sentinel_base_ufw_extra.stdout
+    or 'Rules updated' in sentinel_base_ufw_extra.stdout
+
 - name: Enable the Sentinel firewall
   when:
     - sentinel_base_enable_firewall | bool

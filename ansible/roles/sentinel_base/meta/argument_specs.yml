@@ -37,6 +37,10 @@ argument_specs:
       sentinel_base_ssh_port:
         type: int
         default: 22
+      sentinel_base_open_tcp_ports:
+        type: list
+        elements: int
+        default: []
       sentinel_base_packages:
         type: list
         elements: str

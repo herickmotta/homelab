@@ -88,6 +88,7 @@ flowchart TB
   richProm -->|"Linux exporters"| net
   richProm -->|"Linux exporters"| nas
   richProm -->|"Linux exporters"| apps
+  richProm -->|"Linux exporter"| guard
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
 
