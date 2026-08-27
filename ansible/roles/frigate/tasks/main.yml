@@ -160,6 +160,16 @@
   no_log: true
   notify: Recreate Frigate compose
 
+- name: Check controller YOLOv9 ONNX
+  ansible.builtin.stat:
+    path: "{{ frigate_yolov9_src }}"
+  register: frigate_yolov9_src_stat
+  delegate_to: localhost
+  become: false
+  when:
+    - frigate_model == 'yolov9s320'
+    - frigate_yolov9_src | length > 0
+
 - name: Copy YOLOv9 ONNX when provided
   ansible.builtin.copy:
     src: "{{ frigate_yolov9_src }}"
@@ -170,6 +180,7 @@
   when:
     - frigate_model == 'yolov9s320'
     - frigate_yolov9_src | length > 0
+    - (frigate_yolov9_src_stat.stat | default({})).exists | default(false)
 
 - name: Require YOLOv9 ONNX for that detector
   ansible.builtin.stat:
