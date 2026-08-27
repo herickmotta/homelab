@@ -1,0 +1,60 @@
+---
+- name: Build the fictional host-metrics inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional Proxmox host
+      ansible.builtin.add_host:
+        name: "{{ site.hypervisor.node_name }}"
+        ansible_host: "{{ site.hypervisor.endpoint_ipv4 }}"
+        ansible_user: root
+        groups:
+          - proxmox_host
+
+    - name: Add fictional guests that run node exporter
+      ansible.builtin.add_host:
+        name: "{{ item.value.hostname }}"
+        ansible_host: "{{ item.value.ipv4 }}"
+        ansible_user: "{{ site.access.username }}"
+        groups: "{{ item.value.groups }}"
+      loop: "{{ site.guests | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: "'host_metrics' in item.value.groups"
+
+- name: Configure hypervisor SMART and ZFS exporters
+  hosts: proxmox_host
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.host_metrics
+      vars:
+        host_metrics_listen_ip: "{{ site.hypervisor.endpoint_ipv4 }}"
+        host_metrics_smartctl: true
+        host_metrics_zfs: true
+        host_metrics_smartctl_devices: "{{
+            site.storage.pools
+            | dict2items
+            | map(attribute='value.disks')
+            | flatten
+            | map(attribute='by_id')
+            | list
+          }}"
+        host_metrics_systemd_units:
+          - smartd.service
+          - zfs-zed.service
+
+- name: Configure guest node exporters
+  hosts: host_metrics
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.host_metrics
+      vars:
+        host_metrics_listen_ip: "{{ ansible_host }}"

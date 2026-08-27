@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: Herick Motta
+  role_name: host_metrics
+  description: Pinned node, SMART, and ZFS exporters as systemd units
+  license: MIT
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []

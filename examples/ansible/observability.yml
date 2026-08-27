@@ -29,6 +29,19 @@
         observability_grafana_root_url: "{{ site.monitoring.observability.grafana_root_url }}"
         observability_grafana_admin_password: "{{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
         observability_metrics_targets: "{{ site.monitoring.observability.metrics_targets }}"
+        observability_node_targets: "{{ site.monitoring.host_metrics.node_targets }}"
+        observability_smartctl_address: "{{ site.monitoring.host_metrics.smartctl_address }}"
+        observability_zfs_address: "{{ site.monitoring.host_metrics.zfs_address }}"
+        observability_accepted_degraded_serials: "{{
+            site.storage.pools
+            | dict2items
+            | map(attribute='value.disks')
+            | flatten
+            | selectattr('accepted_degraded', 'defined')
+            | selectattr('accepted_degraded')
+            | map(attribute='serial')
+            | list
+          }}"
         observability_pve_enabled: "{{ site.monitoring.observability.pve_exporter.enabled }}"
         observability_pve_target: "{{ site.hypervisor.endpoint_ipv4 }}"
         observability_pve_user: "{{ site.monitoring.observability.pve_exporter.user }}"

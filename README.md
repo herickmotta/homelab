@@ -85,6 +85,10 @@ flowchart TB
   frigate --> mqtt
   grafana --> richProm
   richProm -->|"PVE and self"| host
+  richProm -->|"Linux exporters"| net
+  richProm -->|"Linux exporters"| nas
+  richProm -->|"Linux exporters"| apps
+  richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
 
   durable --> virtio
@@ -127,7 +131,7 @@ flowchart LR
   tofu["OpenTofu"] --> pve["Proxmox VMs"]
   pve --> cidata["cloud-init"]
   cidata --> ans["Ansible"]
-  ans --> apps["Compose, Samba, Netdata"]
+  ans --> apps["Compose, Samba, host metrics"]
 ```
 
 OpenTofu creates guests. cloud-init gets SSH and networking. Ansible configures
@@ -142,11 +146,12 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.9.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.10.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
-`mqtt_broker`, `homeassistant`, `observability`, `proxmox_host_power`,
-`proxmox_host_storage`, `nas_server`, `netdata_agent`, `sentinel_base`,
-`github_actions_runner`, and `sentinel_monitoring`. Site repositories pin a
+`mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
+`proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
+`netdata_agent`, `sentinel_base`, `github_actions_runner`, and
+`sentinel_monitoring`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
 only.
 

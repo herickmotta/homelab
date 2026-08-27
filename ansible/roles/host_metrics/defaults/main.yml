@@ -1,0 +1,29 @@
+---
+host_metrics_listen_ip: ""
+host_metrics_cache_dir: /var/cache/host-metrics
+host_metrics_extract_dir: /opt/host-metrics
+host_metrics_bin_dir: /usr/local/bin
+
+host_metrics_node_port: 9100
+host_metrics_node_user: host-metrics
+host_metrics_node_group: host-metrics
+host_metrics_node_version: "1.12.1"
+host_metrics_node_archive_sha256: b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63
+host_metrics_filesystem_mount_points_exclude: >-
+  ^/(dev|proc|sys|var/lib/docker/.+|run/docker/netns/.+)($|/)
+host_metrics_systemd_units: []
+
+host_metrics_smartctl: false
+host_metrics_smartctl_port: 9633
+host_metrics_smartctl_version: "0.14.0"
+host_metrics_smartctl_archive_sha256: 875983cd27affc5a682401930e5a8eea3f06c325fe6d6a7228c5547d882685b3
+host_metrics_smartctl_path: /usr/sbin/smartctl
+host_metrics_smartctl_devices: []
+host_metrics_smartctl_packages:
+  - smartmontools
+
+host_metrics_zfs: false
+host_metrics_zfs_port: 9134
+host_metrics_zfs_version: "2.4.1"
+host_metrics_zfs_archive_sha256: 60489e74e8f41eadff4f313fb16e94fc0964d37b9cf1be79c25c927b285a3228
+host_metrics_zpool_binary: /usr/sbin/zpool

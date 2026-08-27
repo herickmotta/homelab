@@ -1,0 +1,32 @@
+# Managed by herickmotta.homelab.host_metrics.
+[Unit]
+Description=Prometheus node exporter
+Documentation=https://github.com/prometheus/node_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+{% if host_metrics_systemd_units | length > 0 %}
+User=root
+Group=root
+{% else %}
+User={{ host_metrics_node_user }}
+Group={{ host_metrics_node_group }}
+{% endif %}
+Restart=always
+RestartSec=5
+ExecStart={{ host_metrics_bin_dir }}/node_exporter \
+    --web.listen-address={{ host_metrics_listen_ip }}:{{ host_metrics_node_port }} \
+    --collector.filesystem.mount-points-exclude={{ host_metrics_filesystem_mount_points_exclude | quote }} \
+{% if host_metrics_systemd_units | length > 0 %}
+    --collector.systemd \
+    --collector.systemd.unit-include={{ host_metrics_systemd_unit_regex }}
+{% else %}
+    --no-collector.systemd
+{% endif %}
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

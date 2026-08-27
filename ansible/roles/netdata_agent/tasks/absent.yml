@@ -1,0 +1,64 @@
+---
+- name: Check for an installed Netdata agent
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - /etc/netdata/netdata.conf
+    - /opt/netdata/etc/netdata/netdata.conf
+    - /usr/libexec/netdata-uninstaller.sh
+    - /opt/netdata/usr/libexec/netdata-uninstaller.sh
+  register: netdata_agent_absent_markers
+
+- name: Download the Netdata kickstart script for uninstall
+  when: >-
+    netdata_agent_absent_markers.results
+    | map(attribute='stat')
+    | selectattr('exists')
+    | list
+    | length > 0
+  ansible.builtin.get_url:
+    url: "{{ netdata_agent_kickstart_url }}"
+    dest: /tmp/netdata-kickstart.sh
+    mode: "0755"
+
+- name: Uninstall the Netdata agent
+  when: >-
+    netdata_agent_absent_markers.results
+    | map(attribute='stat')
+    | selectattr('exists')
+    | list
+    | length > 0
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - /tmp/netdata-kickstart.sh
+      - --uninstall
+      - --non-interactive
+      - --dont-wait
+  register: netdata_agent_uninstall
+  changed_when: netdata_agent_uninstall.rc == 0
+  failed_when: false
+
+- name: Stop leftover Netdata units
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  loop:
+    - netdata.service
+    - netdata-updater.service
+    - netdata-updater.timer
+  failed_when: false
+
+- name: Remove leftover Netdata paths
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ netdata_agent_absent_paths }}"
+
+- name: Remove the kickstart copy
+  ansible.builtin.file:
+    path: /tmp/netdata-kickstart.sh
+    state: absent

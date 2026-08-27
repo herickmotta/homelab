@@ -1,0 +1,25 @@
+# Managed by herickmotta.homelab.host_metrics.
+[Unit]
+Description=Prometheus smartctl exporter
+Documentation=https://github.com/prometheus-community/smartctl_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+RestartSec=5
+ExecStart={{ host_metrics_bin_dir }}/smartctl_exporter \
+    --web.listen-address={{ host_metrics_listen_ip }}:{{ host_metrics_smartctl_port }} \
+    --smartctl.path={{ host_metrics_smartctl_path }} \
+{% for device in host_metrics_smartctl_devices %}
+    --smartctl.device={{ device }} \
+{% endfor %}
+    --smartctl.interval=60s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

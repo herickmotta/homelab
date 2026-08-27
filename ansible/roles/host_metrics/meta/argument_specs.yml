@@ -1,0 +1,62 @@
+---
+argument_specs:
+  main:
+    short_description: Run pinned host exporters as systemd units
+    options:
+      host_metrics_listen_ip:
+        type: str
+        required: true
+      host_metrics_cache_dir:
+        type: path
+      host_metrics_extract_dir:
+        type: path
+      host_metrics_bin_dir:
+        type: path
+      host_metrics_node_port:
+        type: int
+        default: 9100
+      host_metrics_node_user:
+        type: str
+        default: host-metrics
+      host_metrics_node_group:
+        type: str
+        default: host-metrics
+      host_metrics_node_version:
+        type: str
+      host_metrics_node_archive_sha256:
+        type: str
+      host_metrics_filesystem_mount_points_exclude:
+        type: str
+      host_metrics_systemd_units:
+        type: list
+        elements: str
+      host_metrics_smartctl:
+        type: bool
+        default: false
+      host_metrics_smartctl_port:
+        type: int
+        default: 9633
+      host_metrics_smartctl_version:
+        type: str
+      host_metrics_smartctl_archive_sha256:
+        type: str
+      host_metrics_smartctl_path:
+        type: path
+      host_metrics_smartctl_devices:
+        type: list
+        elements: str
+      host_metrics_smartctl_packages:
+        type: list
+        elements: str
+      host_metrics_zfs:
+        type: bool
+        default: false
+      host_metrics_zfs_port:
+        type: int
+        default: 9134
+      host_metrics_zfs_version:
+        type: str
+      host_metrics_zfs_archive_sha256:
+        type: str
+      host_metrics_zpool_binary:
+        type: path

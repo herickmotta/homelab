@@ -119,6 +119,22 @@ site:
           scheme: http
           metrics_path: /api/metrics
           dependency: pve
+    host_metrics:
+      node_targets:
+        - name: net
+          address: 192.0.2.12:9100
+          host: net-example
+        - name: nas
+          address: 192.0.2.14:9100
+          host: nas-example
+        - name: apps
+          address: 192.0.2.15:9100
+          host: apps-example
+        - name: pve
+          address: 192.0.2.10:9100
+          host: pve-example
+      smartctl_address: 192.0.2.10:9633
+      zfs_address: 192.0.2.10:9134
 
   guests:
     network_plane:
@@ -130,6 +146,7 @@ site:
       groups:
         - homelab_guest
         - network_plane
+        - host_metrics
       cores: 2
       memory_mb: 4096
       disk_gb: 16
@@ -158,6 +175,7 @@ site:
         - frigate
         - mqtt_broker
         - homeassistant
+        - host_metrics
       cores: 4
       cpu_type: host
       memory_mb: 8192
@@ -183,6 +201,7 @@ site:
       groups:
         - homelab_guest
         - nas_server
+        - host_metrics
       cores: 2
       memory_mb: 4096
       disk_gb: 32

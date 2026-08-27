@@ -1,8 +1,14 @@
 ---
 argument_specs:
   main:
-    short_description: Install and configure the Netdata Agent from files
+    short_description: Install or purge the Netdata Agent from files
     options:
+      netdata_agent_state:
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
       netdata_agent_kickstart_url:
         type: str
         default: https://get.netdata.cloud/kickstart.sh
@@ -65,5 +71,8 @@ argument_specs:
         type: list
         elements: str
       netdata_agent_packages:
+        type: list
+        elements: str
+      netdata_agent_absent_paths:
         type: list
         elements: str

@@ -52,6 +52,25 @@ argument_specs:
       observability_grafana_root_url:
         type: str
         required: true
+      observability_node_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          host:
+            type: str
+      observability_smartctl_address:
+        type: str
+      observability_zfs_address:
+        type: str
+      observability_accepted_degraded_serials:
+        type: list
+        elements: str
       observability_metrics_targets:
         type: list
         elements: dict

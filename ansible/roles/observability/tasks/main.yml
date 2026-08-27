@@ -41,6 +41,16 @@
   loop_control:
     label: "{{ item.name | default('unknown') }}"
 
+- name: Validate observability node targets
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[A-Za-z0-9._-]+$')
+      - item.address | length > 0
+    fail_msg: Node targets need a safe name and scrape address.
+  loop: "{{ observability_node_targets }}"
+  loop_control:
+    label: "{{ item.name | default('unknown') }}"
+
 - name: Require read-only Proxmox exporter credentials
   when: observability_pve_enabled | bool
   ansible.builtin.assert:
@@ -138,14 +148,21 @@
     mode: "0644"
   notify: Recreate observability compose
 
-- name: Install the Homelab overview dashboard
+- name: Install Grafana dashboards
   ansible.builtin.copy:
-    src: dashboards/overview.json
-    dest: "{{ observability_install_dir }}/grafana/dashboards/overview.json"
+    src: "{{ item }}"
+    dest: "{{ observability_install_dir }}/grafana/dashboards/{{ item | basename }}"
     owner: root
     group: root
     mode: "0644"
+  loop:
+    - dashboards/overview.json
+    - dashboards/linux.json
+    - dashboards/zfs.json
+    - dashboards/smart.json
   notify: Recreate observability compose
+  loop_control:
+    label: "{{ item | basename }}"
 
 - name: Install observability secret environment
   ansible.builtin.template:
