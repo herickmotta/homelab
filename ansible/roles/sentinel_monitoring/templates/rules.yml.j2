@@ -1,0 +1,112 @@
+# Managed by herickmotta.homelab.sentinel_monitoring.
+groups:
+  - name: sentinel
+    rules:
+      - alert: HypervisorUnavailable
+        expr: probe_success{job="blackbox_icmp", target_kind="hypervisor"} == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+        annotations:
+          summary: "Hypervisor {{ '{{ $labels.target_name }}' }} is unreachable"
+          description: The independent Sentinel cannot reach the Proxmox host over ICMP.
+
+      - alert: EndpointUnavailable
+        expr: probe_success{target_kind!="hypervisor"} == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+        annotations:
+          summary: "Endpoint {{ '{{ $labels.target_name }}' }} is unavailable"
+          description: "The {{ '{{ $labels.job }}' }} probe to {{ '{{ $labels.instance }}' }} failed."
+
+      - alert: SentinelScrapeTargetDown
+        expr: up{job=~"prometheus|alertmanager|blackbox_exporter|sentinel|pve_exporter"} == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+        annotations:
+          summary: "Sentinel target {{ '{{ $labels.job }}' }} is down"
+          description: The independent monitoring plane has lost one of its own components.
+
+      - alert: DirectMetricsTargetDown
+        expr: up{job=~"metrics_.+"} == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+        annotations:
+          summary: "Metrics target {{ '{{ $labels.target_name }}' }} is unavailable"
+          description: Sentinel cannot scrape the service's native Prometheus endpoint.
+
+      - alert: FrigateCameraNoFrames
+        expr: frigate_camera_fps == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Frigate camera {{ '{{ $labels.camera_name }}' }} has no frames"
+          description: The Frigate process is reachable, but this camera pipeline reports zero input FPS.
+
+{% if sentinel_monitoring_pve_enabled | bool %}
+      - alert: ProxmoxMetricsUnavailable
+        expr: up{job="pve"} == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: Proxmox API metrics are unavailable
+          description: Sentinel cannot query the Proxmox API through its read-only exporter.
+{% endif %}
+
+{% if sentinel_monitoring_critical_guest_ids | length > 0 %}
+      - alert: ProxmoxGuestDown
+        expr: >-
+          (pve_guest_info{id=~"qemu/({{ sentinel_monitoring_critical_guest_ids | join('|') }})"}
+          * on(id) group_left(name,node) pve_up{}) == 0
+        for: "{{ sentinel_monitoring_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Proxmox guest {{ '{{ $labels.name }}' }} is down"
+          description: "Critical guest {{ '{{ $labels.id }}' }} is not running on {{ '{{ $labels.node }}' }}."
+{% endif %}
+
+      - alert: SentinelDiskSpaceLow
+        expr: >-
+          100 * node_filesystem_avail_bytes{job="sentinel", mountpoint="/"}
+          / node_filesystem_size_bytes{job="sentinel", mountpoint="/"} < 15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel root disk has less than 15 percent free
+          description: Prune operational data before Prometheus reaches its retention limit.
+
+      - alert: SentinelMemoryLow
+        expr: node_memory_MemAvailable_bytes{job="sentinel"} < 536870912
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel has less than 512 MiB available memory
+          description: The survival plane may be unable to alert during another failure.
+
+      - alert: PrometheusRuleEvaluationFailures
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel Prometheus failed to evaluate an alert rule
+          description: Inspect Prometheus logs and the rendered rules file.
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel Prometheus rejected its latest configuration
+          description: The previous configuration remains active; inspect Prometheus logs.

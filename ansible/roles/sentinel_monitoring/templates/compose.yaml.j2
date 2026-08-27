@@ -1,0 +1,84 @@
+# Managed by herickmotta.homelab.sentinel_monitoring.
+services:
+  prometheus:
+    image: "{{ sentinel_monitoring_prometheus_image }}"
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time={{ sentinel_monitoring_retention_time }}
+      - --storage.tsdb.retention.size={{ sentinel_monitoring_retention_size }}
+      - --web.listen-address={{ sentinel_monitoring_prometheus_listen_address }}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
+      - ./data/prometheus:/prometheus
+    mem_limit: 768m
+    cpus: "0.75"
+
+  alertmanager:
+    image: "{{ sentinel_monitoring_alertmanager_image }}"
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address={{ sentinel_monitoring_alertmanager_listen_address }}
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./data/alertmanager:/alertmanager
+    mem_limit: 128m
+    cpus: "0.25"
+
+  blackbox-exporter:
+    image: "{{ sentinel_monitoring_blackbox_image }}"
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+      - --web.listen-address={{ sentinel_monitoring_blackbox_listen_address }}
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    mem_limit: 128m
+    cpus: "0.25"
+
+  node-exporter:
+    image: "{{ sentinel_monitoring_node_exporter_image }}"
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address={{ sentinel_monitoring_node_exporter_listen_address }}
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|run/docker/netns/.+)($|/)
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /:/host:ro,rslave
+    mem_limit: 128m
+    cpus: "0.25"
+
+{% if sentinel_monitoring_pve_enabled | bool %}
+  pve-exporter:
+    image: "{{ sentinel_monitoring_pve_exporter_image }}"
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    command:
+      - --web.listen-address={{ sentinel_monitoring_pve_exporter_listen_address }}
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: "0.5"
+{% endif %}

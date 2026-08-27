@@ -45,9 +45,24 @@ Roles:
   file-managed collectors and a small `health.d` policy. Apply it to the
   hypervisor and to guests that should be observed. The dashboard is not the
   control plane.
+- `herickmotta.homelab.sentinel_base`: converge a minimal x86_64 Ubuntu
+  24.04 or 26.04 server into the independent Sentinel baseline. It creates
+  separate deployment and Hermes identities, hardens SSH, bounds Docker logs,
+  and enables a host firewall.
+- `herickmotta.homelab.github_actions_runner`: install and register a
+  repository-scoped Actions runner as a systemd service. The bootstrap archive
+  and checksum are pinned; GitHub's default runner self-update remains enabled
+  for service compatibility. First registration takes a short-lived token;
+  the token is never persisted in site configuration.
+- `herickmotta.homelab.sentinel_monitoring`: run a small Prometheus,
+  Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
+  exporter on the Sentinel. Retention is bounded and component endpoints bind
+  to loopback by default.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).
+Sentinel recovery and failure boundaries:
+[Independent Sentinel host](../docs/sentinel.md).
 
 A private site repository owns inventory, site values, encrypted secrets, and
 execution. Call roles by fully qualified collection name. The canonical

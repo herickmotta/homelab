@@ -1,0 +1,257 @@
+---
+- name: Validate Sentinel monitoring inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+      - sentinel_monitoring_site_label | length > 0
+      - sentinel_monitoring_retention_time | length > 0
+      - sentinel_monitoring_retention_size | length > 0
+      - >-
+        sentinel_monitoring_icmp_targets | length
+        + sentinel_monitoring_http_targets | length
+        + sentinel_monitoring_tcp_targets | length
+        + sentinel_monitoring_metrics_targets | length > 0
+    fail_msg: Sentinel monitoring needs a site label, bounded retention, and at least one probe.
+
+- name: Validate Sentinel monitoring targets
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[A-Za-z0-9._-]+$')
+      - item.address | length > 0
+      - item.kind | default('endpoint') | length > 0
+      - item.dependency | default('none') | length > 0
+      - item.metrics_path | default('/metrics') is match('^/')
+    fail_msg: Monitoring targets need a safe name, address, kind, and dependency.
+  loop: >-
+    {{
+      sentinel_monitoring_icmp_targets
+      + sentinel_monitoring_http_targets
+      + sentinel_monitoring_tcp_targets
+      + sentinel_monitoring_metrics_targets
+    }}
+  loop_control:
+    label: "{{ item.name | default('unknown') }}"
+
+- name: Decide whether SMTP mail is configured
+  ansible.builtin.set_fact:
+    sentinel_monitoring_mail_enabled: >-
+      {{
+        sentinel_monitoring_email_destination | length > 0
+        and sentinel_monitoring_smtp_host | length > 0
+        and sentinel_monitoring_smtp_username | length > 0
+        and sentinel_monitoring_smtp_password | length > 0
+        and sentinel_monitoring_smtp_from | length > 0
+      }}
+
+- name: Reject partial SMTP configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (
+          sentinel_monitoring_email_destination | length > 0
+          or sentinel_monitoring_smtp_host | length > 0
+          or sentinel_monitoring_smtp_username | length > 0
+          or sentinel_monitoring_smtp_password | length > 0
+          or sentinel_monitoring_smtp_from | length > 0
+        )
+        or sentinel_monitoring_mail_enabled | bool
+    fail_msg: Configure all Sentinel SMTP fields together or leave all empty.
+  no_log: true
+
+- name: Require read-only Proxmox exporter credentials
+  when: sentinel_monitoring_pve_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - sentinel_monitoring_pve_target | length > 0
+      - sentinel_monitoring_pve_user | length > 0
+      - sentinel_monitoring_pve_token_name | length > 0
+      - sentinel_monitoring_pve_token_value | length > 0
+      - sentinel_monitoring_critical_guest_ids | length > 0
+    fail_msg: >-
+      PVE monitoring needs a target, a dedicated read-only token, and at least
+      one critical guest ID.
+  no_log: true
+
+- name: Create Sentinel monitoring directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ sentinel_monitoring_install_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ sentinel_monitoring_install_dir }}/rules"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ sentinel_monitoring_install_dir }}/data"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ sentinel_monitoring_install_dir }}/data/prometheus"
+      owner: "65534"
+      group: "65534"
+      mode: "0750"
+    - path: "{{ sentinel_monitoring_install_dir }}/data/alertmanager"
+      owner: "65534"
+      group: "65534"
+      mode: "0750"
+
+- name: Install Sentinel monitoring public configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ sentinel_monitoring_install_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: compose.yaml.j2
+      dest: compose.yaml
+    - src: blackbox.yml.j2
+      dest: blackbox.yml
+    - src: prometheus.yml.j2
+      dest: prometheus.yml
+    - src: rules.yml.j2
+      dest: rules/sentinel.yml
+  notify: Recreate Sentinel monitoring
+
+- name: Install Sentinel monitoring secret configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ sentinel_monitoring_install_dir }}/{{ item.dest }}"
+    owner: root
+    group: "65534"
+    mode: "0640"
+  loop:
+    - src: alertmanager.yml.j2
+      dest: alertmanager.yml
+  no_log: true
+  notify: Recreate Sentinel monitoring
+
+- name: Install PVE exporter environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ sentinel_monitoring_install_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Recreate Sentinel monitoring
+
+- name: Validate the Sentinel Compose model
+  ansible.builtin.command:
+    cmd: docker compose config --quiet
+    chdir: "{{ sentinel_monitoring_install_dir }}"
+  changed_when: false
+
+- name: Pull pinned Sentinel monitoring images
+  ansible.builtin.command:
+    cmd: docker compose pull --quiet
+    chdir: "{{ sentinel_monitoring_install_dir }}"
+  register: sentinel_monitoring_pull
+  changed_when: >-
+    'Pulled' in (sentinel_monitoring_pull.stdout ~ sentinel_monitoring_pull.stderr)
+    or 'Downloaded' in (sentinel_monitoring_pull.stdout ~ sentinel_monitoring_pull.stderr)
+
+- name: Start Sentinel monitoring
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ sentinel_monitoring_install_dir }}"
+  register: sentinel_monitoring_up
+  changed_when: >-
+    'Started' in (sentinel_monitoring_up.stdout ~ sentinel_monitoring_up.stderr)
+    or 'Created' in (sentinel_monitoring_up.stdout ~ sentinel_monitoring_up.stderr)
+
+- name: Install external heartbeat command
+  when: sentinel_monitoring_heartbeat_url | length > 0
+  ansible.builtin.template:
+    src: sentinel-heartbeat.j2
+    dest: /usr/local/sbin/sentinel-heartbeat
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart Sentinel heartbeat
+
+- name: Install external heartbeat secret
+  when: sentinel_monitoring_heartbeat_url | length > 0
+  ansible.builtin.copy:
+    dest: /etc/sentinel-heartbeat.env
+    owner: root
+    group: root
+    mode: "0600"
+    content: "HEARTBEAT_URL={{ sentinel_monitoring_heartbeat_url }}\n"
+  no_log: true
+  notify: Restart Sentinel heartbeat
+
+- name: Install external heartbeat units
+  when: sentinel_monitoring_heartbeat_url | length > 0
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - sentinel-heartbeat.service
+    - sentinel-heartbeat.timer
+  notify: Restart Sentinel heartbeat
+
+- name: Inspect a retired external heartbeat timer
+  when: sentinel_monitoring_heartbeat_url | length == 0
+  ansible.builtin.stat:
+    path: /etc/systemd/system/sentinel-heartbeat.timer
+  register: sentinel_monitoring_retired_heartbeat
+
+- name: Stop a retired external heartbeat timer
+  when:
+    - sentinel_monitoring_heartbeat_url | length == 0
+    - sentinel_monitoring_retired_heartbeat.stat.exists
+  ansible.builtin.systemd_service:
+    name: sentinel-heartbeat.timer
+    enabled: false
+    state: stopped
+
+- name: Remove retired external heartbeat files
+  when: sentinel_monitoring_heartbeat_url | length == 0
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/sbin/sentinel-heartbeat
+    - /etc/sentinel-heartbeat.env
+    - /etc/systemd/system/sentinel-heartbeat.service
+    - /etc/systemd/system/sentinel-heartbeat.timer
+
+- name: Apply Sentinel monitoring handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Sentinel monitoring endpoints
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    status_code: 200
+    return_content: false
+  loop:
+    - "http://{{ sentinel_monitoring_prometheus_listen_address }}/-/ready"
+    - "http://{{ sentinel_monitoring_alertmanager_listen_address }}/-/ready"
+    - "http://{{ sentinel_monitoring_blackbox_listen_address }}/metrics"
+    - "http://{{ sentinel_monitoring_node_exporter_listen_address }}/metrics"
+  register: sentinel_monitoring_endpoint
+  retries: 12
+  delay: 5
+  until: sentinel_monitoring_endpoint.status | default(0) == 200
+
+- name: Verify the PVE exporter endpoint
+  when: sentinel_monitoring_pve_enabled | bool
+  ansible.builtin.uri:
+    url: "http://{{ sentinel_monitoring_pve_exporter_listen_address }}/"
+    status_code: 200
+    return_content: false
+  register: sentinel_monitoring_pve_endpoint
+  retries: 12
+  delay: 5
+  until: sentinel_monitoring_pve_endpoint.status | default(0) == 200

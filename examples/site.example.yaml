@@ -19,8 +19,19 @@ site:
   # Brownfield machines. OpenTofu does not create these; keep them out of guests.
   hosts:
     watchdog:
+      hostname: sentinel-example
       ipv4: 192.0.2.11
       role: sentinel
+      bootstrap_user: operator
+      ansible_user: gha
+      ubuntu_release: "24.04"
+      management_cidrs:
+        - 192.0.2.0/24
+      runner:
+        repository_url: https://github.com/example/homelab-live
+        name: sentinel-example
+        labels:
+          - sentinel
 
   network:
     cidr: 192.0.2.0/24
@@ -36,6 +47,57 @@ site:
         ssh-ed25519
         AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyOnlyNotRealAAAAAAAAAAAA
         example@invalid
+
+  monitoring:
+    sentinel:
+      site_label: example
+      retention_time: 72h
+      retention_size: 10GB
+      pve_exporter:
+        enabled: true
+        user: prometheus@pve
+        token_name: sentinel
+        verify_ssl: false
+      critical_guest_ids:
+        - 112
+        - 114
+        - 115
+      icmp_targets:
+        - name: gateway
+          address: 192.0.2.1
+          kind: network
+          dependency: none
+        - name: pve-example
+          address: 192.0.2.10
+          kind: hypervisor
+          dependency: none
+      http_targets:
+        - name: adguard
+          address: https://adguard.lab.example.test
+          kind: service
+          dependency: pve
+        - name: frigate
+          address: https://frigate.lab.example.test
+          kind: service
+          dependency: pve
+        - name: homeassistant
+          address: https://ha.lab.example.test
+          kind: service
+          dependency: pve
+      tcp_targets:
+        - name: proxmox-api
+          address: 192.0.2.10:8006
+          kind: pve_api
+          dependency: pve
+      metrics_targets:
+        - name: frigate
+          address: 192.0.2.15:8971
+          scheme: http
+          metrics_path: /api/metrics
+          keep_metrics:
+            - frigate_camera_fps
+            - frigate_process_fps
+          dependency: pve
 
   guests:
     network_plane:

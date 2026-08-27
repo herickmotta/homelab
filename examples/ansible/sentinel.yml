@@ -1,0 +1,57 @@
+---
+- name: Build the fictional Sentinel inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional Sentinel host
+      ansible.builtin.add_host:
+        name: "{{ site.hosts.watchdog.hostname }}"
+        ansible_host: "{{ site.hosts.watchdog.ipv4 }}"
+        ansible_user: "{{ site.hosts.watchdog.bootstrap_user }}"
+        groups:
+          - sentinel
+
+- name: Bootstrap the fictional Sentinel
+  hosts: sentinel
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.sentinel_base
+      vars:
+        sentinel_base_hostname: "{{ site.hosts.watchdog.hostname }}"
+        sentinel_base_timezone: "{{ site.timezone }}"
+        sentinel_base_deployment_authorized_keys: "{{ site.access.ssh_public_keys }}"
+        sentinel_base_management_cidrs: "{{ site.hosts.watchdog.management_cidrs }}"
+    - role: herickmotta.homelab.github_actions_runner
+      vars:
+        github_actions_runner_repository_url: "{{ site.hosts.watchdog.runner.repository_url }}"
+        github_actions_runner_name: "{{ site.hosts.watchdog.runner.name }}"
+        github_actions_runner_labels: "{{ site.hosts.watchdog.runner.labels }}"
+        github_actions_runner_registration_token: "{{ lookup('env', 'GITHUB_RUNNER_TOKEN') }}"
+    - role: herickmotta.homelab.sentinel_monitoring
+      vars:
+        sentinel_monitoring_site_label: "{{ site.monitoring.sentinel.site_label }}"
+        sentinel_monitoring_retention_time: "{{ site.monitoring.sentinel.retention_time }}"
+        sentinel_monitoring_retention_size: "{{ site.monitoring.sentinel.retention_size }}"
+        sentinel_monitoring_icmp_targets: "{{ site.monitoring.sentinel.icmp_targets }}"
+        sentinel_monitoring_http_targets: "{{ site.monitoring.sentinel.http_targets }}"
+        sentinel_monitoring_tcp_targets: "{{ site.monitoring.sentinel.tcp_targets }}"
+        sentinel_monitoring_metrics_targets: "{{ site.monitoring.sentinel.metrics_targets }}"
+        sentinel_monitoring_pve_enabled: "{{ site.monitoring.sentinel.pve_exporter.enabled }}"
+        sentinel_monitoring_pve_target: "{{ site.hypervisor.endpoint_ipv4 }}"
+        sentinel_monitoring_pve_user: "{{ site.monitoring.sentinel.pve_exporter.user }}"
+        sentinel_monitoring_pve_token_name: "{{ site.monitoring.sentinel.pve_exporter.token_name }}"
+        sentinel_monitoring_pve_token_value: "{{ lookup('env', 'PVE_MONITOR_TOKEN_VALUE') }}"
+        sentinel_monitoring_pve_verify_ssl: "{{ site.monitoring.sentinel.pve_exporter.verify_ssl }}"
+        sentinel_monitoring_critical_guest_ids: "{{ site.monitoring.sentinel.critical_guest_ids }}"
+        sentinel_monitoring_email_destination: "{{ site.storage.monitoring.email_destination }}"
+        sentinel_monitoring_smtp_host: "{{ site.storage.monitoring.smtp.host }}"
+        sentinel_monitoring_smtp_port: "{{ site.storage.monitoring.smtp.port }}"
+        sentinel_monitoring_smtp_username: "{{ site.storage.monitoring.smtp.username }}"
+        sentinel_monitoring_smtp_from: "{{ site.storage.monitoring.smtp.from }}"
+        sentinel_monitoring_smtp_require_tls: "{{ site.storage.monitoring.smtp.starttls }}"
+        sentinel_monitoring_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') }}"

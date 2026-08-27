@@ -1,0 +1,44 @@
+---
+sentinel_monitoring_install_dir: /opt/sentinel-monitoring
+sentinel_monitoring_site_label: homelab
+sentinel_monitoring_scrape_interval: 30s
+sentinel_monitoring_evaluation_interval: 30s
+sentinel_monitoring_alert_for: 2m
+sentinel_monitoring_retention_time: 72h
+sentinel_monitoring_retention_size: 10GB
+
+sentinel_monitoring_prometheus_image: prom/prometheus:v3.14.0
+sentinel_monitoring_alertmanager_image: prom/alertmanager:v0.34.0
+sentinel_monitoring_blackbox_image: prom/blackbox-exporter:v0.28.0
+sentinel_monitoring_node_exporter_image: prom/node-exporter:v1.12.1
+sentinel_monitoring_pve_exporter_image: prompve/prometheus-pve-exporter:3.10.0
+
+sentinel_monitoring_prometheus_listen_address: 127.0.0.1:9090
+sentinel_monitoring_alertmanager_listen_address: 127.0.0.1:9093
+sentinel_monitoring_blackbox_listen_address: 127.0.0.1:9115
+sentinel_monitoring_node_exporter_listen_address: 127.0.0.1:9100
+sentinel_monitoring_pve_exporter_listen_address: 127.0.0.1:9221
+
+sentinel_monitoring_icmp_targets: []
+sentinel_monitoring_http_targets: []
+sentinel_monitoring_tcp_targets: []
+sentinel_monitoring_metrics_targets: []
+
+sentinel_monitoring_pve_enabled: false
+sentinel_monitoring_pve_target: ""
+sentinel_monitoring_pve_user: ""
+sentinel_monitoring_pve_token_name: ""
+sentinel_monitoring_pve_token_value: ""
+sentinel_monitoring_pve_verify_ssl: false
+sentinel_monitoring_critical_guest_ids: []
+
+sentinel_monitoring_email_destination: ""
+sentinel_monitoring_smtp_host: ""
+sentinel_monitoring_smtp_port: 587
+sentinel_monitoring_smtp_username: ""
+sentinel_monitoring_smtp_password: ""
+sentinel_monitoring_smtp_from: ""
+sentinel_monitoring_smtp_require_tls: true
+
+sentinel_monitoring_heartbeat_url: ""
+sentinel_monitoring_heartbeat_interval: 1min

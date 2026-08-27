@@ -1,0 +1,229 @@
+---
+- name: Validate the Sentinel operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_version"] in sentinel_base_supported_ubuntu_releases
+      - ansible_facts["architecture"] == "x86_64"
+    fail_msg: >-
+      sentinel_base supports x86_64 Ubuntu releases
+      {{ sentinel_base_supported_ubuntu_releases | join(', ') }} only.
+
+- name: Validate Sentinel identities and access
+  ansible.builtin.assert:
+    that:
+      - sentinel_base_hostname is match('^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')
+      - sentinel_base_deployment_user | length > 0
+      - sentinel_base_deployment_group | length > 0
+      - sentinel_base_hermes_user | length > 0
+      - sentinel_base_hermes_group | length > 0
+      - sentinel_base_deployment_user != sentinel_base_hermes_user
+      - sentinel_base_deployment_authorized_keys | length > 0
+      - not (sentinel_base_enable_firewall | bool) or sentinel_base_management_cidrs | length > 0
+      - sentinel_base_ssh_port | int > 0
+      - sentinel_base_ssh_port | int < 65536
+    fail_msg: >-
+      Sentinel needs distinct deployment/Hermes users, at least one deployment
+      SSH key, and a management CIDR when its firewall is enabled.
+
+- name: Validate deployment SSH public keys
+  ansible.builtin.command:
+    cmd: ssh-keygen -lf -
+    stdin: "{{ item }}"
+  loop: "{{ sentinel_base_deployment_authorized_keys }}"
+  loop_control:
+    label: "{{ item.split()[-1] | default('public-key') }}"
+  changed_when: false
+
+- name: Set the Sentinel hostname
+  ansible.builtin.hostname:
+    name: "{{ sentinel_base_hostname }}"
+
+- name: Read the Sentinel timezone
+  ansible.builtin.command:
+    cmd: timedatectl show --property=Timezone --value
+  changed_when: false
+  register: sentinel_base_current_timezone
+
+- name: Set the Sentinel timezone
+  ansible.builtin.command:
+    argv:
+      - timedatectl
+      - set-timezone
+      - "{{ sentinel_base_timezone }}"
+  when: sentinel_base_current_timezone.stdout != sentinel_base_timezone
+  changed_when: true
+
+- name: Install Sentinel base packages
+  ansible.builtin.apt:
+    name: "{{ sentinel_base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable automatic security updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+- name: Create the deployment group
+  ansible.builtin.group:
+    name: "{{ sentinel_base_deployment_group }}"
+    state: present
+
+- name: Create the deployment user
+  ansible.builtin.user:
+    name: "{{ sentinel_base_deployment_user }}"
+    group: "{{ sentinel_base_deployment_group }}"
+    groups:
+      - docker
+    append: true
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+    state: present
+
+- name: Create deployment-user private directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ sentinel_base_deployment_user }}"
+    group: "{{ sentinel_base_deployment_group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "/home/{{ sentinel_base_deployment_user }}/.ssh"
+      mode: "0700"
+    - path: "/home/{{ sentinel_base_deployment_user }}/.config/sops/age"
+      mode: "0700"
+    - path: "/home/{{ sentinel_base_deployment_user }}/.local/bin"
+      mode: "0755"
+    - path: "/home/{{ sentinel_base_deployment_user }}/.cache"
+      mode: "0755"
+
+- name: Authorize deployment-user SSH keys
+  ansible.builtin.copy:
+    dest: "/home/{{ sentinel_base_deployment_user }}/.ssh/authorized_keys"
+    owner: "{{ sentinel_base_deployment_user }}"
+    group: "{{ sentinel_base_deployment_group }}"
+    mode: "0600"
+    content: "{{ sentinel_base_deployment_authorized_keys | join('\n') }}\n"
+
+- name: Allow the deployment user to converge the Sentinel
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ sentinel_base_deployment_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+    content: |
+      {{ sentinel_base_deployment_user }} ALL=(ALL:ALL) NOPASSWD: ALL
+
+- name: Create the isolated Hermes group
+  ansible.builtin.group:
+    name: "{{ sentinel_base_hermes_group }}"
+    system: true
+    state: present
+
+- name: Create the isolated Hermes user
+  ansible.builtin.user:
+    name: "{{ sentinel_base_hermes_user }}"
+    group: "{{ sentinel_base_hermes_group }}"
+    home: "/var/lib/{{ sentinel_base_hermes_user }}"
+    create_home: true
+    shell: /usr/sbin/nologin
+    password_lock: true
+    system: true
+    state: present
+
+- name: Harden SSH authentication
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/60-homelab-sentinel.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+  notify: Restart ssh
+
+- name: Configure bounded Docker logs
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "live-restore": true,
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-file": "3",
+          "max-size": "10m"
+        }
+      }
+  notify: Restart docker
+
+- name: Enable required Sentinel services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - docker.service
+    - ssh.service
+
+- name: Read UFW status
+  when: sentinel_base_enable_firewall | bool
+  ansible.builtin.command:
+    cmd: ufw status
+  changed_when: false
+  register: sentinel_base_ufw_status
+
+- name: Set default incoming firewall policy
+  when: sentinel_base_enable_firewall | bool
+  ansible.builtin.command:
+    cmd: ufw default deny incoming
+  register: sentinel_base_ufw_default_incoming
+  changed_when: "'Default incoming policy changed' in sentinel_base_ufw_default_incoming.stdout"
+
+- name: Set default outgoing firewall policy
+  when: sentinel_base_enable_firewall | bool
+  ansible.builtin.command:
+    cmd: ufw default allow outgoing
+  register: sentinel_base_ufw_default_outgoing
+  changed_when: "'Default outgoing policy changed' in sentinel_base_ufw_default_outgoing.stdout"
+
+- name: Allow SSH from management networks
+  when: sentinel_base_enable_firewall | bool
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - from
+      - "{{ item }}"
+      - to
+      - any
+      - port
+      - "{{ sentinel_base_ssh_port | string }}"
+      - proto
+      - tcp
+  loop: "{{ sentinel_base_management_cidrs }}"
+  register: sentinel_base_ufw_ssh
+  changed_when: >-
+    'Rule added' in sentinel_base_ufw_ssh.stdout
+    or 'Rules updated' in sentinel_base_ufw_ssh.stdout
+
+- name: Enable the Sentinel firewall
+  when:
+    - sentinel_base_enable_firewall | bool
+    - "'Status: active' not in sentinel_base_ufw_status.stdout"
+  ansible.builtin.command:
+    cmd: ufw --force enable
+  changed_when: true

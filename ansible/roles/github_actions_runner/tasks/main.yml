@@ -1,0 +1,172 @@
+---
+- name: Validate GitHub Actions runner inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["architecture"] == "x86_64"
+      - github_actions_runner_user | length > 0
+      - github_actions_runner_group | length > 0
+      - github_actions_runner_repository_url is match('^https://github.com/[^/]+/[^/]+/?$')
+      - github_actions_runner_name is match('^[A-Za-z0-9._-]+$')
+      - github_actions_runner_labels | length > 0
+      - github_actions_runner_archive_sha256 is match('^[0-9a-f]{64}$')
+      - github_actions_runner_work_dir is match('^[A-Za-z0-9._-]+$')
+    fail_msg: >-
+      Supply a GitHub repository URL, safe runner identity, labels, work
+      directory, and the official SHA-256 for an x86_64 Linux runner.
+
+- name: Require the runner Unix account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ github_actions_runner_user }}"
+
+- name: Create the runner installation directory
+  ansible.builtin.file:
+    path: "{{ github_actions_runner_install_dir }}"
+    state: directory
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_group }}"
+    mode: "0755"
+
+- name: Create runner-local tool and cache directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_group }}"
+    mode: "0755"
+  loop:
+    - "/home/{{ github_actions_runner_user }}/.local/bin"
+    - "/home/{{ github_actions_runner_user }}/.local/share"
+    - "/home/{{ github_actions_runner_user }}/.cache"
+
+- name: Preserve the runner tool path as one line
+  ansible.builtin.copy:
+    dest: "{{ github_actions_runner_install_dir }}/.path"
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_group }}"
+    mode: "0644"
+    content: >-
+      /home/{{ github_actions_runner_user }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+- name: Check whether the runner is registered
+  ansible.builtin.stat:
+    path: "{{ github_actions_runner_install_dir }}/.runner"
+  register: github_actions_runner_registration
+
+- name: Require a short-lived registration token for first registration
+  when: not github_actions_runner_registration.stat.exists
+  ansible.builtin.assert:
+    that:
+      - github_actions_runner_registration_token | length > 0
+    fail_msg: >-
+      First registration needs a short-lived GitHub runner registration
+      token. Supply it at bootstrap time; do not store it in git or SOPS.
+  no_log: true
+
+- name: Download the pinned GitHub Actions runner
+  when: not github_actions_runner_registration.stat.exists
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/actions/runner/releases/download/v{{ github_actions_runner_version
+      }}/actions-runner-linux-x64-{{ github_actions_runner_version }}.tar.gz
+    dest: "/var/cache/actions-runner-linux-x64-{{ github_actions_runner_version }}.tar.gz"
+    checksum: "sha256:{{ github_actions_runner_archive_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Extract the pinned GitHub Actions runner
+  when: not github_actions_runner_registration.stat.exists
+  ansible.builtin.unarchive:
+    src: "/var/cache/actions-runner-linux-x64-{{ github_actions_runner_version }}.tar.gz"
+    dest: "{{ github_actions_runner_install_dir }}"
+    remote_src: true
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_group }}"
+    creates: "{{ github_actions_runner_install_dir }}/bin/Runner.Listener"
+
+- name: Install GitHub Actions runner system dependencies
+  when: not github_actions_runner_registration.stat.exists
+  ansible.builtin.command:
+    cmd: ./bin/installdependencies.sh
+    chdir: "{{ github_actions_runner_install_dir }}"
+    creates: "{{ github_actions_runner_install_dir }}/.dependencies-installed"
+  register: github_actions_runner_dependencies
+
+- name: Record installed runner dependencies
+  when:
+    - not github_actions_runner_registration.stat.exists
+    - github_actions_runner_dependencies is changed
+  ansible.builtin.file:
+    path: "{{ github_actions_runner_install_dir }}/.dependencies-installed"
+    state: touch
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_group }}"
+    mode: "0644"
+
+- name: Register the GitHub Actions runner
+  when: not github_actions_runner_registration.stat.exists
+  become: true
+  become_user: "{{ github_actions_runner_user }}"
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          './config.sh',
+          '--unattended',
+          '--url',
+          github_actions_runner_repository_url,
+          '--token',
+          github_actions_runner_registration_token,
+          '--name',
+          github_actions_runner_name,
+          '--labels',
+          github_actions_runner_labels | join(','),
+          '--work',
+          github_actions_runner_work_dir
+        ]
+        + (['--replace'] if github_actions_runner_replace | bool else [])
+      }}
+    chdir: "{{ github_actions_runner_install_dir }}"
+    creates: "{{ github_actions_runner_install_dir }}/.runner"
+  no_log: true
+
+- name: Find an installed GitHub Actions runner service
+  ansible.builtin.find:
+    paths: /etc/systemd/system
+    patterns: actions.runner.*.service
+    file_type: file
+  register: github_actions_runner_services
+
+- name: Install the GitHub Actions runner service
+  when: github_actions_runner_services.matched | int == 0
+  ansible.builtin.command:
+    argv:
+      - ./svc.sh
+      - install
+      - "{{ github_actions_runner_user }}"
+    chdir: "{{ github_actions_runner_install_dir }}"
+  changed_when: true
+
+- name: Discover the GitHub Actions runner service
+  ansible.builtin.find:
+    paths: /etc/systemd/system
+    patterns: actions.runner.*.service
+    file_type: file
+  register: github_actions_runner_installed_services
+
+- name: Require exactly one GitHub Actions runner service
+  ansible.builtin.assert:
+    that:
+      - github_actions_runner_installed_services.matched | int == 1
+    fail_msg: >-
+      Expected one repository-scoped GitHub Actions runner service on this
+      dedicated host.
+
+- name: Enable the GitHub Actions runner service
+  ansible.builtin.systemd_service:
+    name: "{{ github_actions_runner_installed_services.files[0].path | basename }}"
+    enabled: true
+    state: started
+    daemon_reload: true

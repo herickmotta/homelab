@@ -1,0 +1,42 @@
+---
+argument_specs:
+  main:
+    short_description: Configure an Ubuntu Sentinel host from a minimal server install
+    options:
+      sentinel_base_hostname:
+        type: str
+        default: sentinel
+      sentinel_base_timezone:
+        type: str
+        default: Etc/UTC
+      sentinel_base_supported_ubuntu_releases:
+        type: list
+        elements: str
+      sentinel_base_deployment_user:
+        type: str
+        default: gha
+      sentinel_base_deployment_group:
+        type: str
+        default: gha
+      sentinel_base_deployment_authorized_keys:
+        type: list
+        elements: str
+        required: true
+      sentinel_base_hermes_user:
+        type: str
+        default: hermes
+      sentinel_base_hermes_group:
+        type: str
+        default: hermes
+      sentinel_base_enable_firewall:
+        type: bool
+        default: true
+      sentinel_base_management_cidrs:
+        type: list
+        elements: str
+      sentinel_base_ssh_port:
+        type: int
+        default: 22
+      sentinel_base_packages:
+        type: list
+        elements: str
