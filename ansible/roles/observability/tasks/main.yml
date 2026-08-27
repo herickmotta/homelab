@@ -1,0 +1,240 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Require observability inputs
+  ansible.builtin.assert:
+    that:
+      - observability_install_dir is match('^/')
+      - observability_site_label | length > 0
+      - observability_retention_time | length > 0
+      - observability_retention_size | length > 0
+      - observability_prometheus_image | length > 0
+      - observability_grafana_image | length > 0
+      - observability_grafana_root_url is match('^https://')
+      - observability_grafana_admin_user | length > 0
+      - observability_grafana_admin_password | length >= 16
+      - observability_grafana_admin_password is not match('(?i)^replace')
+      - observability_grafana_http_port | int > 0
+      - observability_grafana_bind_ip | length > 0
+    fail_msg: >-
+      Observability needs a pinned stack, HTTPS Grafana root URL, and a real
+      admin password of at least 16 characters.
+  no_log: true
+
+- name: Derive the Grafana public hostname
+  ansible.builtin.set_fact:
+    observability_grafana_domain: "{{ observability_grafana_root_url | urlsplit('hostname') }}"
+
+- name: Validate observability metrics targets
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[A-Za-z0-9._-]+$')
+      - item.address | length > 0
+      - item.metrics_path | default('/metrics') is match('^/')
+    fail_msg: Metrics targets need a safe name, address, and metrics path.
+  loop: "{{ observability_metrics_targets }}"
+  loop_control:
+    label: "{{ item.name | default('unknown') }}"
+
+- name: Require read-only Proxmox exporter credentials
+  when: observability_pve_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - observability_pve_target | length > 0
+      - observability_pve_user | length > 0
+      - observability_pve_token_name | length > 0
+      - observability_pve_token_value | length > 0
+      - observability_pve_token_value is not match('(?i)^replace')
+    fail_msg: >-
+      PVE monitoring needs a target and a dedicated read-only token that is
+      not the Sentinel or OpenTofu credential.
+  no_log: true
+
+- name: Create observability directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ observability_install_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/grafana"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/grafana/provisioning"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/grafana/provisioning/datasources"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/grafana/provisioning/dashboards"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/grafana/dashboards"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/data"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ observability_install_dir }}/data/prometheus"
+      owner: "65534"
+      group: "65534"
+      mode: "0750"
+    - path: "{{ observability_install_dir }}/data/grafana"
+      owner: "472"
+      group: "472"
+      mode: "0750"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install observability Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ observability_install_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Install Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ observability_install_dir }}/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Install Grafana datasource provisioning
+  ansible.builtin.template:
+    src: grafana-datasources.yml.j2
+    dest: "{{ observability_install_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Install Grafana dashboard provisioning
+  ansible.builtin.template:
+    src: grafana-dashboards.yml.j2
+    dest: "{{ observability_install_dir }}/grafana/provisioning/dashboards/homelab.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Install the Homelab overview dashboard
+  ansible.builtin.copy:
+    src: dashboards/overview.json
+    dest: "{{ observability_install_dir }}/grafana/dashboards/overview.json"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Install observability secret environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ observability_install_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Recreate observability compose
+
+- name: Load generated observability Compose file
+  ansible.builtin.slurp:
+    src: "{{ observability_install_dir }}/compose.yaml"
+  register: observability_compose_slurp
+
+- name: Assert observability Compose bindings
+  ansible.builtin.assert:
+    that:
+      - "'network_mode: host' in observability_compose"
+      - "'homelab.role: observability' in observability_compose"
+      - "'3000:3000' not in observability_compose"
+      - "'9090:9090' not in observability_compose"
+      - (observability_prometheus_listen_address | string) in observability_compose
+    fail_msg: >-
+      Observability must use host networking, keep Prometheus on loopback, and
+      avoid published port mappings.
+  vars:
+    observability_compose: "{{ observability_compose_slurp.content | b64decode }}"
+
+- name: Validate the observability Compose model
+  ansible.builtin.command:
+    cmd: docker compose config --quiet
+    chdir: "{{ observability_install_dir }}"
+  changed_when: false
+
+- name: Pull pinned observability images
+  ansible.builtin.command:
+    cmd: docker compose pull --quiet
+    chdir: "{{ observability_install_dir }}"
+  register: observability_pull
+  async: 1800
+  poll: 15
+  changed_when: >-
+    'Pulled' in (observability_pull.stdout | default('') ~ observability_pull.stderr | default(''))
+    or 'Downloaded' in (observability_pull.stdout | default('') ~ observability_pull.stderr | default(''))
+
+- name: Start observability Compose project
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --remove-orphans
+    chdir: "{{ observability_install_dir }}"
+  register: observability_up
+  async: 300
+  poll: 10
+  changed_when: >-
+    observability_up.rc == 0
+    and ('Started' in (observability_up.stderr ~ observability_up.stdout)
+         or 'Recreated' in (observability_up.stderr ~ observability_up.stdout)
+         or 'Created' in (observability_up.stderr ~ observability_up.stdout))
+
+- name: Apply observability handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for observability endpoints
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    status_code: 200
+    return_content: false
+  loop:
+    - "http://{{ observability_prometheus_listen_address }}/-/ready"
+    - "http://{{ observability_grafana_scrape_address }}/api/health"
+    - "http://{{ observability_node_exporter_listen_address }}/metrics"
+  register: observability_endpoint
+  retries: 12
+  delay: 5
+  until: observability_endpoint.status | default(0) == 200
+
+- name: Verify the PVE exporter endpoint
+  when: observability_pve_enabled | bool
+  ansible.builtin.uri:
+    url: "http://{{ observability_pve_exporter_listen_address }}/"
+    status_code: 200
+    return_content: false
+  register: observability_pve_endpoint
+  retries: 12
+  delay: 5
+  until: observability_pve_endpoint.status | default(0) == 200

@@ -1,0 +1,68 @@
+# Managed by herickmotta.homelab.observability.
+global:
+  scrape_interval: "{{ observability_scrape_interval }}"
+  evaluation_interval: "{{ observability_evaluation_interval }}"
+  external_labels:
+    site: "{{ observability_site_label }}"
+    monitor: observability
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "{{ observability_prometheus_listen_address }}"
+
+  - job_name: grafana
+    static_configs:
+      - targets:
+          - "{{ observability_grafana_scrape_address }}"
+
+  - job_name: observe
+    static_configs:
+      - targets:
+          - "{{ observability_node_exporter_listen_address }}"
+
+{% if observability_pve_enabled | bool %}
+  - job_name: pve_exporter
+    static_configs:
+      - targets:
+          - "{{ observability_pve_exporter_listen_address }}"
+
+  - job_name: pve
+    metrics_path: /pve
+    params:
+      module:
+        - default
+      cluster:
+        - "1"
+      node:
+        - "1"
+    static_configs:
+      - targets:
+          - "{{ observability_pve_target }}"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ observability_pve_exporter_listen_address }}"
+{% endif %}
+
+{% for target in observability_metrics_targets %}
+  - job_name: "metrics_{{ target.name }}"
+    scheme: "{{ target.scheme | default('http') }}"
+    metrics_path: "{{ target.metrics_path | default('/metrics') }}"
+    static_configs:
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          dependency: "{{ target.dependency | default('none') }}"
+{% if target.keep_metrics | default([]) | length > 0 %}
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        action: keep
+        regex: "{{ target.keep_metrics | join('|') }}"
+{% endif %}
+{% endfor %}

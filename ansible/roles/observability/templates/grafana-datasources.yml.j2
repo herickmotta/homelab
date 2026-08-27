@@ -1,0 +1,10 @@
+# Managed by herickmotta.homelab.observability.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://{{ observability_prometheus_listen_address }}
+    isDefault: true
+    editable: false

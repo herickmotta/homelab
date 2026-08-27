@@ -62,6 +62,7 @@ site:
         - 112
         - 114
         - 115
+        - 116
       icmp_targets:
         - name: gateway
           address: 192.0.2.1
@@ -84,6 +85,10 @@ site:
           address: https://ha.lab.example.test
           kind: service
           dependency: pve
+        - name: grafana
+          address: https://grafana.lab.example.test
+          kind: service
+          dependency: pve
       tcp_targets:
         - name: proxmox-api
           address: 192.0.2.10:8006
@@ -97,6 +102,22 @@ site:
           keep_metrics:
             - frigate_camera_fps
             - frigate_process_fps
+          dependency: pve
+    observability:
+      site_label: example
+      retention_time: 15d
+      retention_size: 40GB
+      grafana_root_url: https://grafana.lab.example.test
+      pve_exporter:
+        enabled: true
+        user: observe@pve
+        token_name: observe
+        verify_ssl: false
+      metrics_targets:
+        - name: frigate
+          address: 192.0.2.15:8971
+          scheme: http
+          metrics_path: /api/metrics
           dependency: pve
 
   guests:
@@ -124,6 +145,8 @@ site:
           upstream: 192.0.2.15:8971
         - hostname: ha
           upstream: 192.0.2.15:8123
+        - hostname: grafana
+          upstream: 192.0.2.16:3000
 
     application_runtime:
       hostname: apps-example
@@ -172,6 +195,21 @@ site:
           expose_acl: true
         - mapping: example-media
           expose_acl: true
+
+    observability:
+      hostname: observe-example
+      vm_id: 116
+      ipv4: 192.0.2.16
+      groups:
+        - homelab_guest
+        - observability
+      cores: 4
+      memory_mb: 8192
+      disk_gb: 64
+      tags:
+        - observe
+      startup:
+        order: 4
 
   storage:
     pools:

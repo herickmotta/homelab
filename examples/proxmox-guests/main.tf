@@ -76,6 +76,19 @@ module "example" {
         }
       ]
     }
+
+    observability = {
+      name      = "observe-example"
+      vm_id     = 116
+      ipv4      = "192.0.2.16"
+      cores     = 4
+      memory_mb = 8192
+      disk_gb   = 64
+      tags      = ["observe"]
+      startup = {
+        order = 4
+      }
+    }
   }
 
   directory_mappings = {

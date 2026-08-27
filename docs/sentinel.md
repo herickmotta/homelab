@@ -58,14 +58,15 @@ Sentinel monitoring is deliberately small:
 - an optional systemd timer pings an external dead-man service.
 
 Prometheus, Alertmanager, exporters, and their APIs bind to loopback by
-default. Operators use SSH forwarding for inspection. A later rich
-observability VM may send alerts to Sentinel Alertmanager after a site
+default. Operators use SSH forwarding for inspection. A later Alertmanager
+listener may accept alerts from the observability guest after a site
 explicitly opens that single LAN endpoint.
 
-Grafana, Loki, long retention, detailed application metrics, and log search
-belong on the rich Proxmox observability VM. Losing Proxmox can therefore make
-detailed logs temporarily unavailable, but it does not remove independent
-detection or notification.
+Grafana, longer Prometheus retention, detailed application metrics, and
+later log search belong on the Proxmox observability guest
+(`herickmotta.homelab.observability`). Losing Proxmox can therefore make
+Grafana temporarily unavailable, but it does not remove independent
+detection or notification. Do not run Grafana on Sentinel.
 
 ## Failure behavior
 

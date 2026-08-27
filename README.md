@@ -15,9 +15,10 @@ for the repo split and how a site consumes this code. The diagram below is the
 
 ## Architecture
 
-Three guests on one Proxmox host. The network-plane guest is the only place for
+Four guests on one Proxmox host. The network-plane guest is the only place for
 DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
-end. The application guest runs Compose workloads such as Frigate. ZFS stays
+end. The application guest runs Compose workloads such as Frigate. The
+observability guest holds Grafana and longer-retention Prometheus. ZFS stays
 on the hypervisor, so destroying a guest does not destroy host datasets.
 
 ```mermaid
@@ -56,6 +57,11 @@ flowchart TB
     ha["Home Assistant"]
   end
 
+  subgraph observe["Observability guest"]
+    grafana["Grafana"]
+    richProm["Prometheus 15d"]
+  end
+
   subgraph cameras["Cameras"]
     stacked["Stacked dual-lens RTSP"]
   end
@@ -66,15 +72,20 @@ flowchart TB
   guard -->|"service probes"| net
   guard -->|"service probes"| nas
   guard -->|"service probes"| apps
+  guard -->|"Grafana probe"| grafana
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
   proxy -->|"AdGuard UI"| dns
   proxy -->|"Frigate UI"| frigate
   proxy -->|"Home Assistant"| ha
+  proxy -->|"Grafana"| grafana
   stacked -->|"go2rtc VAAPI crops"| frigate
   ha --> mqtt
   frigate --> mqtt
+  grafana --> richProm
+  richProm -->|"PVE and self"| host
+  richProm -->|"Frigate metrics"| frigate
 
   durable --> virtio
   virtio --> smb
@@ -92,7 +103,8 @@ How traffic and data move:
 - LAN DHCP points at AdGuard. AdGuard filters ads and answers lab names.
   Caddy terminates TLS and proxies to services. AdGuard stays on the
   network-plane guest; Frigate, Home Assistant, and later apps run on the
-  application guest and receive names the same way.
+  application guest and receive names the same way. Grafana lives on the
+  observability guest and is reached the same way.
 - Tailscale on that guest advertises the LAN. Remote devices join the tailnet
   and reach DNS and SMB without a second exposure path. Cloudflare is used
   for DNS-01 certificates, not as a public reverse proxy for the LAN.
@@ -130,9 +142,9 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.8.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.9.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
-`mqtt_broker`, `homeassistant`, `proxmox_host_power`,
+`mqtt_broker`, `homeassistant`, `observability`, `proxmox_host_power`,
 `proxmox_host_storage`, `nas_server`, `netdata_agent`, `sentinel_base`,
 `github_actions_runner`, and `sentinel_monitoring`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
