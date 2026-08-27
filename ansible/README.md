@@ -65,7 +65,8 @@ Roles:
   Proxmox guest. Retention is longer than Sentinel. Grafana binds the guest
   LAN for Caddy; Prometheus stays on loopback. It scrapes guest node
   exporters, the Sentinel host Linux exporter, and hypervisor SMART and ZFS.
-  The Homelab overview dashboard is the fleet/NAS view. Optional read-only PVE
+  The Homelab overview dashboard is the fleet/NAS view, including Sentinel
+  CPU, memory, and root disk. Optional read-only PVE
   exporter uses a token distinct from Sentinel. Alertmanager stays on Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
