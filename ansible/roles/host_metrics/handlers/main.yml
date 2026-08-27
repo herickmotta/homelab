@@ -1,0 +1,22 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart node exporter
+  ansible.builtin.systemd_service:
+    name: node_exporter.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart smartctl exporter
+  ansible.builtin.systemd_service:
+    name: smartctl_exporter.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart zfs exporter
+  ansible.builtin.systemd_service:
+    name: zfs_exporter.service
+    state: restarted
+    daemon_reload: true

@@ -23,6 +23,10 @@ observability_grafana_admin_password: ""
 observability_grafana_root_url: ""
 
 observability_metrics_targets: []
+observability_node_targets: []
+observability_smartctl_address: ""
+observability_zfs_address: ""
+observability_accepted_degraded_serials: []
 
 observability_pve_enabled: false
 observability_pve_target: ""

@@ -1,4 +1,5 @@
 ---
+netdata_agent_state: present
 netdata_agent_kickstart_url: https://get.netdata.cloud/kickstart.sh
 netdata_agent_release_channel: stable
 netdata_agent_config_dir: /etc/netdata
@@ -26,3 +27,10 @@ netdata_agent_mail_packages:
 netdata_agent_packages:
   - ca-certificates
   - curl
+netdata_agent_absent_paths:
+  - /etc/netdata
+  - /opt/netdata
+  - /var/log/netdata
+  - /var/cache/netdata
+  - /var/lib/netdata
+  - /usr/libexec/netdata-uninstaller.sh

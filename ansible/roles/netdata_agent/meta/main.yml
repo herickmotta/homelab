@@ -2,7 +2,7 @@
 galaxy_info:
   author: Herick Motta
   role_name: netdata_agent
-  description: File-managed Netdata Agent for host and guest metrics and alerts
+  description: Install or purge the Netdata Agent without touching smartd or ZED
   license: MIT
   min_ansible_version: "2.17"
 dependencies: []

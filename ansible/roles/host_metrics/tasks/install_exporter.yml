@@ -1,0 +1,44 @@
+---
+- name: Download the pinned exporter archive for {{ host_metrics_exporter_name }}
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/{{ host_metrics_exporter_project }}/releases/download/{{
+      host_metrics_exporter_tag }}/{{ host_metrics_exporter_archive }}
+    dest: "{{ host_metrics_cache_dir }}/{{ host_metrics_exporter_archive }}"
+    checksum: "sha256:{{ host_metrics_exporter_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the extract directory for {{ host_metrics_exporter_name }}
+  ansible.builtin.file:
+    path: "{{ host_metrics_extract_dir }}/{{ host_metrics_exporter_name }}-{{ host_metrics_exporter_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Extract the pinned exporter archive for {{ host_metrics_exporter_name }}
+  ansible.builtin.unarchive:
+    src: "{{ host_metrics_cache_dir }}/{{ host_metrics_exporter_archive }}"
+    dest: "{{ host_metrics_extract_dir }}/{{ host_metrics_exporter_name }}-{{ host_metrics_exporter_version }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    owner: root
+    group: root
+    creates: >-
+      {{ host_metrics_extract_dir }}/{{ host_metrics_exporter_name }}-{{
+      host_metrics_exporter_version }}/{{ host_metrics_exporter_binary }}
+
+- name: Install the exporter binary for {{ host_metrics_exporter_name }}
+  ansible.builtin.copy:
+    src: >-
+      {{ host_metrics_extract_dir }}/{{ host_metrics_exporter_name }}-{{
+      host_metrics_exporter_version }}/{{ host_metrics_exporter_binary }}
+    dest: "{{ host_metrics_bin_dir }}/{{ host_metrics_exporter_binary }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: "{{ host_metrics_exporter_restart_handler }}"

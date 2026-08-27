@@ -41,10 +41,12 @@ Roles:
   replaceable NAS VM. Guest access and SMB1 stay disabled. The household
   account uses a fixed UID/GID, and the role writes an SMB probe to each
   share.
-- `herickmotta.homelab.netdata_agent`: reusable Netdata Agent install with
-  file-managed collectors and a small `health.d` policy. Apply it to the
-  hypervisor and to guests that should be observed. The dashboard is not the
-  control plane.
+- `herickmotta.homelab.host_metrics`: pinned `node_exporter` as a systemd
+  unit on guests and the hypervisor. Optional `smartctl_exporter` and
+  `zfs_exporter` on the hypervisor. Listen on a site IPv4, not loopback.
+- `herickmotta.homelab.netdata_agent`: optional Netdata Agent with
+  file-managed collectors. `netdata_agent_state: present` installs it;
+  `absent` uninstalls it without touching smartd, ZED, or msmtp.
 - `herickmotta.homelab.sentinel_base`: converge a minimal x86_64 Ubuntu
   24.04 or 26.04 server into the independent Sentinel baseline. It creates
   separate deployment and Hermes identities, hardens SSH, bounds Docker logs,
@@ -60,9 +62,9 @@ Roles:
   to loopback by default.
 - `herickmotta.homelab.observability`: Prometheus and Grafana on a dedicated
   Proxmox guest. Retention is longer than Sentinel. Grafana binds the guest
-  LAN for Caddy; Prometheus and exporters stay on loopback. Optional
-  read-only PVE exporter uses a token distinct from Sentinel. Alertmanager
-  stays on Sentinel.
+  LAN for Caddy; Prometheus stays on loopback. It scrapes guest node
+  exporters plus hypervisor SMART and ZFS. Optional read-only PVE exporter
+  uses a token distinct from Sentinel. Alertmanager stays on Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

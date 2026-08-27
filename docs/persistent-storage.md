@@ -72,27 +72,22 @@ the household Samba account with a fixed UID/GID, configures SMB3 without
 guest access or SMB1, and writes a probe file to each share to confirm the
 file appears on the matching guest path only.
 
-`herickmotta.homelab.netdata_agent` is the reusable metrics and alert agent
-for the lab, not a NAS-only sidecar. Apply it to the Proxmox host and to
-guests that should be observed. It installs the official Netdata Agent and
-manages collectors and `health.d` rules as files. The local dashboard is a
-view, not the control plane, and Netdata Cloud is left disabled. Collectors
-used here:
+`herickmotta.homelab.host_metrics` installs pinned `node_exporter`,
+optional `smartctl_exporter`, and optional `zfs_exporter` as systemd
+units. Guests get Linux node metrics. The hypervisor gets SMART for
+declared disks and ZFS pool/dataset metrics. Observe Prometheus scrapes
+those endpoints. Do not scrape Netdata's Prometheus export.
 
-- Proxmox host/VM/systemd metrics from the agent on the hypervisor
-- `zfspool` and `smartctl` on the hypervisor
-- `samba` on the NAS VM (`smbd profiling level = count`)
-- agent-dispatched email when SMTP is configured
-- Prometheus-compatible `/api/v1/allmetrics?format=prometheus` for a later
-  central stack
+`herickmotta.homelab.netdata_agent` remains in the collection for
+transition. `netdata_agent_state: present` still installs the agent.
+`netdata_agent_state: absent` stops the service, runs the official
+kickstart uninstaller, and removes leftover paths. It must not touch
+smartd, ZED, or msmtp. After Grafana shows Linux, ZFS, and SMART,
+sites should purge the agent.
 
-Custom `health.d` rules cover pool not online, SMART failed and critical
-sector counters, inactive `smbd`/smartd/ZED or VirtioFS mount units, and
-free-space thresholds on declared data mounts.
-
-Runtime health belongs to Netdata, ZED, and smartd. Recovery and debug stay
-on standard commands: `zpool status`, `smartctl -j`, `systemctl`, and
-`smbstatus`.
+Runtime view belongs to Grafana on the observability guest. Disk and
+pool mail belong to smartd and ZED. Recovery and debug stay on standard
+commands: `zpool status`, `smartctl -j`, `systemctl`, and `smbstatus`.
 
 ## Stable data owner
 
@@ -117,5 +112,5 @@ stay on the guest OS disk and are reproducible from git except event history.
 - Treating Frigate recordings, event history, or detector models as backed up
 - NFS
 - A backup product
-- Prometheus, Grafana, Loki, Alertmanager, or another central monitoring stack
+- Loki, Alertmanager, or Grafana SMTP
 - LDAP, Active Directory, quotas, or a web file manager

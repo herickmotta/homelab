@@ -1,0 +1,22 @@
+# Managed by herickmotta.homelab.host_metrics.
+[Unit]
+Description=Prometheus ZFS exporter
+Documentation=https://github.com/pdf/zfs_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+RestartSec=5
+ExecStart={{ host_metrics_bin_dir }}/zfs_exporter \
+    --web.listen-address={{ host_metrics_listen_ip }}:{{ host_metrics_zfs_port }} \
+    --no-collector.dataset-snapshot \
+    --no-collector.dataset-volume
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

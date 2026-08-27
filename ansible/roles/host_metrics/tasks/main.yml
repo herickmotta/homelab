@@ -1,0 +1,241 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+      - ansible_facts["architecture"] == "x86_64"
+    fail_msg: Host metrics exporters support Debian-family x86_64 Linux only.
+
+- name: Require a LAN listen address and pinned checksums
+  ansible.builtin.assert:
+    that:
+      - host_metrics_listen_ip is match("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$")
+      - host_metrics_node_port | int > 0
+      - host_metrics_node_archive_sha256 is match('^[0-9a-f]{64}$')
+      - host_metrics_cache_dir is match('^/')
+      - host_metrics_extract_dir is match('^/')
+      - host_metrics_bin_dir is match('^/')
+    fail_msg: Host metrics need a dotted IPv4 listen address and pinned SHA-256 checksums.
+
+- name: Require SMART exporter inputs
+  when: host_metrics_smartctl | bool
+  ansible.builtin.assert:
+    that:
+      - host_metrics_smartctl_port | int > 0
+      - host_metrics_smartctl_archive_sha256 is match('^[0-9a-f]{64}$')
+      - host_metrics_smartctl_devices | length > 0
+      - host_metrics_smartctl_devices | select('match', '^/') | list | length
+        == host_metrics_smartctl_devices | length
+    fail_msg: SMART exporter needs a listen port and absolute /dev disk paths.
+
+- name: Require ZFS exporter inputs
+  when: host_metrics_zfs | bool
+  ansible.builtin.assert:
+    that:
+      - host_metrics_zfs_port | int > 0
+      - host_metrics_zfs_archive_sha256 is match('^[0-9a-f]{64}$')
+    fail_msg: ZFS exporter needs a listen port and a pinned SHA-256 checksum.
+
+- name: Require the host ZFS tools
+  when: host_metrics_zfs | bool
+  ansible.builtin.stat:
+    path: "{{ host_metrics_zpool_binary }}"
+  register: host_metrics_zpool
+
+- name: Assert the host ZFS tools exist
+  when: host_metrics_zfs | bool
+  ansible.builtin.assert:
+    that:
+      - host_metrics_zpool.stat.executable | default(false)
+    fail_msg: ZFS exporter needs {{ host_metrics_zpool_binary }} on the hypervisor.
+
+- name: Build the systemd unit include regex
+  when: host_metrics_systemd_units | length > 0
+  ansible.builtin.set_fact:
+    host_metrics_systemd_unit_regex: >-
+      ^({{ host_metrics_systemd_units | map('regex_escape') | join('|') }})$
+
+- name: Create host-metrics directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ host_metrics_cache_dir }}"
+    - "{{ host_metrics_extract_dir }}"
+    - "{{ host_metrics_bin_dir }}"
+
+- name: Create the node exporter group
+  ansible.builtin.group:
+    name: "{{ host_metrics_node_group }}"
+    system: true
+
+- name: Create the node exporter user
+  ansible.builtin.user:
+    name: "{{ host_metrics_node_user }}"
+    group: "{{ host_metrics_node_group }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+
+- name: Install node exporter
+  ansible.builtin.include_tasks: install_exporter.yml
+  vars:
+    host_metrics_exporter_name: node_exporter
+    host_metrics_exporter_version: "{{ host_metrics_node_version }}"
+    host_metrics_exporter_project: prometheus/node_exporter
+    host_metrics_exporter_tag: "v{{ host_metrics_node_version }}"
+    host_metrics_exporter_archive: >-
+      node_exporter-{{ host_metrics_node_version }}.linux-amd64.tar.gz
+    host_metrics_exporter_sha256: "{{ host_metrics_node_archive_sha256 }}"
+    host_metrics_exporter_binary: node_exporter
+    host_metrics_exporter_restart_handler: Restart node exporter
+
+- name: Install the node exporter unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart node exporter
+
+- name: Enable node exporter
+  ansible.builtin.systemd_service:
+    name: node_exporter.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Install SMART packages
+  when: host_metrics_smartctl | bool
+  ansible.builtin.apt:
+    name: "{{ host_metrics_smartctl_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install smartctl exporter
+  when: host_metrics_smartctl | bool
+  ansible.builtin.include_tasks: install_exporter.yml
+  vars:
+    host_metrics_exporter_name: smartctl_exporter
+    host_metrics_exporter_version: "{{ host_metrics_smartctl_version }}"
+    host_metrics_exporter_project: prometheus-community/smartctl_exporter
+    host_metrics_exporter_tag: "v{{ host_metrics_smartctl_version }}"
+    host_metrics_exporter_archive: >-
+      smartctl_exporter-{{ host_metrics_smartctl_version }}.linux-amd64.tar.gz
+    host_metrics_exporter_sha256: "{{ host_metrics_smartctl_archive_sha256 }}"
+    host_metrics_exporter_binary: smartctl_exporter
+    host_metrics_exporter_restart_handler: Restart smartctl exporter
+
+- name: Install the smartctl exporter unit
+  when: host_metrics_smartctl | bool
+  ansible.builtin.template:
+    src: smartctl_exporter.service.j2
+    dest: /etc/systemd/system/smartctl_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart smartctl exporter
+
+- name: Enable smartctl exporter
+  when: host_metrics_smartctl | bool
+  ansible.builtin.systemd_service:
+    name: smartctl_exporter.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Stop smartctl exporter when disabled
+  when: not (host_metrics_smartctl | bool)
+  ansible.builtin.systemd_service:
+    name: smartctl_exporter.service
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Install zfs exporter
+  when: host_metrics_zfs | bool
+  ansible.builtin.include_tasks: install_exporter.yml
+  vars:
+    host_metrics_exporter_name: zfs_exporter
+    host_metrics_exporter_version: "{{ host_metrics_zfs_version }}"
+    host_metrics_exporter_project: pdf/zfs_exporter
+    host_metrics_exporter_tag: "v{{ host_metrics_zfs_version }}"
+    host_metrics_exporter_archive: >-
+      zfs_exporter-{{ host_metrics_zfs_version }}.linux-amd64.tar.gz
+    host_metrics_exporter_sha256: "{{ host_metrics_zfs_archive_sha256 }}"
+    host_metrics_exporter_binary: zfs_exporter
+    host_metrics_exporter_restart_handler: Restart zfs exporter
+
+- name: Install the zfs exporter unit
+  when: host_metrics_zfs | bool
+  ansible.builtin.template:
+    src: zfs_exporter.service.j2
+    dest: /etc/systemd/system/zfs_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart zfs exporter
+
+- name: Enable zfs exporter
+  when: host_metrics_zfs | bool
+  ansible.builtin.systemd_service:
+    name: zfs_exporter.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Stop zfs exporter when disabled
+  when: not (host_metrics_zfs | bool)
+  ansible.builtin.systemd_service:
+    name: zfs_exporter.service
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Apply host-metrics handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for node exporter
+  ansible.builtin.uri:
+    url: "http://{{ host_metrics_listen_ip }}:{{ host_metrics_node_port }}/metrics"
+    status_code: 200
+    return_content: false
+  register: host_metrics_node_ready
+  retries: 12
+  delay: 5
+  until: host_metrics_node_ready.status | default(0) == 200
+
+- name: Wait for smartctl exporter
+  when: host_metrics_smartctl | bool
+  ansible.builtin.uri:
+    url: "http://{{ host_metrics_listen_ip }}:{{ host_metrics_smartctl_port }}/metrics"
+    status_code: 200
+    return_content: false
+  register: host_metrics_smartctl_ready
+  retries: 12
+  delay: 5
+  until: host_metrics_smartctl_ready.status | default(0) == 200
+
+- name: Wait for zfs exporter
+  when: host_metrics_zfs | bool
+  ansible.builtin.uri:
+    url: "http://{{ host_metrics_listen_ip }}:{{ host_metrics_zfs_port }}/metrics"
+    status_code: 200
+    return_content: false
+  register: host_metrics_zfs_ready
+  retries: 12
+  delay: 5
+  until: host_metrics_zfs_ready.status | default(0) == 200
