@@ -4,6 +4,8 @@ log_shipper_site_label: homelab
 log_shipper_host_label: ""
 log_shipper_docker: false
 log_shipper_journal_units: []
+log_shipper_heartbeat_unit: alloy-heartbeat.service
+log_shipper_heartbeat_interval: 5min
 
 log_shipper_user: alloy
 log_shipper_group: alloy

@@ -62,6 +62,11 @@ jobs:
       - name: Build collection
         run: ansible-galaxy collection build ansible --output-path /tmp
 
+      - name: Test per-host log freshness
+        run: |
+          pip install jinja2 pyyaml
+          python3 tests/observability/test_log_freshness.py
+
   ci:
     name: ci
     if: always()

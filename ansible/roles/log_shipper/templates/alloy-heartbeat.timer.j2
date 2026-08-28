@@ -1,0 +1,13 @@
+# Managed by herickmotta.homelab.log_shipper.
+[Unit]
+Description=Alloy log-pipeline heartbeat
+
+[Timer]
+Unit={{ log_shipper_heartbeat_unit }}
+OnBootSec=1min
+OnUnitActiveSec={{ log_shipper_heartbeat_interval }}
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
