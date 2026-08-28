@@ -27,7 +27,7 @@ loki.relabel "journal" {
 
   rule {
     source_labels = ["__journal__systemd_unit"]
-    regex         = "^({{ log_shipper_journal_units | map('regex_escape') | join('|') }})$"
+    regex         = "^({{ log_shipper_journal_units | map('regex_escape') | join('|') | replace('\\', '\\\\') }})$"
     action        = "keep"
   }
 
