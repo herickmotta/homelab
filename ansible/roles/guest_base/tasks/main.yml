@@ -8,12 +8,13 @@
 - name: Gather facts
   ansible.builtin.setup:
 
-- name: Install guest agent and Docker
+- name: Install guest agent, Docker, and growpart
   ansible.builtin.apt:
     name:
       - qemu-guest-agent
       - docker.io
       - docker-compose-v2
+      - cloud-guest-utils
     state: present
     update_cache: true
 
@@ -40,3 +41,6 @@
     name: "{{ ansible_user }}"
     groups: docker
     append: true
+
+- name: Grow the root filesystem when the hypervisor disk is larger
+  ansible.builtin.include_tasks: grow_root.yml

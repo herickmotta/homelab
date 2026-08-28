@@ -83,7 +83,7 @@ module "example" {
       ipv4      = "192.0.2.16"
       cores     = 4
       memory_mb = 8192
-      disk_gb   = 64
+      disk_gb   = 128
       tags      = ["observe"]
       startup = {
         order = 4

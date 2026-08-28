@@ -227,7 +227,7 @@ site:
         - observability
       cores: 4
       memory_mb: 8192
-      disk_gb: 64
+      disk_gb: 128
       tags:
         - observe
       startup:
