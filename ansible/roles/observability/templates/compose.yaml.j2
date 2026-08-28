@@ -57,6 +57,26 @@ services:
     labels:
       homelab.role: observability
 
+  loki:
+    image: "{{ observability_loki_image }}"
+    restart: unless-stopped
+    network_mode: host
+    user: "{{ observability_loki_user }}:{{ observability_loki_group }}"
+    command:
+      - -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./loki.yml:/etc/loki/loki.yml:ro
+      - ./data/loki:/loki
+    mem_limit: 1g
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      homelab.role: observability
+
   node-exporter:
     image: "{{ observability_node_exporter_image }}"
     restart: unless-stopped

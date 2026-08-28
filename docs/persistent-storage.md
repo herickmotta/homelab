@@ -78,6 +78,11 @@ units. Guests get Linux node metrics. The hypervisor gets SMART for
 declared disks and ZFS pool/dataset metrics. Observe Prometheus scrapes
 those endpoints. Do not scrape Netdata's Prometheus export.
 
+`herickmotta.homelab.log_shipper` installs pinned Grafana Alloy as a
+systemd unit. It ships selected journal units and optional Docker logs
+to Loki on the observability guest. Alloy's HTTP endpoint stays on
+loopback. Loki is log search, not a data lake.
+
 `herickmotta.homelab.netdata_agent` remains in the collection for
 transition. `netdata_agent_state: present` still installs the agent.
 `netdata_agent_state: absent` stops the service, runs the official

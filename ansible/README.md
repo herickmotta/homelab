@@ -45,6 +45,10 @@ Roles:
 - `herickmotta.homelab.host_metrics`: pinned `node_exporter` as a systemd
   unit on guests and the hypervisor. Optional `smartctl_exporter` and
   `zfs_exporter` on the hypervisor. Listen on a site IPv4, not loopback.
+- `herickmotta.homelab.log_shipper`: pinned Grafana Alloy as a systemd
+  unit. It pushes selected journal units (info and above, not debug) and
+  optional Docker container logs to Loki. Alloy's own HTTP endpoint stays
+  on loopback.
 - `herickmotta.homelab.netdata_agent`: optional Netdata Agent with
   file-managed collectors. `netdata_agent_state: present` installs it;
   `absent` uninstalls it without touching smartd, ZED, or msmtp.
@@ -62,13 +66,15 @@ Roles:
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default.
-- `herickmotta.homelab.observability`: Prometheus and Grafana on a dedicated
-  Proxmox guest. Retention is longer than Sentinel. Grafana binds the guest
-  LAN for Caddy; Prometheus stays on loopback. It scrapes guest node
-  exporters, the Sentinel host Linux exporter, and hypervisor SMART and ZFS.
-  The Homelab overview dashboard is the fleet/NAS view, including Sentinel
-  CPU, memory, and root disk. Optional read-only PVE
-  exporter uses a token distinct from Sentinel. Alertmanager stays on Sentinel.
+- `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
+  dedicated Proxmox guest. Retention is longer than Sentinel. Grafana binds
+  the guest LAN for Caddy; Prometheus stays on loopback; Loki listens on
+  the guest LAN for Alloy push and is not published through Caddy. It
+  scrapes guest node exporters, the Sentinel host Linux exporter, and
+  hypervisor SMART and ZFS. The Homelab overview dashboard is the fleet/NAS
+  view, including Sentinel CPU, memory, and root disk. Optional read-only
+  PVE exporter uses a token distinct from Sentinel. Alertmanager stays on
+  Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

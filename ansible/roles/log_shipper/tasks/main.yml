@@ -1,0 +1,203 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+      - ansible_facts["architecture"] == "x86_64"
+    fail_msg: Log shipper supports Debian-family x86_64 Linux only.
+
+- name: Require log shipper inputs
+  ansible.builtin.assert:
+    that:
+      - log_shipper_loki_url is match('^http://.+/loki/api/v1/push$')
+      - log_shipper_site_label | length > 0
+      - log_shipper_host_label is match('^[A-Za-z0-9._-]+$')
+      - log_shipper_listen_address | length > 0
+      - log_shipper_config_dir is match('^/')
+      - log_shipper_state_dir is match('^/')
+      - log_shipper_cache_dir is match('^/')
+      - log_shipper_extract_dir is match('^/')
+      - log_shipper_bin_dir is match('^/')
+      - log_shipper_archive_sha256 is match('^[0-9a-f]{64}$')
+      - log_shipper_journal_units | length > 0 or (log_shipper_docker | bool)
+    fail_msg: >-
+      Log shipper needs an HTTP Loki push URL, a host label, a pinned SHA-256,
+      and at least one journal unit or Docker collection.
+
+- name: Validate journal unit names
+  when: log_shipper_journal_units | length > 0
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9:_.-]+$')
+    fail_msg: Journal unit names must be safe systemd unit identifiers.
+  loop: "{{ log_shipper_journal_units }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Require the Docker socket when shipping container logs
+  when: log_shipper_docker | bool
+  ansible.builtin.stat:
+    path: /var/run/docker.sock
+  register: log_shipper_docker_sock
+
+- name: Assert the Docker socket exists
+  when: log_shipper_docker | bool
+  ansible.builtin.assert:
+    that:
+      - log_shipper_docker_sock.stat.issock | default(false)
+    fail_msg: Docker log shipping needs /var/run/docker.sock on this host.
+
+- name: Create log-shipper directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ log_shipper_cache_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ log_shipper_extract_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ log_shipper_bin_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ log_shipper_config_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Create the Alloy group
+  ansible.builtin.group:
+    name: "{{ log_shipper_group }}"
+    system: true
+
+- name: Create the Alloy user
+  ansible.builtin.user:
+    name: "{{ log_shipper_user }}"
+    group: "{{ log_shipper_group }}"
+    groups: "{{ ['adm', 'systemd-journal'] + (['docker'] if (log_shipper_docker | bool) else []) }}"
+    append: true
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    home: "{{ log_shipper_state_dir }}"
+
+- name: Create the Alloy state directory
+  ansible.builtin.file:
+    path: "{{ log_shipper_state_dir }}"
+    state: directory
+    owner: "{{ log_shipper_user }}"
+    group: "{{ log_shipper_group }}"
+    mode: "0750"
+
+- name: Download the pinned Alloy archive
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/{{ log_shipper_project }}/releases/download/{{
+      log_shipper_tag }}/{{ log_shipper_archive }}
+    dest: "{{ log_shipper_cache_dir }}/{{ log_shipper_archive }}"
+    checksum: "sha256:{{ log_shipper_archive_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the Alloy extract directory
+  ansible.builtin.file:
+    path: "{{ log_shipper_extract_dir }}/alloy-{{ log_shipper_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Extract the pinned Alloy archive
+  ansible.builtin.unarchive:
+    src: "{{ log_shipper_cache_dir }}/{{ log_shipper_archive }}"
+    dest: "{{ log_shipper_extract_dir }}/alloy-{{ log_shipper_version }}"
+    remote_src: true
+    owner: root
+    group: root
+    creates: "{{ log_shipper_extract_dir }}/alloy-{{ log_shipper_version }}/alloy-linux-amd64"
+
+- name: Find the extracted Alloy binary
+  ansible.builtin.find:
+    paths: "{{ log_shipper_extract_dir }}/alloy-{{ log_shipper_version }}"
+    patterns:
+      - alloy
+      - alloy-linux-amd64
+    file_type: file
+    recurse: true
+  register: log_shipper_binary_find
+
+- name: Require exactly one Alloy binary
+  ansible.builtin.assert:
+    that:
+      - log_shipper_binary_find.files | length == 1
+    fail_msg: The Alloy archive must contain exactly one alloy or alloy-linux-amd64 binary.
+
+- name: Install the Alloy binary
+  ansible.builtin.copy:
+    src: "{{ log_shipper_binary_find.files[0].path }}"
+    dest: "{{ log_shipper_bin_dir }}/alloy"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart Alloy
+
+- name: Install the Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ log_shipper_config_dir }}/config.alloy"
+    owner: root
+    group: "{{ log_shipper_group }}"
+    mode: "0640"
+  notify: Restart Alloy
+
+- name: Validate the Alloy configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ log_shipper_bin_dir }}/alloy"
+      - fmt
+      - --test
+      - "{{ log_shipper_config_dir }}/config.alloy"
+  changed_when: false
+
+- name: Install the Alloy unit
+  ansible.builtin.template:
+    src: alloy.service.j2
+    dest: /etc/systemd/system/alloy.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart Alloy
+
+- name: Enable Alloy
+  ansible.builtin.systemd_service:
+    name: alloy.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply Alloy handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Alloy
+  ansible.builtin.uri:
+    url: "http://{{ log_shipper_listen_address }}/-/ready"
+    status_code: 200
+    return_content: false
+  register: log_shipper_ready
+  retries: 12
+  delay: 5
+  until: log_shipper_ready.status | default(0) == 200

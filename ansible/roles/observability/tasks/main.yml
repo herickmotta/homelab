@@ -15,6 +15,11 @@
       - observability_retention_size | length > 0
       - observability_prometheus_image | length > 0
       - observability_grafana_image | length > 0
+      - observability_loki_image | length > 0
+      - observability_loki_retention_period | length > 0
+      - observability_loki_http_listen_address | length > 0
+      - observability_loki_http_listen_port | int > 0
+      - observability_loki_ready_address | length > 0
       - observability_grafana_root_url is match('^https://')
       - observability_grafana_admin_user | length > 0
       - observability_grafana_admin_password | length >= 16
@@ -22,8 +27,8 @@
       - observability_grafana_http_port | int > 0
       - observability_grafana_bind_ip | length > 0
     fail_msg: >-
-      Observability needs a pinned stack, HTTPS Grafana root URL, and a real
-      admin password of at least 16 characters.
+      Observability needs a pinned stack, HTTPS Grafana root URL, Loki
+      retention, and a real admin password of at least 16 characters.
   no_log: true
 
 - name: Derive the Grafana public hostname
@@ -109,6 +114,10 @@
       owner: "472"
       group: "472"
       mode: "0750"
+    - path: "{{ observability_install_dir }}/data/loki"
+      owner: "{{ observability_loki_user }}"
+      group: "{{ observability_loki_group }}"
+      mode: "0750"
   loop_control:
     label: "{{ item.path }}"
 
@@ -130,10 +139,24 @@
     mode: "0644"
   notify: Recreate observability compose
 
+- name: Install Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ observability_install_dir }}/loki.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate observability compose
+
+- name: Remove the Prometheus-only Grafana datasource filename
+  ansible.builtin.file:
+    path: "{{ observability_install_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    state: absent
+
 - name: Install Grafana datasource provisioning
   ansible.builtin.template:
     src: grafana-datasources.yml.j2
-    dest: "{{ observability_install_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    dest: "{{ observability_install_dir }}/grafana/provisioning/datasources/datasources.yml"
     owner: root
     group: root
     mode: "0644"
@@ -186,10 +209,12 @@
       - "'homelab.role: observability' in observability_compose"
       - "'3000:3000' not in observability_compose"
       - "'9090:9090' not in observability_compose"
+      - "'3100:3100' not in observability_compose"
       - (observability_prometheus_listen_address | string) in observability_compose
+      - (observability_loki_http_listen_port | string) in observability_compose
     fail_msg: >-
-      Observability must use host networking, keep Prometheus on loopback, and
-      avoid published port mappings.
+      Observability must use host networking, keep Prometheus on loopback,
+      bind Loki without published port mappings, and include the Loki service.
   vars:
     observability_compose: "{{ observability_compose_slurp.content | b64decode }}"
 
@@ -244,6 +269,16 @@
   retries: 12
   delay: 5
   until: observability_endpoint.status | default(0) == 200
+
+- name: Wait for Loki
+  ansible.builtin.uri:
+    url: "http://{{ observability_loki_ready_address }}/ready"
+    status_code: 200
+    return_content: false
+  register: observability_loki_ready
+  retries: 24
+  delay: 5
+  until: observability_loki_ready.status | default(0) == 200
 
 - name: Verify the PVE exporter endpoint
   when: observability_pve_enabled | bool

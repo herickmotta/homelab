@@ -108,6 +108,7 @@ site:
       retention_time: 15d
       retention_size: 40GB
       grafana_root_url: https://grafana.lab.example.test
+      loki_retention_period: 336h
       pve_exporter:
         enabled: true
         user: observe@pve
@@ -138,6 +139,35 @@ site:
           host: sentinel
       smartctl_address: 192.0.2.10:9633
       zfs_address: 192.0.2.10:9134
+    log_shipper:
+      loki_write_url: http://192.0.2.16:3100/loki/api/v1/push
+      hosts:
+        net-example:
+          docker: true
+          journal_units:
+            - tailscaled.service
+        nas-example:
+          docker: false
+          journal_units:
+            - smbd.service
+        apps-example:
+          docker: true
+          journal_units: []
+        observe-example:
+          docker: true
+          journal_units: []
+        pve-example:
+          docker: false
+          journal_units:
+            - pvedaemon.service
+            - pveproxy.service
+            - pvestatd.service
+            - zfs-zed.service
+            - smartmontools.service
+        sentinel-example:
+          docker: true
+          journal_units:
+            - sentinel-monitoring.service
 
   guests:
     network_plane:
@@ -150,6 +180,7 @@ site:
         - homelab_guest
         - network_plane
         - host_metrics
+        - log_shipper
       cores: 2
       memory_mb: 4096
       disk_gb: 16
@@ -179,6 +210,7 @@ site:
         - mqtt_broker
         - homeassistant
         - host_metrics
+        - log_shipper
       cores: 4
       cpu_type: host
       memory_mb: 8192
@@ -205,6 +237,7 @@ site:
         - homelab_guest
         - nas_server
         - host_metrics
+        - log_shipper
       cores: 2
       memory_mb: 4096
       disk_gb: 32
@@ -225,6 +258,7 @@ site:
       groups:
         - homelab_guest
         - observability
+        - log_shipper
       cores: 4
       memory_mb: 8192
       disk_gb: 128

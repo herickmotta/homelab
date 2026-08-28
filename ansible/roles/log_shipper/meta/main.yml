@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: Herick Motta
+  role_name: log_shipper
+  description: Pinned Grafana Alloy that ships selected journal and Docker logs to Loki
+  license: MIT
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []
