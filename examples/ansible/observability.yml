@@ -48,3 +48,6 @@
         observability_pve_token_name: "{{ site.monitoring.observability.pve_exporter.token_name }}"
         observability_pve_token_value: "{{ lookup('env', 'PVE_OBSERVE_TOKEN_VALUE') }}"
         observability_pve_verify_ssl: "{{ site.monitoring.observability.pve_exporter.verify_ssl }}"
+        observability_loki_retention_period: "{{
+            site.monitoring.observability.loki_retention_period
+          }}"

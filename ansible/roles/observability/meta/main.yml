@@ -2,7 +2,7 @@
 galaxy_info:
   author: Herick Motta
   role_name: observability
-  description: Prometheus and Grafana on a dedicated Proxmox observability guest
+  description: Prometheus, Grafana, and Loki on a dedicated Proxmox observability guest
   license: MIT
   min_ansible_version: "2.16"
   platforms:

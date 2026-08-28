@@ -60,6 +60,7 @@ flowchart TB
   subgraph observe["Observability guest"]
     grafana["Grafana"]
     richProm["Prometheus 15d"]
+    loki["Loki 14d"]
   end
 
   subgraph cameras["Cameras"]
@@ -84,13 +85,21 @@ flowchart TB
   ha --> mqtt
   frigate --> mqtt
   grafana --> richProm
+  grafana --> loki
   richProm -->|"PVE and self"| host
   richProm -->|"Linux exporters"| net
   richProm -->|"Linux exporters"| nas
   richProm -->|"Linux exporters"| apps
   richProm -->|"Linux exporter"| guard
   richProm -->|"Linux, SMART, ZFS"| host
-  richProm -->|"Frigate metrics"| frigate
+  richProm -->|"Frigate metrics"| frigate. Grafana Explore reads Loki.
+  Selected journal and Docker logs reach Loki through Grafana Alloy on the
+  guests, the hypervisor, and Sentinel. Loki is not on Caddy.
+  net -->|"Alloy logs"| loki
+  nas -->|"Alloy logs"| loki
+  apps -->|"Alloy logs"| loki
+  host -->|"Alloy logs"| loki
+  guard -->|"Alloy logs"| loki
 
   durable --> virtio
   virtio --> smb
@@ -116,6 +125,9 @@ How traffic and data move:
 - Personal and media datasets live on host ZFS. Proxmox maps those directories
   into the NAS guest with VirtioFS. Samba exports SMB3. Disposable camera
   footage is mapped into the application guest, not exported over SMB.
+- Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
+  journal and Docker logs to Loki on the observability guest. Grafana
+  Explore is the log UI. Loki is not on Caddy.
 
 ```mermaid
 flowchart LR
@@ -147,10 +159,10 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.10.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.11.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
-`proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
+`log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
 `netdata_agent`, `sentinel_base`, `github_actions_runner`, and
 `sentinel_monitoring`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module

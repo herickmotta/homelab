@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Run Prometheus and Grafana on the rich observability guest
+    short_description: Run Prometheus, Grafana, and Loki on the rich observability guest
     options:
       observability_install_dir:
         type: path
@@ -29,6 +29,30 @@ argument_specs:
         type: str
       observability_pve_exporter_image:
         type: str
+      observability_loki_image:
+        type: str
+      observability_loki_user:
+        type: str
+      observability_loki_group:
+        type: str
+      observability_loki_retention_period:
+        type: str
+        default: 336h
+      observability_loki_http_listen_address:
+        type: str
+        default: 0.0.0.0
+      observability_loki_http_listen_port:
+        type: int
+        default: 3100
+      observability_loki_grpc_listen_address:
+        type: str
+        default: 127.0.0.1
+      observability_loki_grpc_listen_port:
+        type: int
+        default: 9096
+      observability_loki_ready_address:
+        type: str
+        default: 127.0.0.1:3100
       observability_prometheus_listen_address:
         type: str
       observability_node_exporter_listen_address:

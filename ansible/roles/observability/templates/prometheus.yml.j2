@@ -17,6 +17,11 @@ scrape_configs:
       - targets:
           - "{{ observability_grafana_scrape_address }}"
 
+  - job_name: loki
+    static_configs:
+      - targets:
+          - "{{ observability_loki_ready_address }}"
+
   - job_name: observe
     static_configs:
       - targets:

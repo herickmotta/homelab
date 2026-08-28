@@ -8,3 +8,11 @@ datasources:
     url: http://{{ observability_prometheus_listen_address }}
     isDefault: true
     editable: false
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://{{ observability_loki_ready_address }}
+    editable: false
+    jsonData:
+      maxLines: 1000

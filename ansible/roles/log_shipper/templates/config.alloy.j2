@@ -1,0 +1,79 @@
+// Managed by herickmotta.homelab.log_shipper.
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+loki.write "observe" {
+  endpoint {
+    url = "{{ log_shipper_loki_url }}"
+  }
+
+  external_labels = {
+    host = "{{ log_shipper_host_label }}",
+    site = "{{ log_shipper_site_label }}",
+  }
+}
+
+{% if log_shipper_journal_units | length > 0 %}
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal_priority"]
+    regex         = "[0-6]"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    regex         = "^({{ log_shipper_journal_units | map('regex_escape') | join('|') }})$"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "selected" {
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {
+    job = "journal",
+  }
+  forward_to    = [loki.write.observe.receiver]
+}
+{% endif %}
+
+{% if log_shipper_docker | bool %}
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+loki.relabel "docker" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = loki.relabel.docker.rules
+  labels        = {
+    job = "docker",
+  }
+  forward_to    = [loki.write.observe.receiver]
+}
+{% endif %}

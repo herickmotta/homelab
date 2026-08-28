@@ -1,0 +1,49 @@
+---
+argument_specs:
+  main:
+    short_description: Run pinned Grafana Alloy as a systemd log shipper
+    options:
+      log_shipper_loki_url:
+        type: str
+        required: true
+      log_shipper_site_label:
+        type: str
+        default: homelab
+      log_shipper_host_label:
+        type: str
+        required: true
+      log_shipper_docker:
+        type: bool
+        default: false
+      log_shipper_journal_units:
+        type: list
+        elements: str
+      log_shipper_user:
+        type: str
+        default: alloy
+      log_shipper_group:
+        type: str
+        default: alloy
+      log_shipper_config_dir:
+        type: path
+      log_shipper_state_dir:
+        type: path
+      log_shipper_cache_dir:
+        type: path
+      log_shipper_extract_dir:
+        type: path
+      log_shipper_bin_dir:
+        type: path
+      log_shipper_listen_address:
+        type: str
+        default: 127.0.0.1:12345
+      log_shipper_version:
+        type: str
+      log_shipper_project:
+        type: str
+      log_shipper_tag:
+        type: str
+      log_shipper_archive:
+        type: str
+      log_shipper_archive_sha256:
+        type: str

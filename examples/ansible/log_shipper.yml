@@ -1,0 +1,50 @@
+---
+- name: Build the fictional log-shipper inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional Proxmox host
+      ansible.builtin.add_host:
+        name: "{{ site.hypervisor.node_name }}"
+        ansible_host: "{{ site.hypervisor.endpoint_ipv4 }}"
+        ansible_user: root
+        groups:
+          - proxmox_host
+
+    - name: Add fictional guests that ship logs
+      ansible.builtin.add_host:
+        name: "{{ item.value.hostname }}"
+        ansible_host: "{{ item.value.ipv4 }}"
+        ansible_user: "{{ site.access.username }}"
+        groups: "{{ item.value.groups }}"
+      loop: "{{ site.guests | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: "'log_shipper' in item.value.groups"
+
+    - name: Add the fictional Sentinel
+      ansible.builtin.add_host:
+        name: "{{ site.hosts.watchdog.hostname }}"
+        ansible_host: "{{ site.hosts.watchdog.ipv4 }}"
+        ansible_user: "{{ site.hosts.watchdog.ansible_user }}"
+        groups:
+          - sentinel
+
+- name: Configure fictional log shippers
+  hosts: log_shipper:proxmox_host:sentinel
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.log_shipper
+      vars:
+        log_shipper_loki_url: "{{ site.monitoring.log_shipper.loki_write_url }}"
+        log_shipper_site_label: "{{ site.monitoring.observability.site_label }}"
+        log_shipper_host_label: "{{ inventory_hostname }}"
+        log_shipper_docker: "{{ site.monitoring.log_shipper.hosts[inventory_hostname].docker }}"
+        log_shipper_journal_units: "{{
+            site.monitoring.log_shipper.hosts[inventory_hostname].journal_units
+          }}"
