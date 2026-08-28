@@ -68,18 +68,12 @@ Roles:
   and checksum are pinned; GitHub's default runner self-update remains enabled
   for service compatibility. First registration takes a short-lived token;
   the token is never persisted in site configuration.
-- `herickmotta.homelab.hermes`: optional read-only triage on the Sentinel.
-  Disabled by default. When enabled it runs as the isolated `hermes` user,
-  listens on `127.0.0.1`, accepts the Alertmanager bearer webhook, long-polls
-  one Telegram chat ID, and calls typed evidence tools. Secrets are rendered
-  to a root/`hermes`-readable environment file. Rollback is `hermes_enabled:
-  false`.
 - `herickmotta.homelab.sentinel_monitoring`: run a small Prometheus,
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default. A typed LAN bind can expose Alertmanager to the
-  observe guest only. A loopback Hermes webhook input exists but stays empty
-  until that role is enabled; email routing remains independent.
+  observe guest only. A loopback webhook input exists but stays empty until a
+  later consumer is enabled; email routing remains independent.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
   dedicated Proxmox guest. Retention is longer than Sentinel. Grafana binds
   the guest LAN for Caddy; Prometheus may bind the guest address for later
