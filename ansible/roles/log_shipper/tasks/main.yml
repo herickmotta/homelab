@@ -99,6 +99,13 @@
     group: "{{ log_shipper_group }}"
     mode: "0750"
 
+- name: Install unzip for the Alloy archive
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
 - name: Download the pinned Alloy archive
   ansible.builtin.get_url:
     url: >-
@@ -166,8 +173,7 @@
   ansible.builtin.command:
     argv:
       - "{{ log_shipper_bin_dir }}/alloy"
-      - fmt
-      - --test
+      - validate
       - "{{ log_shipper_config_dir }}/config.alloy"
   changed_when: false
 
