@@ -1,0 +1,10 @@
+# Sanitized Grafana Alloy v1.19.2 /metrics excerpt for loki.write.
+# Recorded from a live shipper, with documentation addresses substituted.
+#
+# The native `host` label is the Loki push endpoint, not the shipper hostname.
+# Prometheus scrape labels (honor_labels: false) keep the shipper host and
+# rename this endpoint label to exported_host.
+#
+# HELP loki_write_sent_entries_total Number of log entries sent to the ingester.
+# TYPE loki_write_sent_entries_total counter
+loki_write_sent_entries_total{component_id="loki.write.observe",component_path="/",host="192.0.2.16:3100",tenant=""} 254

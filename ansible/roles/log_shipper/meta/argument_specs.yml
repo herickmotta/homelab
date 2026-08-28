@@ -18,6 +18,12 @@ argument_specs:
       log_shipper_journal_units:
         type: list
         elements: str
+      log_shipper_heartbeat_unit:
+        type: str
+        default: alloy-heartbeat.service
+      log_shipper_heartbeat_interval:
+        type: str
+        default: 5min
       log_shipper_user:
         type: str
         default: alloy

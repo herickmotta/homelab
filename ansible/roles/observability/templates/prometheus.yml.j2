@@ -82,7 +82,10 @@ scrape_configs:
 {% endif %}
 
 {% if observability_alloy_targets | length > 0 %}
+  # loki.write exports host as the Loki endpoint. honor_labels false keeps the
+  # scrape shipper host and renames the endpoint label to exported_host.
   - job_name: alloy
+    honor_labels: false
     static_configs:
 {% for target in observability_alloy_targets %}
       - targets:

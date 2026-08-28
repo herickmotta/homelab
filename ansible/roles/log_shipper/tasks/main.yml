@@ -21,17 +21,18 @@
       - log_shipper_bin_dir is match('^/')
       - log_shipper_archive_sha256 is match('^[0-9a-f]{64}$')
       - log_shipper_journal_units | length > 0 or (log_shipper_docker | bool)
+      - log_shipper_heartbeat_unit is match('^[A-Za-z0-9:_.-]+\\.service$')
+      - log_shipper_heartbeat_interval is match('^[0-9]+(s|min|h)$')
     fail_msg: >-
       Log shipper needs an HTTP Loki push URL, a host label, a pinned SHA-256,
-      and at least one journal unit or Docker collection.
+      at least one journal unit or Docker collection, and a bounded heartbeat.
 
 - name: Validate journal unit names
-  when: log_shipper_journal_units | length > 0
   ansible.builtin.assert:
     that:
       - item is match('^[A-Za-z0-9:_.-]+$')
     fail_msg: Journal unit names must be safe systemd unit identifiers.
-  loop: "{{ log_shipper_journal_units }}"
+  loop: "{{ log_shipper_journal_units + [log_shipper_heartbeat_unit] }}"
   loop_control:
     label: "{{ item }}"
 
@@ -188,9 +189,36 @@
     - Reload systemd
     - Restart Alloy
 
+- name: Install the Alloy heartbeat unit
+  ansible.builtin.template:
+    src: alloy-heartbeat.service.j2
+    dest: /etc/systemd/system/{{ log_shipper_heartbeat_unit }}
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+
+- name: Install the Alloy heartbeat timer
+  ansible.builtin.template:
+    src: alloy-heartbeat.timer.j2
+    dest: /etc/systemd/system/alloy-heartbeat.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+
 - name: Enable Alloy
   ansible.builtin.systemd_service:
     name: alloy.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable the Alloy heartbeat timer
+  ansible.builtin.systemd_service:
+    name: alloy-heartbeat.timer
     enabled: true
     state: started
     daemon_reload: true
@@ -207,3 +235,18 @@
   retries: 12
   delay: 5
   until: log_shipper_ready.status | default(0) == 200
+
+- name: Load the generated Alloy configuration
+  ansible.builtin.slurp:
+    src: "{{ log_shipper_config_dir }}/config.alloy"
+  register: log_shipper_config_slurp
+
+- name: Assert Alloy always ships the pipeline heartbeat
+  ansible.builtin.assert:
+    that:
+      - log_shipper_heartbeat_unit in log_shipper_config
+      - "'loki.source.journal' in log_shipper_config"
+      - "'loki.write' in log_shipper_config"
+    fail_msg: Alloy must ship a journal heartbeat through loki.write on every host.
+  vars:
+    log_shipper_config: "{{ log_shipper_config_slurp.content | b64decode }}"

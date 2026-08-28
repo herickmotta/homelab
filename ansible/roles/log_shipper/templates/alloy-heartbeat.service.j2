@@ -1,0 +1,9 @@
+# Managed by herickmotta.homelab.log_shipper.
+[Unit]
+Description=Alloy log-pipeline heartbeat
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger --tag alloy-heartbeat pipeline ok
+PrivateTmp=true
+NoNewPrivileges=true

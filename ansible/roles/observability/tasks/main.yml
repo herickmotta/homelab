@@ -67,23 +67,28 @@
   loop_control:
     label: "{{ item.name | default('unknown') }}"
 
-- name: Validate expected log hosts have Alloy targets
+- name: Require unique expected log hosts
+  when: observability_expected_log_hosts | length > 0
+  ansible.builtin.assert:
+    that:
+      - >-
+          observability_expected_log_hosts | unique | list | length
+          == observability_expected_log_hosts | length
+    fail_msg: expected_log_hosts must not contain duplicates.
+
+- name: Validate expected log hosts match Alloy scrape host labels
   when: observability_expected_log_hosts | length > 0
   ansible.builtin.assert:
     that:
       - item is match('^[A-Za-z0-9._-]+$')
-      - >-
-          observability_alloy_targets
-          | selectattr('name', 'equalto', item)
-          | list | length > 0
-          or (
-            observability_alloy_targets
-            | rejectattr('host', 'undefined')
-            | selectattr('host', 'equalto', item)
-            | list | length > 0
-          )
-    fail_msg: Every expected log host needs an Alloy scrape target.
+      - (matching_named_hosts | length) + (matching_unnamed_hosts | length) == 1
+    fail_msg: >-
+      Every expected log host must match exactly one Alloy scrape host label
+      (target.host, or target.name when host is omitted).
   loop: "{{ observability_expected_log_hosts }}"
+  vars:
+    matching_named_hosts: "{{ observability_alloy_targets | selectattr('host', 'defined') | selectattr('host', 'equalto', item) | list }}"
+    matching_unnamed_hosts: "{{ observability_alloy_targets | rejectattr('host', 'defined') | selectattr('name', 'equalto', item) | list }}"
 
 - name: Validate the Alertmanager address
   when: observability_alertmanager_address | length > 0
@@ -256,6 +261,11 @@
     src: "{{ observability_install_dir }}/prometheus.yml"
   register: observability_prometheus_slurp
 
+- name: Load generated Prometheus alert rules
+  ansible.builtin.slurp:
+    src: "{{ observability_install_dir }}/rules/observability.yml"
+  register: observability_rules_slurp
+
 - name: Load generated Loki configuration
   ansible.builtin.slurp:
     src: "{{ observability_install_dir }}/loki.yml"
@@ -290,6 +300,50 @@
     fail_msg: Observe Prometheus must load rules and send alerts to Sentinel Alertmanager.
   vars:
     observability_prometheus: "{{ observability_prometheus_slurp.content | b64decode }}"
+
+- name: Assert Alloy scrape keeps shipper host labels
+  when: observability_alloy_targets | length > 0
+  ansible.builtin.assert:
+    that:
+      - "'job_name: alloy' in observability_prometheus"
+      - "'honor_labels: false' in observability_prometheus"
+    fail_msg: >-
+      Alloy scrape must set honor_labels false so loki.write's endpoint host
+      becomes exported_host and the shipper host label is kept.
+  vars:
+    observability_prometheus: "{{ observability_prometheus_slurp.content | b64decode }}"
+
+- name: Assert per-host Alloy pipeline freshness alerts
+  when: observability_expected_log_hosts | length > 0
+  ansible.builtin.assert:
+    that:
+      - stale_rule_count == observability_expected_log_hosts | length
+      - "'LokiIngestionStale' not in observability_rules"
+      - "'vector(0)' in observability_rules"
+      - item in observability_rules
+      - "'host: \"{{ item }}\"' in observability_rules"
+      - "'host=\"{{ item }}\"' in observability_rules"
+    fail_msg: Every expected log host needs exactly one AlloyLogPipelineStale rule.
+  vars:
+    observability_rules: "{{ observability_rules_slurp.content | b64decode }}"
+    stale_rule_count: "{{
+        observability_rules_slurp.content | b64decode
+        | regex_findall('(?m)^\\s+- alert: AlloyLogPipelineStale$')
+        | length
+      }}"
+  loop: "{{ observability_expected_log_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Assert global Loki ingestion fallback when no expected hosts
+  when: observability_expected_log_hosts | length == 0
+  ansible.builtin.assert:
+    that:
+      - "'LokiIngestionStale' in observability_rules"
+      - "'AlloyLogPipelineStale' not in observability_rules"
+    fail_msg: Sites without expected log hosts must keep the global LokiIngestionStale fallback.
+  vars:
+    observability_rules: "{{ observability_rules_slurp.content | b64decode }}"
 
 - name: Assert Loki listen bindings
   ansible.builtin.assert:
