@@ -15,6 +15,7 @@ sentinel_base_enable_firewall: true
 sentinel_base_management_cidrs: []
 sentinel_base_ssh_port: 22
 sentinel_base_open_tcp_ports: []
+sentinel_base_ingress_rules: []
 
 sentinel_base_packages:
   - ca-certificates

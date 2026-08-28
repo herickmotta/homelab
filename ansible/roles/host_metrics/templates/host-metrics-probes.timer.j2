@@ -1,0 +1,11 @@
+# Managed by herickmotta.homelab.host_metrics.
+[Unit]
+Description=Refresh homelab node-exporter textfile probes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

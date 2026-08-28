@@ -1,0 +1,123 @@
+# Managed by herickmotta.homelab.observability.
+groups:
+  - name: observability
+    rules:
+      - alert: ObserveDiskSpaceLow
+        expr: >-
+          100 * node_filesystem_avail_bytes{job="observe", mountpoint="/"}
+          / node_filesystem_size_bytes{job="observe", mountpoint="/"} < 15
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: Observe root disk has less than 15 percent free
+          description: Loki and Prometheus retention may fail if the guest disk fills.
+
+      - alert: ObservePrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: Observe Prometheus is down
+          description: The rich-plane Prometheus self-scrape failed.
+
+      - alert: ObserveGrafanaDown
+        expr: up{job="grafana"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: Observe Grafana is down
+          description: Grafana metrics on the observability guest are unreachable.
+
+      - alert: ObserveLokiDown
+        expr: up{job="loki"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: Observe Loki is down
+          description: Loki self-metrics on the observability guest are unreachable.
+
+      - alert: ObservePrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful{job="prometheus"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: Observe Prometheus rejected its latest configuration
+          description: The previous configuration remains active; inspect Prometheus logs.
+
+      - alert: LokiIngestionStale
+        expr: >-
+          (
+            sum(increase(loki_distributor_lines_received_total[15m]))
+            or
+            sum(increase(loki_distributor_bytes_received_total[15m]))
+          ) == 0
+        for: 15m
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: Loki has received no log lines
+          description: Alloy push or Loki ingestion has been silent for 15 minutes.
+
+      - alert: AlloyDown
+        expr: up{job="alloy"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alloy on {{ '{{ $labels.host }}' }} is down"
+          description: Observe cannot scrape the Grafana Alloy HTTP endpoint.
+
+      - alert: LocalServiceUnreachable
+        expr: homelab_local_tcp_up == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Local TCP service {{ '{{ $labels.name }}' }} is unreachable"
+          description: A host-local probe such as loopback Mosquitto failed.
+
+      - alert: CriticalContainerAbsent
+        expr: homelab_container_up == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Container {{ '{{ $labels.name }}' }} is not running"
+          description: An allowlisted Compose service is absent or stopped.
+
+      - alert: CriticalSystemdUnitDown
+        expr: >-
+          node_systemd_unit_state{name!="alloy.service", state="active",
+          host="sentinel"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: none
+        annotations:
+          summary: "systemd unit {{ '{{ $labels.name }}' }} is not active on {{ '{{ $labels.host }}' }}"
+          description: A collected Sentinel unit left the active state.
+
+      - alert: CriticalSystemdUnitDown
+        expr: >-
+          node_systemd_unit_state{name!="alloy.service", state="active",
+          host!="sentinel"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "systemd unit {{ '{{ $labels.name }}' }} is not active on {{ '{{ $labels.host }}' }}"
+          description: A collected critical unit left the active state.

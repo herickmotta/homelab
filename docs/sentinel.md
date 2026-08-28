@@ -57,10 +57,12 @@ Sentinel monitoring is deliberately small:
   hypervisor is unreachable;
 - an optional systemd timer pings an external dead-man service.
 
-Prometheus, Alertmanager, exporters, and their APIs bind to loopback by
-default. Operators use SSH forwarding for inspection. A later Alertmanager
-listener may accept alerts from the observability guest after a site
-explicitly opens that single LAN endpoint.
+Prometheus, exporters, and their APIs bind to loopback by default.
+Alertmanager stays loopback unless a site sets a LAN bind address, typically
+`0.0.0.0:9093`. That listener is not on Caddy and is not a management UI.
+A host firewall rule must allow only the observability guest to reach it.
+Sentinel Prometheus continues to use loopback. Raw email and Proxmox-down
+inhibition stay on this Alertmanager regardless of observe or Hermes.
 
 Grafana, longer Prometheus retention, detailed application metrics, and
 later log search belong on the Proxmox observability guest

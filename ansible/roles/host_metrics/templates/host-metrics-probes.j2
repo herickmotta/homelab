@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Managed by herickmotta.homelab.host_metrics.
+set -euo pipefail
+
+textfile_dir={{ host_metrics_textfile_dir | quote }}
+tmp="$(mktemp)"
+trap 'rm -f "${tmp}"' EXIT
+
+{
+{% if host_metrics_local_tcp_probes | length > 0 %}
+  echo '# HELP homelab_local_tcp_up Whether a local TCP probe succeeded (1) or failed (0).'
+  echo '# TYPE homelab_local_tcp_up gauge'
+{% for probe in host_metrics_local_tcp_probes %}
+  if timeout 2 bash -c 'echo >/dev/tcp/{{ probe.address.split(":")[0] }}/{{ probe.address.split(":")[1] }}' 2>/dev/null; then
+    echo 'homelab_local_tcp_up{name="{{ probe.name }}"} 1'
+  else
+    echo 'homelab_local_tcp_up{name="{{ probe.name }}"} 0'
+  fi
+{% endfor %}
+{% endif %}
+{% if host_metrics_container_probes | length > 0 %}
+  echo '# HELP homelab_container_up Whether an allowlisted Compose container is running (1) or absent (0).'
+  echo '# TYPE homelab_container_up gauge'
+{% for probe in host_metrics_container_probes %}
+  if [ "$(docker ps -q --filter 'label={{ probe.label }}' --filter status=running | wc -l | tr -d ' ')" -ge 1 ]; then
+    echo 'homelab_container_up{name="{{ probe.name }}"} 1'
+  else
+    echo 'homelab_container_up{name="{{ probe.name }}"} 0'
+  fi
+{% endfor %}
+{% endif %}
+} >"${tmp}"
+
+install -m 0644 "${tmp}" "${textfile_dir}/homelab-probes.prom"

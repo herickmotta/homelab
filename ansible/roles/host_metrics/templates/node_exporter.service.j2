@@ -21,10 +21,11 @@ ExecStart={{ host_metrics_bin_dir }}/node_exporter \
     --collector.filesystem.mount-points-exclude={{ host_metrics_filesystem_mount_points_exclude | quote }} \
 {% if host_metrics_systemd_units | length > 0 %}
     --collector.systemd \
-    --collector.systemd.unit-include={{ host_metrics_systemd_unit_regex }}
+    --collector.systemd.unit-include={{ host_metrics_systemd_unit_regex }} \
 {% else %}
-    --no-collector.systemd
+    --no-collector.systemd \
 {% endif %}
+    --collector.textfile.directory={{ host_metrics_textfile_dir }}
 NoNewPrivileges=true
 PrivateTmp=true
 

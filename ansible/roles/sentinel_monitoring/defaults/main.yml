@@ -15,6 +15,9 @@ sentinel_monitoring_pve_exporter_image: prompve/prometheus-pve-exporter:3.10.0
 
 sentinel_monitoring_prometheus_listen_address: 127.0.0.1:9090
 sentinel_monitoring_alertmanager_listen_address: 127.0.0.1:9093
+sentinel_monitoring_alertmanager_bind_address: ""
+sentinel_monitoring_hermes_webhook_url: ""
+sentinel_monitoring_hermes_webhook_secret: ""
 sentinel_monitoring_blackbox_listen_address: 127.0.0.1:9115
 sentinel_monitoring_node_exporter_listen_address: 127.0.0.1:9100
 sentinel_monitoring_pve_exporter_listen_address: 127.0.0.1:9221

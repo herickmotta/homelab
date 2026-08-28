@@ -1,0 +1,7 @@
+# Managed by herickmotta.homelab.host_metrics.
+[Unit]
+Description=Refresh homelab node-exporter textfile probes
+
+[Service]
+Type=oneshot
+ExecStart={{ host_metrics_bin_dir }}/host-metrics-probes

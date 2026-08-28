@@ -30,6 +30,28 @@ argument_specs:
       host_metrics_systemd_units:
         type: list
         elements: str
+      host_metrics_textfile_dir:
+        type: path
+      host_metrics_local_tcp_probes:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+      host_metrics_container_probes:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          label:
+            type: str
+            required: true
       host_metrics_smartctl:
         type: bool
         default: false

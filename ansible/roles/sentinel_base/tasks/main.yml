@@ -244,6 +244,43 @@
     'Rule added' in sentinel_base_ufw_extra.stdout
     or 'Rules updated' in sentinel_base_ufw_extra.stdout
 
+- name: Validate source-specific ingress rules
+  when: sentinel_base_ingress_rules | length > 0
+  ansible.builtin.assert:
+    that:
+      - item.source is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+      - item.port | int > 0
+      - item.port | int < 65536
+      - item.proto | default('tcp') in ['tcp', 'udp']
+    fail_msg: Ingress rules need a host IPv4 source, a port, and tcp or udp.
+  loop: "{{ sentinel_base_ingress_rules }}"
+  loop_control:
+    label: "{{ item.source | default('unknown') }}:{{ item.port | default('unknown') }}"
+
+- name: Allow source-specific ingress
+  when:
+    - sentinel_base_enable_firewall | bool
+    - sentinel_base_ingress_rules | length > 0
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - from
+      - "{{ item.source }}"
+      - to
+      - any
+      - port
+      - "{{ item.port | string }}"
+      - proto
+      - "{{ item.proto | default('tcp') }}"
+  loop: "{{ sentinel_base_ingress_rules }}"
+  loop_control:
+    label: "{{ item.source }}:{{ item.port }}/{{ item.proto | default('tcp') }}"
+  register: sentinel_base_ufw_ingress
+  changed_when: >-
+    'Rule added' in sentinel_base_ufw_ingress.stdout
+    or 'Rules updated' in sentinel_base_ufw_ingress.stdout
+
 - name: Enable the Sentinel firewall
   when:
     - sentinel_base_enable_firewall | bool

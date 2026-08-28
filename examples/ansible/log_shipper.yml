@@ -44,6 +44,7 @@
         log_shipper_loki_url: "{{ site.monitoring.log_shipper.loki_write_url }}"
         log_shipper_site_label: "{{ site.monitoring.observability.site_label }}"
         log_shipper_host_label: "{{ inventory_hostname }}"
+        log_shipper_listen_address: "{{ ansible_host }}:12345"
         log_shipper_docker: "{{ site.monitoring.log_shipper.hosts[inventory_hostname].docker }}"
         log_shipper_journal_units: "{{
             site.monitoring.log_shipper.hosts[inventory_hostname].journal_units
