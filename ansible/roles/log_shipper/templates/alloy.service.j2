@@ -2,17 +2,24 @@
 [Unit]
 Description=Grafana Alloy log shipper
 Documentation=https://grafana.com/docs/alloy/latest/
-After=network-online.target{% if log_shipper_docker | bool %} docker.service{% endif %}
 Wants=network-online.target
+After=network-online.target
+{% if log_shipper_docker | bool %}
+After=docker.service
+{% endif %}
 
 [Service]
 Type=simple
 User={{ log_shipper_user }}
 Group={{ log_shipper_group }}
-SupplementaryGroups=adm systemd-journal{% if log_shipper_docker | bool %} docker{% endif %}
+{% if log_shipper_docker | bool %}
+SupplementaryGroups=adm systemd-journal docker
+{% else %}
+SupplementaryGroups=adm systemd-journal
+{% endif %}
 Restart=always
 RestartSec=5
-ExecStart={{ log_shipper_bin_dir }}/alloy run {{ log_shipper_config_dir }}/config.alloy --storage.path={{ log_shipper_state_dir }} --server.http.listen-addr={{ log_shipper_listen_address }}
+ExecStart={{ log_shipper_bin_dir }}/alloy run --storage.path={{ log_shipper_state_dir }} --server.http.listen-addr={{ log_shipper_listen_address }} {{ log_shipper_config_dir }}/config.alloy
 NoNewPrivileges=true
 PrivateTmp=true
 
