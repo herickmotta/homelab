@@ -202,21 +202,41 @@
     src: "{{ observability_install_dir }}/compose.yaml"
   register: observability_compose_slurp
 
+- name: Load generated Loki configuration
+  ansible.builtin.slurp:
+    src: "{{ observability_install_dir }}/loki.yml"
+  register: observability_loki_slurp
+
 - name: Assert observability Compose bindings
   ansible.builtin.assert:
     that:
       - "'network_mode: host' in observability_compose"
       - "'homelab.role: observability' in observability_compose"
+      - "'  loki:' in observability_compose"
+      - observability_loki_image in observability_compose
+      - "'./loki.yml:/etc/loki/loki.yml:ro' in observability_compose"
       - "'3000:3000' not in observability_compose"
       - "'9090:9090' not in observability_compose"
       - "'3100:3100' not in observability_compose"
       - (observability_prometheus_listen_address | string) in observability_compose
-      - (observability_loki_http_listen_port | string) in observability_compose
     fail_msg: >-
       Observability must use host networking, keep Prometheus on loopback,
       bind Loki without published port mappings, and include the Loki service.
   vars:
     observability_compose: "{{ observability_compose_slurp.content | b64decode }}"
+
+- name: Assert Loki listen bindings
+  ansible.builtin.assert:
+    that:
+      - observability_loki_http_address_line in observability_loki
+      - observability_loki_http_port_line in observability_loki
+      - observability_loki_grpc_address_line in observability_loki
+    fail_msg: Loki must listen on the configured HTTP and gRPC addresses from loki.yml.
+  vars:
+    observability_loki: "{{ observability_loki_slurp.content | b64decode }}"
+    observability_loki_http_address_line: "http_listen_address: {{ observability_loki_http_listen_address }}"
+    observability_loki_http_port_line: "http_listen_port: {{ observability_loki_http_listen_port }}"
+    observability_loki_grpc_address_line: "grpc_listen_address: {{ observability_loki_grpc_listen_address }}"
 
 - name: Validate the observability Compose model
   ansible.builtin.command:
