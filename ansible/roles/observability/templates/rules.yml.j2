@@ -54,6 +54,35 @@ groups:
           summary: Observe Prometheus rejected its latest configuration
           description: The previous configuration remains active; inspect Prometheus logs.
 
+{% if observability_expected_log_hosts | length > 0 %}
+{% for log_host in observability_expected_log_hosts %}
+{% set ns = namespace(dependency='none') %}
+{% for target in observability_alloy_targets %}
+{% if (target.host | default(target.name)) == log_host %}
+{% set ns.dependency = target.dependency | default('none') %}
+{% endif %}
+{% endfor %}
+      - alert: AlloyLogPipelineStale
+        expr: >-
+          (
+            sum(increase(loki_write_sent_entries_total{job="alloy",host="{{ log_host }}"}[15m]))
+            or
+            vector(0)
+          ) == 0
+          and on() (up{job="alloy",host="{{ log_host }}"} == 1)
+        for: 15m
+        labels:
+          severity: critical
+          dependency: "{{ ns.dependency }}"
+          host: "{{ log_host }}"
+        annotations:
+          summary: Alloy on {{ log_host }} has not sent logs to Loki
+          description: >-
+            loki.write sent no entries for 15 minutes while Alloy is still
+            scrapeable. A broken journal or Docker pipeline is more likely
+            than a quiet host; every shipper emits a bounded heartbeat.
+{% endfor %}
+{% else %}
       - alert: LokiIngestionStale
         expr: >-
           (
@@ -68,6 +97,7 @@ groups:
         annotations:
           summary: Loki has received no log lines
           description: Alloy push or Loki ingestion has been silent for 15 minutes.
+{% endif %}
 
       - alert: AlloyDown
         expr: up{job="alloy"} == 0

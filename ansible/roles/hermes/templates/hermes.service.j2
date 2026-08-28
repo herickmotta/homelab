@@ -1,0 +1,37 @@
+# Managed by herickmotta.homelab.hermes.
+[Unit]
+Description=Hermes read-only homelab triage
+Documentation=https://github.com/herickmotta/homelab
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ hermes_user }}
+Group={{ hermes_group }}
+WorkingDirectory={{ hermes_install_dir }}/app
+EnvironmentFile={{ hermes_config_dir }}/hermes.env
+Environment=HERMES_LISTEN_ADDRESS={{ hermes_listen_address }}
+ExecStart={{ hermes_install_dir }}/venv/bin/hermes-triage
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths={{ hermes_state_dir }}
+
+[Install]
+WantedBy=multi-user.target

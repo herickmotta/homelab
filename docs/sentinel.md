@@ -20,9 +20,14 @@ after that first SSH connection:
    performs first registration with a short-lived token, and installs the
    runner as a systemd service. GitHub's default runner self-update remains
    enabled; the bootstrap version is not a long-lived enforcement control.
-3. `sentinel_monitoring` renders and starts the pinned monitoring Compose
+3. `hermes` installs a loopback Python triage service as the isolated Unix
+   user. The default is disabled: the role stops the unit and removes runtime
+   state. Enabling it requires site-owned Telegram, OpenAI, PVEAuditor,
+   GitHub contents-read, and Alertmanager webhook credentials.
+4. `sentinel_monitoring` renders and starts the pinned monitoring Compose
    project, alert rules, notification routing, and optional external
-   heartbeat timer.
+   heartbeat timer. The Hermes webhook route stays empty until Hermes is
+   enabled; email routing remains independent.
 
 The site repository owns the real address, repository URL, probe targets,
 notification routing, encrypted credentials, and bootstrap runbook.
@@ -35,9 +40,11 @@ dedicated Unix account. A site should scope the runner to one private
 deployment repository and protect its apply environment.
 
 The `hermes` user has no login shell, sudo, Docker group, runner home, SOPS
-key, SSH private key, or apply credentials. This role only reserves the
-identity; an agent runtime is a later capability with its own typed,
-read-only diagnostic interface.
+key, SSH private key, or apply credentials. `herickmotta.homelab.hermes`
+runs a read-only triage service as that user when a site sets
+`hermes_enabled: true`. It listens on loopback, long-polls one Telegram chat
+ID, and may call only typed evidence tools. Disable the role to stop the
+unit and delete its environment file, install tree, and conversation state.
 
 The age private key and deployment SSH private key are not stored in either
 repository. They must be restored through the site's private recovery

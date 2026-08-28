@@ -32,6 +32,47 @@ site:
         name: sentinel-example
         labels:
           - sentinel
+      hermes:
+        user: hermes
+        enabled: false
+        listen_address: "127.0.0.1:8787"
+        models:
+          default: gpt-5.6-luna
+          complex: gpt-5.6-sol
+        allowed_hosts:
+          - net-example
+          - nas-example
+          - apps-example
+          - observe-example
+          - pve-example
+          - sentinel-example
+        allowed_services:
+          - frigate
+          - mosquitto
+          - homeassistant
+          - adguard
+          - grafana
+        allowed_vmids:
+          - 112
+          - 114
+          - 115
+          - 116
+        allowed_git_paths:
+          - site.yaml
+          - ansible/site.yml
+        log_sources:
+          - name: frigate
+            host: apps-example
+            kind: container
+            selector: frigate
+          - name: smbd
+            host: nas-example
+            kind: unit
+            selector: smbd.service
+          - name: sentinel-monitoring
+            host: sentinel-example
+            kind: unit
+            selector: sentinel-monitoring.service
 
   network:
     cidr: 192.0.2.0/24

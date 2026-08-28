@@ -1,0 +1,30 @@
+---
+hermes_enabled: false
+hermes_user: hermes
+hermes_group: hermes
+hermes_install_dir: /opt/hermes
+hermes_state_dir: /var/lib/hermes/state
+hermes_config_dir: /etc/hermes
+hermes_listen_address: 127.0.0.1:8787
+hermes_webhook_secret: ""
+hermes_telegram_bot_token: ""
+hermes_telegram_chat_id: ""
+hermes_openai_api_key: ""
+hermes_model_default: gpt-5.6-luna
+hermes_model_complex: gpt-5.6-sol
+hermes_sentinel_prometheus_url: http://127.0.0.1:9090
+hermes_observe_prometheus_url: ""
+hermes_observe_loki_url: ""
+hermes_pve_url: ""
+hermes_pve_token_id: ""
+hermes_pve_token_secret: ""
+hermes_pve_node: ""
+hermes_github_token: ""
+hermes_github_repository: ""
+hermes_allowed_hosts: []
+hermes_allowed_services: []
+hermes_allowed_vmids: []
+hermes_allowed_git_paths:
+  - site.yaml
+  - ansible/site.yml
+hermes_log_sources: []

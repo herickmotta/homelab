@@ -43,6 +43,7 @@ flowchart TB
   subgraph sentinel["Independent Sentinel host"]
     runner["Reviewed apply runner"]
     guard["Prometheus + Alertmanager<br/>Blackbox + PVE exporters"]
+    hermes["Hermes triage (optional)"]
   end
 
   subgraph nas["NAS guest"]
@@ -94,6 +95,7 @@ flowchart TB
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
   richProm -->|"selected alerts"| guard
+  guard -->|"loopback webhook"| hermes
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
@@ -128,7 +130,8 @@ How traffic and data move:
   journal and Docker logs to Loki on the observability guest. Grafana
   Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
   selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
-  Sentinel.
+  Sentinel. Hermes is an optional loopback consumer of that Alertmanager
+  path and cannot replace email.
 
 ```mermaid
 flowchart LR
@@ -160,12 +163,12 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.12.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.13.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
-`netdata_agent`, `sentinel_base`, `github_actions_runner`, and
-`sentinel_monitoring`. Site repositories pin a
+`netdata_agent`, `sentinel_base`, `github_actions_runner`,
+`sentinel_monitoring`, and `hermes`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
 only.
 
@@ -255,15 +258,16 @@ both pins to the same SHA and reviews a real OpenTofu plan.
 
 ## Validation
 
-CI runs OpenTofu `fmt`/`validate`, `ansible-lint`, and an Ansible
-collection build. It uses only fictional example values and cannot reach or
-deploy a live environment.
+CI runs OpenTofu `fmt`/`validate`, `ansible-lint`, Hermes unit tests, and an
+Ansible collection build. It uses only fictional example values and cannot
+reach or deploy a live environment.
 
 Locally:
 
 - `tofu fmt -check -recursive`
 - `tofu validate` in each example root
 - `ansible-lint ansible`
+- `pytest ansible/roles/hermes/files`
 - `ansible-galaxy collection build ansible`
 
 See [AGENTS.md](AGENTS.md) for repository boundaries, workflow, and safety

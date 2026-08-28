@@ -1,4 +1,6 @@
 // Managed by herickmotta.homelab.log_shipper.
+{% set heartbeat_unit = log_shipper_heartbeat_unit %}
+{% set journal_keep_units = (log_shipper_journal_units + [heartbeat_unit]) | unique | list %}
 logging {
   level  = "info"
   format = "logfmt"
@@ -15,7 +17,6 @@ loki.write "observe" {
   }
 }
 
-{% if log_shipper_journal_units | length > 0 %}
 loki.relabel "journal" {
   forward_to = []
 
@@ -27,7 +28,7 @@ loki.relabel "journal" {
 
   rule {
     source_labels = ["__journal__systemd_unit"]
-    regex         = "^({{ log_shipper_journal_units | map('regex_escape') | join('|') | replace('\\', '\\\\') }})$"
+    regex         = "^({{ journal_keep_units | map('regex_escape') | join('|') | replace('\\', '\\\\') }})$"
     action        = "keep"
   }
 
@@ -50,7 +51,6 @@ loki.source.journal "selected" {
   }
   forward_to    = [loki.write.observe.receiver]
 }
-{% endif %}
 
 {% if log_shipper_docker | bool %}
 discovery.docker "containers" {

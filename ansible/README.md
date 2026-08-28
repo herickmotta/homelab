@@ -49,8 +49,10 @@ Roles:
   container state without exposing the Docker socket to other roles.
 - `herickmotta.homelab.log_shipper`: pinned Grafana Alloy as a systemd
   unit. It pushes selected journal units (info and above, not debug) and
-  optional Docker container logs to Loki. Alloy's HTTP endpoint defaults to
-  loopback; a site may bind the host IPv4 so observe can scrape it.
+  optional Docker container logs to Loki. Every host also emits a bounded
+  journal heartbeat so a quiet service cannot hide a broken pipeline.
+  Alloy's HTTP endpoint defaults to loopback; a site may bind the host IPv4
+  so observe can scrape it.
 - `herickmotta.homelab.netdata_agent`: optional Netdata Agent with
   file-managed collectors. `netdata_agent_state: present` installs it;
   `absent` uninstalls it without touching smartd, ZED, or msmtp.
@@ -66,6 +68,12 @@ Roles:
   and checksum are pinned; GitHub's default runner self-update remains enabled
   for service compatibility. First registration takes a short-lived token;
   the token is never persisted in site configuration.
+- `herickmotta.homelab.hermes`: optional read-only triage on the Sentinel.
+  Disabled by default. When enabled it runs as the isolated `hermes` user,
+  listens on `127.0.0.1`, accepts the Alertmanager bearer webhook, long-polls
+  one Telegram chat ID, and calls typed evidence tools. Secrets are rendered
+  to a root/`hermes`-readable environment file. Rollback is `hermes_enabled:
+  false`.
 - `herickmotta.homelab.sentinel_monitoring`: run a small Prometheus,
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
@@ -81,7 +89,9 @@ Roles:
   selected alerts to Sentinel Alertmanager. The Homelab overview dashboard
   is the fleet/NAS view, including Sentinel CPU, memory, and root disk.
   Optional read-only PVE exporter uses a token distinct from Sentinel.
-  Alertmanager stays on Sentinel.
+  Alertmanager stays on Sentinel. When expected log hosts are set, Prometheus
+  alerts per host if Alloy's `loki.write` send counter is stale while Alloy
+  is still scrapeable.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

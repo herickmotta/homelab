@@ -256,6 +256,11 @@
     src: "{{ observability_install_dir }}/prometheus.yml"
   register: observability_prometheus_slurp
 
+- name: Load generated Prometheus alert rules
+  ansible.builtin.slurp:
+    src: "{{ observability_install_dir }}/rules/observability.yml"
+  register: observability_rules_slurp
+
 - name: Load generated Loki configuration
   ansible.builtin.slurp:
     src: "{{ observability_install_dir }}/loki.yml"
@@ -290,6 +295,21 @@
     fail_msg: Observe Prometheus must load rules and send alerts to Sentinel Alertmanager.
   vars:
     observability_prometheus: "{{ observability_prometheus_slurp.content | b64decode }}"
+
+- name: Assert per-host Alloy pipeline freshness alerts
+  when: observability_expected_log_hosts | length > 0
+  ansible.builtin.assert:
+    that:
+      - "'AlloyLogPipelineStale' in observability_rules"
+      - "'LokiIngestionStale' not in observability_rules"
+      - item in observability_rules
+      - "'host=\"{{ item }}\"' in observability_rules"
+    fail_msg: Every expected log host needs an AlloyLogPipelineStale rule.
+  vars:
+    observability_rules: "{{ observability_rules_slurp.content | b64decode }}"
+  loop: "{{ observability_expected_log_hosts }}"
+  loop_control:
+    label: "{{ item }}"
 
 - name: Assert Loki listen bindings
   ansible.builtin.assert:

@@ -38,6 +38,19 @@
         github_actions_runner_name: "{{ site.hosts.watchdog.runner.name }}"
         github_actions_runner_labels: "{{ site.hosts.watchdog.runner.labels }}"
         github_actions_runner_registration_token: "{{ lookup('env', 'GITHUB_RUNNER_TOKEN') }}"
+    - role: herickmotta.homelab.hermes
+      vars:
+        hermes_enabled: "{{ site.hosts.watchdog.hermes.enabled }}"
+        hermes_user: "{{ site.hosts.watchdog.hermes.user }}"
+        hermes_group: "{{ site.hosts.watchdog.hermes.user }}"
+        hermes_listen_address: "{{ site.hosts.watchdog.hermes.listen_address }}"
+        hermes_model_default: "{{ site.hosts.watchdog.hermes.models.default }}"
+        hermes_model_complex: "{{ site.hosts.watchdog.hermes.models.complex }}"
+        hermes_allowed_hosts: "{{ site.hosts.watchdog.hermes.allowed_hosts }}"
+        hermes_allowed_services: "{{ site.hosts.watchdog.hermes.allowed_services }}"
+        hermes_allowed_vmids: "{{ site.hosts.watchdog.hermes.allowed_vmids }}"
+        hermes_allowed_git_paths: "{{ site.hosts.watchdog.hermes.allowed_git_paths }}"
+        hermes_log_sources: "{{ site.hosts.watchdog.hermes.log_sources }}"
     - role: herickmotta.homelab.sentinel_monitoring
       vars:
         sentinel_monitoring_site_label: "{{ site.monitoring.sentinel.site_label }}"
