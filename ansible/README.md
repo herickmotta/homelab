@@ -45,10 +45,12 @@ Roles:
 - `herickmotta.homelab.host_metrics`: pinned `node_exporter` as a systemd
   unit on guests and the hypervisor. Optional `smartctl_exporter` and
   `zfs_exporter` on the hypervisor. Listen on a site IPv4, not loopback.
+  Optional textfile probes publish loopback TCP and allowlisted Compose
+  container state without exposing the Docker socket to other roles.
 - `herickmotta.homelab.log_shipper`: pinned Grafana Alloy as a systemd
   unit. It pushes selected journal units (info and above, not debug) and
-  optional Docker container logs to Loki. Alloy's own HTTP endpoint stays
-  on loopback.
+  optional Docker container logs to Loki. Alloy's HTTP endpoint defaults to
+  loopback; a site may bind the host IPv4 so observe can scrape it.
 - `herickmotta.homelab.netdata_agent`: optional Netdata Agent with
   file-managed collectors. `netdata_agent_state: present` installs it;
   `absent` uninstalls it without touching smartd, ZED, or msmtp.
@@ -56,7 +58,9 @@ Roles:
   24.04 or 26.04 server into the independent Sentinel baseline. It creates
   separate deployment and Hermes identities, hardens SSH, bounds Docker logs,
   and enables a host firewall. Optional extra TCP ports can be opened from
-  management CIDRs so observe can scrape a LAN node exporter.
+  management CIDRs so observe can scrape a LAN node exporter. Source-specific
+  ingress rules open a single host to a single port, used for observe to
+  Sentinel Alertmanager.
 - `herickmotta.homelab.github_actions_runner`: install and register a
   repository-scoped Actions runner as a systemd service. The bootstrap archive
   and checksum are pinned; GitHub's default runner self-update remains enabled
@@ -65,16 +69,19 @@ Roles:
 - `herickmotta.homelab.sentinel_monitoring`: run a small Prometheus,
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
-  to loopback by default.
+  to loopback by default. A typed LAN bind can expose Alertmanager to the
+  observe guest only. A loopback Hermes webhook input exists but stays empty
+  until that role is enabled; email routing remains independent.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
   dedicated Proxmox guest. Retention is longer than Sentinel. Grafana binds
-  the guest LAN for Caddy; Prometheus stays on loopback; Loki listens on
-  the guest LAN for Alloy push and is not published through Caddy. It
-  scrapes guest node exporters, the Sentinel host Linux exporter, and
-  hypervisor SMART and ZFS. The Homelab overview dashboard is the fleet/NAS
-  view, including Sentinel CPU, memory, and root disk. Optional read-only
-  PVE exporter uses a token distinct from Sentinel. Alertmanager stays on
-  Sentinel.
+  the guest LAN for Caddy; Prometheus may bind the guest address for later
+  read-only consumers; Loki listens on the guest LAN for Alloy push and is
+  not published through Caddy. It scrapes guest node exporters, Alloy, the
+  Sentinel host Linux exporter, and hypervisor SMART and ZFS, and sends
+  selected alerts to Sentinel Alertmanager. The Homelab overview dashboard
+  is the fleet/NAS view, including Sentinel CPU, memory, and root disk.
+  Optional read-only PVE exporter uses a token distinct from Sentinel.
+  Alertmanager stays on Sentinel.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

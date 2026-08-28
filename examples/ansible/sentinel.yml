@@ -26,6 +26,12 @@
         sentinel_base_timezone: "{{ site.timezone }}"
         sentinel_base_deployment_authorized_keys: "{{ site.access.ssh_public_keys }}"
         sentinel_base_management_cidrs: "{{ site.hosts.watchdog.management_cidrs }}"
+        sentinel_base_open_tcp_ports:
+          - 9100
+        sentinel_base_ingress_rules:
+          - source: "{{ site.guests.observability.ipv4 }}"
+            port: 9093
+            proto: tcp
     - role: herickmotta.homelab.github_actions_runner
       vars:
         github_actions_runner_repository_url: "{{ site.hosts.watchdog.runner.repository_url }}"
@@ -37,6 +43,9 @@
         sentinel_monitoring_site_label: "{{ site.monitoring.sentinel.site_label }}"
         sentinel_monitoring_retention_time: "{{ site.monitoring.sentinel.retention_time }}"
         sentinel_monitoring_retention_size: "{{ site.monitoring.sentinel.retention_size }}"
+        sentinel_monitoring_alertmanager_bind_address: "{{
+            site.monitoring.sentinel.alertmanager_bind_address
+          }}"
         sentinel_monitoring_icmp_targets: "{{ site.monitoring.sentinel.icmp_targets }}"
         sentinel_monitoring_http_targets: "{{ site.monitoring.sentinel.http_targets }}"
         sentinel_monitoring_tcp_targets: "{{ site.monitoring.sentinel.tcp_targets }}"

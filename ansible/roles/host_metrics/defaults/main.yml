@@ -12,6 +12,9 @@ host_metrics_node_archive_sha256: b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4
 host_metrics_filesystem_mount_points_exclude: >-
   ^/(dev|proc|sys|var/lib/docker/.+|run/docker/netns/.+)($|/)
 host_metrics_systemd_units: []
+host_metrics_textfile_dir: /var/lib/node_exporter/textfile
+host_metrics_local_tcp_probes: []
+host_metrics_container_probes: []
 
 host_metrics_smartctl: false
 host_metrics_smartctl_port: 9633

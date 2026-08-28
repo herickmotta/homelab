@@ -55,6 +55,29 @@ argument_specs:
         default: 127.0.0.1:3100
       observability_prometheus_listen_address:
         type: str
+      observability_alertmanager_address:
+        type: str
+      observability_alert_for:
+        type: str
+        default: 2m
+      observability_alloy_targets:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          address:
+            type: str
+            required: true
+          host:
+            type: str
+          dependency:
+            type: str
+            default: none
+      observability_expected_log_hosts:
+        type: list
+        elements: str
       observability_node_exporter_listen_address:
         type: str
       observability_pve_exporter_listen_address:

@@ -13,6 +13,7 @@ services:
       - --web.listen-address={{ observability_prometheus_listen_address }}
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
       - ./data/prometheus:/prometheus
     mem_limit: 2g
     cpus: "1.5"

@@ -28,8 +28,18 @@
         observability_retention_size: "{{ site.monitoring.observability.retention_size }}"
         observability_grafana_root_url: "{{ site.monitoring.observability.grafana_root_url }}"
         observability_grafana_admin_password: "{{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
+        observability_prometheus_listen_address: "{{
+            site.monitoring.observability.prometheus_listen_address
+          }}"
+        observability_alertmanager_address: "{{
+            site.monitoring.observability.alertmanager_address
+          }}"
         observability_metrics_targets: "{{ site.monitoring.observability.metrics_targets }}"
         observability_node_targets: "{{ site.monitoring.host_metrics.node_targets }}"
+        observability_alloy_targets: "{{ site.monitoring.observability.alloy_targets }}"
+        observability_expected_log_hosts: "{{
+            site.monitoring.observability.expected_log_hosts
+          }}"
         observability_smartctl_address: "{{ site.monitoring.host_metrics.smartctl_address }}"
         observability_zfs_address: "{{ site.monitoring.host_metrics.zfs_address }}"
         observability_accepted_degraded_serials: "{{

@@ -92,9 +92,8 @@ flowchart TB
   richProm -->|"Linux exporters"| apps
   richProm -->|"Linux exporter"| guard
   richProm -->|"Linux, SMART, ZFS"| host
-  richProm -->|"Frigate metrics"| frigate. Grafana Explore reads Loki.
-  Selected journal and Docker logs reach Loki through Grafana Alloy on the
-  guests, the hypervisor, and Sentinel. Loki is not on Caddy.
+  richProm -->|"Frigate metrics"| frigate
+  richProm -->|"selected alerts"| guard
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
@@ -127,7 +126,9 @@ How traffic and data move:
   footage is mapped into the application guest, not exported over SMB.
 - Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
   journal and Docker logs to Loki on the observability guest. Grafana
-  Explore is the log UI. Loki is not on Caddy.
+  Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
+  selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
+  Sentinel.
 
 ```mermaid
 flowchart LR
@@ -159,7 +160,7 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.11.3 ships
+under `examples/`. Collection `herickmotta.homelab` 0.12.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,

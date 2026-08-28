@@ -26,7 +26,7 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
-      - --web.listen-address={{ sentinel_monitoring_alertmanager_listen_address }}
+      - --web.listen-address={{ sentinel_monitoring_alertmanager_bind_address | default(sentinel_monitoring_alertmanager_listen_address, true) }}
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ./data/alertmanager:/alertmanager

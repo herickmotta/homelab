@@ -41,6 +41,19 @@ argument_specs:
         type: list
         elements: int
         default: []
+      sentinel_base_ingress_rules:
+        type: list
+        elements: dict
+        options:
+          source:
+            type: str
+            required: true
+          port:
+            type: int
+            required: true
+          proto:
+            type: str
+            default: tcp
       sentinel_base_packages:
         type: list
         elements: str

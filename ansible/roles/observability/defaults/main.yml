@@ -21,6 +21,10 @@ observability_loki_grpc_listen_port: 9096
 observability_loki_ready_address: 127.0.0.1:3100
 
 observability_prometheus_listen_address: 127.0.0.1:9090
+observability_alertmanager_address: ""
+observability_alert_for: 2m
+observability_alloy_targets: []
+observability_expected_log_hosts: []
 observability_node_exporter_listen_address: 127.0.0.1:9100
 observability_pve_exporter_listen_address: 127.0.0.1:9221
 observability_grafana_bind_ip: 0.0.0.0

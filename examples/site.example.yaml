@@ -53,6 +53,7 @@ site:
       site_label: example
       retention_time: 72h
       retention_size: 10GB
+      alertmanager_bind_address: "0.0.0.0:9093"
       pve_exporter:
         enabled: true
         user: prometheus@pve
@@ -109,6 +110,8 @@ site:
       retention_size: 40GB
       grafana_root_url: https://grafana.lab.example.test
       loki_retention_period: 336h
+      prometheus_listen_address: "192.0.2.16:9090"
+      alertmanager_address: "192.0.2.11:9093"
       pve_exporter:
         enabled: true
         user: observe@pve
@@ -120,6 +123,38 @@ site:
           scheme: http
           metrics_path: /api/metrics
           dependency: pve
+      alloy_targets:
+        - name: net
+          address: 192.0.2.12:12345
+          host: net-example
+          dependency: pve
+        - name: nas
+          address: 192.0.2.14:12345
+          host: nas-example
+          dependency: pve
+        - name: apps
+          address: 192.0.2.15:12345
+          host: apps-example
+          dependency: pve
+        - name: observe
+          address: 192.0.2.16:12345
+          host: observe-example
+          dependency: pve
+        - name: pve
+          address: 192.0.2.10:12345
+          host: pve-example
+          dependency: pve
+        - name: sentinel
+          address: 192.0.2.11:12345
+          host: sentinel-example
+          dependency: none
+      expected_log_hosts:
+        - net-example
+        - nas-example
+        - apps-example
+        - observe-example
+        - pve-example
+        - sentinel-example
     host_metrics:
       node_targets:
         - name: net
@@ -139,6 +174,37 @@ site:
           host: sentinel
       smartctl_address: 192.0.2.10:9633
       zfs_address: 192.0.2.10:9134
+      hosts:
+        net-example:
+          systemd_units:
+            - tailscaled.service
+            - alloy.service
+        nas-example:
+          systemd_units:
+            - smbd.service
+            - alloy.service
+        apps-example:
+          systemd_units:
+            - alloy.service
+          local_tcp_probes:
+            - name: mosquitto
+              address: "127.0.0.1:1883"
+          container_probes:
+            - name: mosquitto
+              label: homelab.role=mqtt_broker
+            - name: frigate
+              label: homelab.role=frigate
+            - name: homeassistant
+              label: homelab.role=homeassistant
+        pve-example:
+          systemd_units:
+            - smartmontools.service
+            - zfs-zed.service
+            - alloy.service
+        sentinel-example:
+          systemd_units:
+            - sentinel-monitoring.service
+            - alloy.service
     log_shipper:
       loki_write_url: http://192.0.2.16:3100/loki/api/v1/push
       hosts:
