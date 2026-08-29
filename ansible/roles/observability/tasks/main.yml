@@ -284,9 +284,11 @@
       - "'9090:9090' not in observability_compose"
       - "'3100:3100' not in observability_compose"
       - (observability_prometheus_listen_address | string) in observability_compose
+      - (observability_compose | from_yaml)['services']['grafana']['mem_limit'] == '1g'
     fail_msg: >-
       Observability must use host networking, bind Prometheus and Loki without
-      published port mappings, include Loki, and mount Prometheus rules.
+      published port mappings, include Loki, mount Prometheus rules, and give
+      Grafana enough memory for the provisioned dashboards.
   vars:
     observability_compose: "{{ observability_compose_slurp.content | b64decode }}"
 

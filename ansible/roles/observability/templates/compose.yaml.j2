@@ -48,7 +48,7 @@ services:
       - ./data/grafana:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
-    mem_limit: 512m
+    mem_limit: 1g
     cpus: "0.5"
     logging:
       driver: json-file
