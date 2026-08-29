@@ -1,0 +1,65 @@
+---
+# Disabled and conservative until a site opts in.
+hermes_agent_enabled: false
+hermes_agent_full_capability: false
+hermes_agent_preserve_state_on_disable: true
+
+# Upstream pin: v2026.8.27 / Hermes Agent v0.20.6.
+# Image index digest carries OCI label
+# org.opencontainers.image.revision matching this commit.
+hermes_agent_source_repository: https://github.com/NousResearch/hermes-agent
+hermes_agent_source_commit: "5fc308a70719a83cccdbba4c0e39c23f5a8239d5"
+hermes_agent_image_repository: nousresearch/hermes-agent
+hermes_agent_image_digest: "sha256:e0df6adebddf29b91112aefc999d4aaf6846c9eb544faca5672a16a13590ff79"
+
+hermes_agent_install_dir: /opt/hermes-agent
+hermes_agent_data_dir: /opt/hermes-agent/data
+hermes_agent_managed_dir: /opt/hermes-agent/managed
+hermes_agent_backup_dir: /opt/hermes-agent/data/backups
+hermes_agent_container_data_dir: /opt/data
+hermes_agent_container_managed_dir: /opt/hermes-policy
+
+hermes_agent_runtime_user: hermes
+hermes_agent_runtime_group: hermes
+hermes_agent_runtime_uid: 10000
+hermes_agent_runtime_gid: 10000
+
+hermes_agent_container_name: hermes-agent
+hermes_agent_profile: default
+hermes_agent_timezone: Etc/UTC
+
+hermes_agent_network_name: hermes-agent
+hermes_agent_network_subnet: 172.30.136.0/24
+hermes_agent_dns_servers:
+  - 1.1.1.1
+  - 1.0.0.1
+
+hermes_agent_cpus: "2.0"
+hermes_agent_memory: 3g
+hermes_agent_pids_limit: 256
+hermes_agent_log_max_size: "10m"
+hermes_agent_log_max_file: "5"
+
+hermes_agent_healthcheck_interval: 30s
+hermes_agent_healthcheck_timeout: 10s
+hermes_agent_healthcheck_retries: 5
+hermes_agent_healthcheck_start_period: 90s
+
+hermes_agent_provider: openrouter
+hermes_agent_model: anthropic/claude-sonnet-4.5
+hermes_agent_provider_api_key: ""
+hermes_agent_provider_env_names:
+  openrouter: OPENROUTER_API_KEY
+  openai: OPENAI_API_KEY
+  anthropic: ANTHROPIC_API_KEY
+  google: GOOGLE_API_KEY
+  gemini: GEMINI_API_KEY
+  nous: NOUS_API_KEY
+
+hermes_agent_telegram_enabled: false
+hermes_agent_telegram_user_id: ""
+hermes_agent_telegram_admin_id: ""
+hermes_agent_telegram_bot_token: ""
+
+hermes_agent_egress_unit: hermes-agent-egress.service
+hermes_agent_egress_script: /usr/local/sbin/hermes-agent-egress

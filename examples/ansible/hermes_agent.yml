@@ -1,0 +1,35 @@
+---
+- name: Build the fictional Hermes Agent inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional Hermes guest
+      ansible.builtin.add_host:
+        name: "{{ site.guests.hermes.hostname }}"
+        ansible_host: "{{ site.guests.hermes.ipv4 }}"
+        ansible_user: "{{ site.access.username }}"
+        groups:
+          - hermes_agent
+
+- name: Configure the fictional Hermes Agent
+  hosts: hermes_agent
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.guest_base
+    - role: herickmotta.homelab.hermes_agent
+      vars:
+        hermes_agent_enabled: "{{ site.hermes.enabled | bool }}"
+        hermes_agent_full_capability: "{{ site.hermes.full_capability | bool }}"
+        hermes_agent_timezone: "{{ site.timezone }}"
+        hermes_agent_provider: "{{ site.hermes.provider }}"
+        hermes_agent_model: "{{ site.hermes.model }}"
+        hermes_agent_telegram_enabled: true
+        hermes_agent_telegram_user_id: "{{ site.hermes.telegram_user_id }}"
+        hermes_agent_telegram_admin_id: "{{ site.hermes.telegram_user_id }}"
+        hermes_agent_telegram_bot_token: "{{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}"
+        hermes_agent_provider_api_key: "{{ lookup('env', 'HERMES_PROVIDER_API_KEY') }}"

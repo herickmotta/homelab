@@ -1,0 +1,13 @@
+---
+- name: Recreate Hermes Agent compose
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ hermes_agent_install_dir }}"
+  changed_when: true
+
+- name: Reload Hermes Agent egress
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_egress_unit }}"
+    state: restarted
+    enabled: true
+    daemon_reload: true

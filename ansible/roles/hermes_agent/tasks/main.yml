@@ -1,0 +1,15 @@
+---
+- name: Validate Hermes Agent inputs
+  ansible.builtin.include_tasks: validate.yml
+
+- name: Resolve the provider secret environment name
+  ansible.builtin.set_fact:
+    hermes_agent_provider_env_name: "{{ hermes_agent_provider_env_names[hermes_agent_provider] }}"
+
+- name: Configure the Hermes Agent
+  when: hermes_agent_enabled | bool
+  ansible.builtin.include_tasks: present.yml
+
+- name: Remove the Hermes Agent runtime
+  when: not (hermes_agent_enabled | bool)
+  ansible.builtin.include_tasks: absent.yml

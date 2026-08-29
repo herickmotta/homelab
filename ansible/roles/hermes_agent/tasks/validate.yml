@@ -1,0 +1,77 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Validate the Hermes Agent image and source pins
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_source_repository is match('^https://github.com/NousResearch/hermes-agent$')
+      - hermes_agent_source_commit is match('^[0-9a-f]{40}$')
+      - hermes_agent_image_repository == 'nousresearch/hermes-agent'
+      - hermes_agent_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - "'latest' not in hermes_agent_image_repository"
+      - "':' not in hermes_agent_image_repository"
+      - "'@' not in hermes_agent_image_repository"
+    fail_msg: >-
+      Hermes Agent must pin the official repository, a 40-character source
+      commit, and an immutable sha256 image digest. Moving tags are rejected.
+
+- name: Validate Hermes Agent runtime identity and paths
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_install_dir is match('^/')
+      - hermes_agent_data_dir is match('^/')
+      - hermes_agent_managed_dir is match('^/')
+      - hermes_agent_backup_dir is match('^/')
+      - hermes_agent_container_data_dir == '/opt/data'
+      - hermes_agent_runtime_user | length > 0
+      - hermes_agent_runtime_user != 'root'
+      - hermes_agent_runtime_uid | int > 0
+      - hermes_agent_runtime_gid | int > 0
+      - hermes_agent_network_subnet is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]+$')
+      - hermes_agent_dns_servers | length > 0
+      - hermes_agent_profile | length > 0
+      - hermes_agent_provider | length > 0
+      - hermes_agent_provider in hermes_agent_provider_env_names
+      - hermes_agent_model | length > 0
+    fail_msg: >-
+      Hermes Agent needs non-root host identity, absolute state paths, a
+      private Docker subnet, public DNS, and a known provider.
+
+- name: Validate Hermes Agent public DNS resolvers
+  ansible.builtin.assert:
+    that:
+      - item is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+      - item is not match('^(10\\.|127\\.|169\\.254\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|192\\.168\\.)')
+    fail_msg: Hermes Agent DNS resolvers must be public unicast addresses.
+  loop: "{{ hermes_agent_dns_servers }}"
+
+- name: Require Telegram binding when Hermes Agent is enabled
+  when: hermes_agent_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_telegram_enabled | bool
+      - hermes_agent_telegram_user_id | string is match('^[0-9]+$')
+      - hermes_agent_telegram_admin_id | string is match('^[0-9]+$')
+      - (hermes_agent_telegram_user_id | string) == (hermes_agent_telegram_admin_id | string)
+      - (hermes_agent_telegram_user_id | string) | length >= 5
+    fail_msg: >-
+      Enabled Hermes Agent needs exactly one numeric Telegram user ID, and
+      that same ID as administrator.
+
+- name: Require Hermes Agent secrets when enabled
+  when: hermes_agent_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_telegram_bot_token | length > 0
+      - hermes_agent_telegram_bot_token is not match('(?i)^replace')
+      - hermes_agent_provider_api_key | length > 0
+      - hermes_agent_provider_api_key is not match('(?i)^replace')
+    fail_msg: >-
+      Enabled Hermes Agent needs a Telegram bot token and provider API key
+      that are not placeholders.
+  no_log: true

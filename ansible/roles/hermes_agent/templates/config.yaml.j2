@@ -1,0 +1,70 @@
+# Managed by herickmotta.homelab.hermes_agent.
+# Root-owned policy. Secrets stay in the sibling .env (mode 0640).
+---
+model:
+  provider: {{ hermes_agent_provider | to_json }}
+  default: {{ hermes_agent_model | to_json }}
+
+unauthorized_dm_behavior: ignore
+telegram:
+  unauthorized_dm_behavior: ignore
+
+gateway:
+  platforms:
+    telegram:
+      extra:
+        allow_from:
+          - {{ hermes_agent_telegram_user_id | string | to_json }}
+        allow_admin_from:
+          - {{ hermes_agent_telegram_admin_id | string | to_json }}
+        guest_mode: false
+        group_allowed_chats: []
+        group_allow_from: []
+
+terminal:
+  backend: local
+
+tool_loop_guardrails:
+  hard_stop_enabled: true
+
+{% if hermes_agent_full_capability | bool %}
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+
+skills:
+  write_approval: false
+
+auxiliary:
+  background_review:
+    enabled: true
+
+display:
+  memory_notifications: "on"
+{% else %}
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+  write_approval: true
+
+skills:
+  write_approval: true
+
+auxiliary:
+  background_review:
+    enabled: false
+
+agent:
+  disabled_toolsets:
+    - terminal
+    - file
+    - web
+    - browser
+    - code_execution
+    - delegation
+    - cronjob
+    - memory
+    - skills
+    - session_search
+{% endif %}
