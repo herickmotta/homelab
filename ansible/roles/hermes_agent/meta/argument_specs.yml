@@ -95,3 +95,28 @@ argument_specs:
         type: str
       hermes_agent_egress_script:
         type: str
+      hermes_agent_github_enabled:
+        type: bool
+      hermes_agent_github_app_id:
+        type: str
+      hermes_agent_github_installation_id:
+        type: str
+      hermes_agent_github_app_slug:
+        type: str
+      hermes_agent_github_app_private_key:
+        type: str
+      hermes_agent_github_git_name:
+        type: str
+      hermes_agent_github_git_email:
+        type: str
+      hermes_agent_github_repos:
+        type: list
+        elements: dict
+      hermes_agent_github_repos_dir:
+        type: str
+      hermes_agent_github_container_repos_dir:
+        type: str
+      hermes_agent_github_cli_version:
+        type: str
+      hermes_agent_github_cli_archive_sha256:
+        type: str

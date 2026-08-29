@@ -76,3 +76,18 @@ hermes_agent_telegram_bot_token: ""
 
 hermes_agent_egress_unit: hermes-agent-egress.service
 hermes_agent_egress_script: /usr/local/sbin/hermes-agent-egress
+
+# Optional GitHub App draft-PR worker. Disabled until a site supplies the
+# App, installation, PEM, and repository list. Merge remains operator-only.
+hermes_agent_github_enabled: false
+hermes_agent_github_app_id: ""
+hermes_agent_github_installation_id: ""
+hermes_agent_github_app_slug: ""
+hermes_agent_github_app_private_key: ""
+hermes_agent_github_git_name: ""
+hermes_agent_github_git_email: ""
+hermes_agent_github_repos: []
+hermes_agent_github_repos_dir: /opt/hermes-agent/data/repos
+hermes_agent_github_container_repos_dir: /opt/data/repos
+hermes_agent_github_cli_version: "2.98.0"
+hermes_agent_github_cli_archive_sha256: "3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de"

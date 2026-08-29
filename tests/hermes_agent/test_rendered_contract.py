@@ -65,6 +65,8 @@ def load_yaml(name: str, **overrides) -> dict:
 def assert_defaults() -> None:
     if DEFAULTS["hermes_agent_enabled"] or DEFAULTS["hermes_agent_full_capability"]:
         raise SystemExit("role defaults must stay disabled and conservative")
+    if DEFAULTS["hermes_agent_github_enabled"]:
+        raise SystemExit("GitHub App access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_runtime_user"] in ("root", ""):
         raise SystemExit("runtime user must be a non-root identity")
     if int(DEFAULTS["hermes_agent_runtime_uid"]) <= 0:
@@ -128,6 +130,8 @@ def assert_compose_isolation() -> None:
         SECRET_KEY,
         "user: root",
         "user: \"0\"",
+        "BEGIN ",
+        "GH_TOKEN",
     )
     for item in forbidden:
         if item in text:
@@ -212,6 +216,8 @@ def assert_secrets_and_egress() -> None:
         raise SystemExit("allow-all users must stay disabled")
     if f"TELEGRAM_ALLOWED_USERS={TELEGRAM_USER}" not in oauth_env:
         raise SystemExit("managed env must pin the single Telegram user")
+    if "HERMES_GITHUB_APP_ID=" in oauth_env or "GH_TOKEN=" in oauth_env:
+        raise SystemExit("GitHub App env must stay out of the default managed env")
     keyed_env = render(
         "managed.env.j2",
         hermes_agent_telegram_bot_token=SECRET_TOKEN,
@@ -262,6 +268,10 @@ def assert_validation_contract() -> None:
         "hermes_agent_openai_runtime == 'auto'",
         "hermes_agent_provider not in hermes_agent_oauth_providers",
         "hermes_agent_provider_api_key | length == 0",
+        "hermes_agent_github_enabled | bool",
+        "hermes_agent_github_app_id | string is match('^[0-9]+$')",
+        "'PRIVATE KEY' in hermes_agent_github_app_private_key",
+        "item.url is match(\"^https://github.com/.+\\\\.git$\")",
     )
     for snippet in required_snippets:
         if snippet not in VALIDATE:
@@ -282,12 +292,54 @@ def assert_example_and_specs() -> None:
         raise SystemExit("example site must bind openai-codex / gpt-5.6-luna")
     if not hermes["enabled"] or not hermes["full_capability"]:
         raise SystemExit("example site must show the opt-in full-capability binding")
+    if hermes.get("github", {}).get("enabled"):
+        raise SystemExit("example site must keep GitHub App access disabled")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())
     options = specs["argument_specs"]["main"]["options"]
     for key in DEFAULTS:
         if key not in options:
             raise SystemExit(f"argument spec missing {key}")
     print("example site and argument specs cover the public contract")
+
+
+def assert_github_draft_pr_helpers() -> None:
+    if DEFAULTS["hermes_agent_github_repos"]:
+        raise SystemExit("default GitHub repo list must stay empty")
+    if DEFAULTS["hermes_agent_github_container_repos_dir"] != "/opt/data/repos":
+        raise SystemExit("GitHub clones must live under /opt/data/repos")
+    files_dir = ROLE / "files"
+    wrapper = (files_dir / "gh").read_text()
+    hook = (files_dir / "git-pre-push-no-main").read_text()
+    token_helper = (files_dir / "github-app-token").read_text()
+    if "must not merge pull requests" not in wrapper:
+        raise SystemExit("gh wrapper must refuse merge")
+    if "refs/heads/main" not in hook:
+        raise SystemExit("pre-push hook must block main")
+    if "sys.stdout.write(token)" not in token_helper:
+        raise SystemExit("token helper must print only the token")
+    github_env = render(
+        "managed.env.j2",
+        hermes_agent_telegram_bot_token=SECRET_TOKEN,
+        hermes_agent_provider_api_key="",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_provider_env_name="",
+        hermes_agent_github_enabled=True,
+        hermes_agent_github_app_id="4765344",
+        hermes_agent_github_installation_id="157602350",
+    )
+    if "HERMES_GITHUB_APP_ID=4765344" not in github_env:
+        raise SystemExit("enabled GitHub env must pin the App ID")
+    if "GH_TOKEN=" in github_env or "BEGIN " in github_env:
+        raise SystemExit("managed env must not hold GH_TOKEN or the PEM")
+    if "/opt/hermes-policy/bin" not in github_env:
+        raise SystemExit("GitHub helpers must be first on PATH")
+    soul = render("SOUL.md.j2", hermes_agent_github_enabled=True)
+    if "Never merge" not in soul or "gh pr merge" not in soul:
+        raise SystemExit("SOUL.md must forbid GitHub merges when the App is enabled")
+    github_tasks = (ROLE / "tasks/github.yml").read_text()
+    if "github-app.pem" not in github_tasks or "mode: \"0640\"" not in github_tasks:
+        raise SystemExit("GitHub App PEM must be installed mode 0640")
+    print("github draft-PR helpers: token mint, no merge, no PEM in env")
 
 
 def main() -> None:
@@ -299,6 +351,7 @@ def main() -> None:
     assert_disable_preserves_state()
     assert_validation_contract()
     assert_example_and_specs()
+    assert_github_draft_pr_helpers()
     print("hermes_agent rendered contract ok")
 
 

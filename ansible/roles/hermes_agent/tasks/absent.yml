@@ -37,6 +37,11 @@
     - "{{ hermes_agent_install_dir }}/PIN.txt"
     - "{{ hermes_agent_managed_dir }}/config.yaml"
     - "{{ hermes_agent_managed_dir }}/.env"
+    - "{{ hermes_agent_managed_dir }}/github-app.pem"
+    - "{{ hermes_agent_managed_dir }}/bin/github-app-token"
+    - "{{ hermes_agent_managed_dir }}/bin/gh"
+    - "{{ hermes_agent_managed_dir }}/bin/gh-bin"
+    - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
     - "{{ hermes_agent_egress_script }}"
     - "/etc/systemd/system/{{ hermes_agent_egress_unit }}"
 

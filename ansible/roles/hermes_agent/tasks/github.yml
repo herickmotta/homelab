@@ -1,0 +1,167 @@
+---
+- name: Fill GitHub App git name from the app slug
+  when: (hermes_agent_github_git_name | default('') | trim | length) == 0
+  ansible.builtin.set_fact:
+    hermes_agent_github_git_name: "{{ hermes_agent_github_app_slug }}[bot]"
+
+- name: Fill GitHub App git email from the app id and slug
+  when: (hermes_agent_github_git_email | default('') | trim | length) == 0
+  ansible.builtin.set_fact:
+    hermes_agent_github_git_email: >-
+      {{ hermes_agent_github_app_id }}+{{ hermes_agent_github_app_slug }}[bot]@users.noreply.github.com
+
+- name: Install GitHub App host packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - openssl
+      - python3
+    state: present
+
+- name: Create the GitHub App managed bin directory
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/bin"
+    state: directory
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Create the GitHub workspace directory
+  ansible.builtin.file:
+    path: "{{ hermes_agent_github_repos_dir }}"
+    state: directory
+    owner: "{{ hermes_agent_runtime_user }}"
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Install the GitHub App private key
+  ansible.builtin.copy:
+    content: "{{ hermes_agent_github_app_private_key }}"
+    dest: "{{ hermes_agent_managed_dir }}/github-app.pem"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+  no_log: true
+
+- name: Install GitHub App helper scripts
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ hermes_agent_managed_dir }}/bin/{{ item.dest }}"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+  loop:
+    - src: github-app-token
+      dest: github-app-token
+    - src: gh
+      dest: gh
+    - src: git-credential-github-app
+      dest: git-credential-github-app
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Create the GitHub CLI extract directory
+  ansible.builtin.file:
+    path: "/var/cache/gh_{{ hermes_agent_github_cli_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download the pinned GitHub CLI archive
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/cli/cli/releases/download/v{{ hermes_agent_github_cli_version
+      }}/gh_{{ hermes_agent_github_cli_version }}_linux_amd64.tar.gz
+    dest: "/var/cache/gh_{{ hermes_agent_github_cli_version }}_linux_amd64.tar.gz"
+    checksum: "sha256:{{ hermes_agent_github_cli_archive_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Extract the pinned GitHub CLI
+  ansible.builtin.unarchive:
+    src: "/var/cache/gh_{{ hermes_agent_github_cli_version }}_linux_amd64.tar.gz"
+    dest: "/var/cache/gh_{{ hermes_agent_github_cli_version }}"
+    remote_src: true
+    creates: >-
+      /var/cache/gh_{{ hermes_agent_github_cli_version }}/gh_{{ hermes_agent_github_cli_version }}_linux_amd64/bin/gh
+
+- name: Install the pinned GitHub CLI binary
+  ansible.builtin.copy:
+    src: >-
+      /var/cache/gh_{{ hermes_agent_github_cli_version }}/gh_{{ hermes_agent_github_cli_version }}_linux_amd64/bin/gh
+    dest: "{{ hermes_agent_managed_dir }}/bin/gh-bin"
+    remote_src: true
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Install Hermes gitconfig for the GitHub App
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "{{ hermes_agent_data_dir }}/home/.gitconfig"
+    owner: "{{ hermes_agent_runtime_user }}"
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+
+- name: Prove the GitHub App can mint an installation token
+  ansible.builtin.command:
+    argv:
+      - "{{ hermes_agent_managed_dir }}/bin/github-app-token"
+  environment:
+    HERMES_GITHUB_APP_ID: "{{ hermes_agent_github_app_id | string }}"
+    HERMES_GITHUB_INSTALLATION_ID: "{{ hermes_agent_github_installation_id | string }}"
+    HERMES_GITHUB_APP_KEY_FILE: "{{ hermes_agent_managed_dir }}/github-app.pem"
+  register: hermes_agent_github_token
+  changed_when: false
+  failed_when: hermes_agent_github_token.rc != 0
+  no_log: true
+
+- name: Clone GitHub App repositories
+  ansible.builtin.command:
+    argv:
+      - git
+      - -c
+      - credential.helper=
+      - -c
+      - "credential.helper={{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
+      - clone
+      - --
+      - "{{ item.url }}"
+      - "{{ hermes_agent_github_repos_dir }}/{{ item.name }}"
+    creates: "{{ hermes_agent_github_repos_dir }}/{{ item.name }}/.git"
+  environment:
+    HERMES_GITHUB_APP_ID: "{{ hermes_agent_github_app_id | string }}"
+    HERMES_GITHUB_INSTALLATION_ID: "{{ hermes_agent_github_installation_id | string }}"
+    HERMES_GITHUB_APP_KEY_FILE: "{{ hermes_agent_managed_dir }}/github-app.pem"
+  become: true
+  become_user: "{{ hermes_agent_runtime_user }}"
+  loop: "{{ hermes_agent_github_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install no-main pre-push hooks
+  ansible.builtin.copy:
+    src: git-pre-push-no-main
+    dest: "{{ hermes_agent_github_repos_dir }}/{{ item.name }}/.git/hooks/pre-push"
+    owner: "{{ hermes_agent_runtime_user }}"
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+  loop: "{{ hermes_agent_github_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Stat the GitHub App private key
+  ansible.builtin.stat:
+    path: "{{ hermes_agent_managed_dir }}/github-app.pem"
+  register: hermes_agent_github_key_stat
+
+- name: Assert the GitHub App private key is not world-readable
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_github_key_stat.stat.exists
+      - hermes_agent_github_key_stat.stat.pw_name == 'root'
+      - hermes_agent_github_key_stat.stat.gr_name == hermes_agent_runtime_group
+      - hermes_agent_github_key_stat.stat.mode == '0640'
+    fail_msg: GitHub App private key must be root:runtime mode 0640.

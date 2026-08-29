@@ -96,3 +96,46 @@
     fail_msg: >-
       OAuth Hermes providers authenticate via device login into auth.json on
       the data volume. Do not inject a provider API key.
+
+- name: Require GitHub App binding when draft-PR access is enabled
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_github_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_github_app_id | string is match('^[0-9]+$')
+      - hermes_agent_github_installation_id | string is match('^[0-9]+$')
+      - hermes_agent_github_app_slug | length > 0
+      - "' ' not in hermes_agent_github_app_slug"
+      - hermes_agent_github_app_private_key | length > 0
+      - "'BEGIN ' in hermes_agent_github_app_private_key"
+      - "'PRIVATE KEY' in hermes_agent_github_app_private_key"
+      - hermes_agent_github_repos | length > 0
+      - hermes_agent_github_repos_dir is match('^/')
+      - hermes_agent_github_container_repos_dir == '/opt/data/repos'
+    fail_msg: >-
+      Enabled GitHub App access needs numeric app and installation IDs, the
+      app slug, a PEM, and at least one https repository.
+  no_log: true
+
+- name: Validate GitHub App repositories
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_github_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - item.name | length > 0
+      - item.name is match('^[A-Za-z0-9._-]+$')
+      - item.url is match("^https://github.com/.+\\.git$")
+    fail_msg: GitHub App repositories must use https GitHub clone URLs and safe directory names.
+  loop: "{{ hermes_agent_github_repos }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+
+- name: Reject GitHub App secrets when draft-PR access is disabled
+  when: not (hermes_agent_github_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_github_app_private_key | length == 0
+    fail_msg: Do not pass a GitHub App private key when GitHub access is disabled.
+  no_log: true

@@ -87,6 +87,23 @@
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0644"
 
+- name: Configure optional GitHub App draft-PR access
+  when: hermes_agent_github_enabled | bool
+  ansible.builtin.include_tasks: github.yml
+
+- name: Remove GitHub App files when draft-PR access is disabled
+  when: not (hermes_agent_github_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hermes_agent_managed_dir }}/github-app.pem"
+    - "{{ hermes_agent_managed_dir }}/bin/github-app-token"
+    - "{{ hermes_agent_managed_dir }}/bin/gh"
+    - "{{ hermes_agent_managed_dir }}/bin/gh-bin"
+    - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
+    - "{{ hermes_agent_data_dir }}/home/.gitconfig"
+
 - name: Install Hermes Agent Compose file
   ansible.builtin.template:
     src: compose.yaml.j2
@@ -155,6 +172,16 @@
   ansible.builtin.assert:
     that:
       - hermes_agent_telegram_bot_token not in hermes_agent_compose_text
+    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
+  no_log: true
+
+- name: Assert GitHub App secrets stay out of Compose
+  when: hermes_agent_github_app_private_key | length > 0
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_github_app_private_key not in hermes_agent_compose_text
+      - "'BEGIN ' not in hermes_agent_compose_text"
+      - "'GH_TOKEN' not in hermes_agent_compose_text"
     fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
   no_log: true
 

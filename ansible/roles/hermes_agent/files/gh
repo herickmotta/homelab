@@ -1,0 +1,25 @@
+#!/bin/sh
+# Wrap the pinned gh binary with a one-hour installation token.
+# Refuse merge. GitHub rules on public main are the real merge lock.
+set -eu
+
+bindir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+prev=""
+for arg in "$@"; do
+  case "$arg" in
+    merge)
+      case "$prev" in
+        pr | prs)
+          printf '%s\n' "refused: this GitHub App must not merge pull requests" >&2
+          exit 1
+          ;;
+      esac
+      ;;
+  esac
+  prev=$arg
+done
+
+GH_TOKEN=$("$bindir/github-app-token") || exit 1
+export GH_TOKEN
+export GH_PROMPT_DISABLED=1
+exec "$bindir/gh-bin" "$@"

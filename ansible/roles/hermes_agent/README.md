@@ -60,6 +60,25 @@ not inject an OpenAI or OpenRouter API key for that provider. Keep
 search, and its complete tool loop. `/codex-runtime codex_app_server` is out
 of scope for this role.
 
+## Optional GitHub App draft PRs
+
+Defaults keep GitHub access **off**. A site may set
+`hermes_agent_github_enabled: true` and supply a GitHub App installation
+(app ID, installation ID, slug, PEM, and `https://github.com/...git`
+repositories). The role then:
+
+- writes the PEM as `0640` `root:hermes` under the managed directory
+- installs a token helper that mints a one-hour installation token
+- pins GitHub CLI `gh` and wraps it so `gh pr merge` is refused
+- clones the named repositories into `/opt/data/repos`
+- configures git to use the helper and a pre-push hook that blocks `main`
+
+The App is a distinct actor from the operator. Contents and pull-request
+write can still merge unless the repository's `main` protection denies that
+App. This role does not grant Administration, Actions write, Secrets, or
+Workflows. Do not put `GH_TOKEN` in Compose. Do not bind-mount operator
+workstations or `.git` credentials.
+
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:
 
