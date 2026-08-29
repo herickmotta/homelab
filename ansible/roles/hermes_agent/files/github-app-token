@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Mint a short-lived GitHub App installation token. Print only the token."""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+def _b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _fail(message: str) -> None:
+    sys.stderr.write(message + "\n")
+    raise SystemExit(1)
+
+
+def main() -> None:
+    bindir = Path(__file__).resolve().parent
+    policy_dir = bindir.parent
+    app_id = os.environ.get("HERMES_GITHUB_APP_ID", "").strip()
+    installation_id = os.environ.get("HERMES_GITHUB_INSTALLATION_ID", "").strip()
+    key_file = Path(
+        os.environ.get(
+            "HERMES_GITHUB_APP_KEY_FILE", str(policy_dir / "github-app.pem")
+        )
+    )
+    if not app_id.isdigit() or not installation_id.isdigit():
+        _fail("HERMES_GITHUB_APP_ID and HERMES_GITHUB_INSTALLATION_ID must be numeric")
+    if not key_file.is_file():
+        _fail(f"GitHub App private key is missing: {key_file}")
+
+    now = int(time.time())
+    header = _b64url(json.dumps({"alg": "RS256", "typ": "JWT"}, separators=(",", ":")).encode())
+    payload = _b64url(
+        json.dumps(
+            {"iat": now - 60, "exp": now + 540, "iss": int(app_id)},
+            separators=(",", ":"),
+        ).encode()
+    )
+    signing_input = f"{header}.{payload}".encode()
+    try:
+        signature = subprocess.check_output(
+            ["openssl", "dgst", "-sha256", "-sign", str(key_file)],
+            input=signing_input,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        _fail(f"failed to sign GitHub App JWT: {exc}")
+    jwt = f"{header}.{payload}.{_b64url(signature)}"
+
+    request = urllib.request.Request(
+        f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+        data=b"",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {jwt}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "hermes-agent-github-app",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            body = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        _fail(f"GitHub App token request failed: HTTP {exc.code}")
+    except urllib.error.URLError as exc:
+        _fail(f"GitHub App token request failed: {exc.reason}")
+    token = body.get("token", "")
+    if not token or not token.startswith("ghs_"):
+        _fail("GitHub App token response was empty")
+    sys.stdout.write(token)
+
+
+if __name__ == "__main__":
+    main()

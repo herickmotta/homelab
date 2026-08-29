@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refuse pushing the default branch. Feature branches and draft PRs are allowed.
+set -eu
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/master)
+      printf 'refused: do not push %s; open a pull request instead\n' "$remote_ref" >&2
+      exit 1
+      ;;
+  esac
+done

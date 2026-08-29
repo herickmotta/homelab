@@ -33,3 +33,15 @@
         hermes_agent_telegram_admin_id: "{{ site.hermes.telegram_user_id }}"
         hermes_agent_telegram_bot_token: "{{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}"
         hermes_agent_provider_api_key: "{{ lookup('env', 'HERMES_PROVIDER_API_KEY') | default('', true) }}"
+        hermes_agent_github_enabled: "{{ site.hermes.github.enabled | default(false) | bool }}"
+        hermes_agent_github_app_id: "{{ site.hermes.github.app_id | default('') }}"
+        hermes_agent_github_installation_id: "{{ site.hermes.github.installation_id | default('') }}"
+        hermes_agent_github_app_slug: "{{ site.hermes.github.app_slug | default('') }}"
+        hermes_agent_github_git_name: "{{ site.hermes.github.git_name | default('') }}"
+        hermes_agent_github_git_email: "{{ site.hermes.github.git_email | default('') }}"
+        hermes_agent_github_repos: "{{ site.hermes.github.repos | default([]) }}"
+        hermes_agent_github_app_private_key: "{{
+            lookup('env', 'HERMES_GITHUB_APP_PRIVATE_KEY') | default('', true)
+            if (site.hermes.github.enabled | default(false) | bool)
+            else ''
+          }}"

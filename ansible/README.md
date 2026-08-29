@@ -93,7 +93,9 @@ Roles:
   or RFC1918 egress access. Default inference is ChatGPT Codex OAuth
   (`openai-codex`, Luna) with the normal Hermes runtime. Telegram is one
   allowlisted administrator. There is no dashboard, API server, or
-  published port.
+  published port. Optional GitHub App installation tokens can clone
+  declared repositories and open pull requests; merge stays with the
+  operator.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

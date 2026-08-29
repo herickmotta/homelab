@@ -1,0 +1,10 @@
+# Git identity used inside the Hermes container.
+[user]
+	name = {{ hermes_agent_github_git_name }}
+	email = {{ hermes_agent_github_git_email }}
+[credential]
+	helper =
+	helper = {{ hermes_agent_container_managed_dir }}/bin/git-credential-github-app
+[credential "https://github.com"]
+	helper =
+	helper = {{ hermes_agent_container_managed_dir }}/bin/git-credential-github-app
