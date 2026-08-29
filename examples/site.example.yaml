@@ -466,13 +466,15 @@ site:
       - 192.0.2.12
       - 127.0.0.1
 
-  # Official Hermes Agent on a dedicated guest. Tokens stay in the site
-  # secret store. The numeric Telegram user is also the administrator.
+  # Official Hermes Agent on a dedicated guest. The Telegram bot token stays
+  # in the site secret store. openai-codex authenticates with ChatGPT device
+  # login into the persistent data volume. The numeric Telegram user is also
+  # the administrator.
   hermes:
     enabled: true
     full_capability: true
-    provider: openrouter
-    model: anthropic/claude-sonnet-4.5
+    provider: openai-codex
+    model: gpt-5.6-luna
     telegram_user_id: "123456789"
 
   frigate:

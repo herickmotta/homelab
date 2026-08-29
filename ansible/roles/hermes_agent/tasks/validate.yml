@@ -36,11 +36,14 @@
       - hermes_agent_dns_servers | length > 0
       - hermes_agent_profile | length > 0
       - hermes_agent_provider | length > 0
-      - hermes_agent_provider in hermes_agent_provider_env_names
       - hermes_agent_model | length > 0
+      - hermes_agent_openai_runtime == 'auto'
+      - hermes_agent_provider in hermes_agent_oauth_providers
+        or hermes_agent_provider in hermes_agent_provider_env_names
     fail_msg: >-
       Hermes Agent needs non-root host identity, absolute state paths, a
-      private Docker subnet, public DNS, and a known provider.
+      private Docker subnet, public DNS, and a known provider. openai_runtime
+      must stay auto so Hermes keeps its own tool loop.
 
 - name: Validate Hermes Agent public DNS resolvers
   ansible.builtin.assert:
@@ -63,15 +66,33 @@
       Enabled Hermes Agent needs exactly one numeric Telegram user ID, and
       that same ID as administrator.
 
-- name: Require Hermes Agent secrets when enabled
+- name: Require Telegram secrets when Hermes Agent is enabled
   when: hermes_agent_enabled | bool
   ansible.builtin.assert:
     that:
       - hermes_agent_telegram_bot_token | length > 0
       - hermes_agent_telegram_bot_token is not match('(?i)^replace')
+    fail_msg: Enabled Hermes Agent needs a Telegram bot token that is not a placeholder.
+  no_log: true
+
+- name: Require a provider API key for non-OAuth Hermes providers
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_provider not in hermes_agent_oauth_providers
+  ansible.builtin.assert:
+    that:
       - hermes_agent_provider_api_key | length > 0
       - hermes_agent_provider_api_key is not match('(?i)^replace')
-    fail_msg: >-
-      Enabled Hermes Agent needs a Telegram bot token and provider API key
-      that are not placeholders.
+    fail_msg: This Hermes provider needs an API key that is not a placeholder.
   no_log: true
+
+- name: Reject leftover provider API keys for OAuth Hermes providers
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_provider in hermes_agent_oauth_providers
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_provider_api_key | length == 0
+    fail_msg: >-
+      OAuth Hermes providers authenticate via device login into auth.json on
+      the data volume. Do not inject a provider API key.

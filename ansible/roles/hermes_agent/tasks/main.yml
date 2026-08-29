@@ -4,7 +4,8 @@
 
 - name: Resolve the provider secret environment name
   ansible.builtin.set_fact:
-    hermes_agent_provider_env_name: "{{ hermes_agent_provider_env_names[hermes_agent_provider] }}"
+    hermes_agent_uses_oauth: "{{ hermes_agent_provider in hermes_agent_oauth_providers }}"
+    hermes_agent_provider_env_name: "{{ hermes_agent_provider_env_names.get(hermes_agent_provider, '') }}"
 
 - name: Configure the Hermes Agent
   when: hermes_agent_enabled | bool

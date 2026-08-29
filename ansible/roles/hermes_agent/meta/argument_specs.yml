@@ -72,8 +72,15 @@ argument_specs:
         type: str
       hermes_agent_model:
         type: str
+      hermes_agent_openai_runtime:
+        type: str
+      hermes_agent_model_aliases:
+        type: dict
       hermes_agent_provider_api_key:
         type: str
+      hermes_agent_oauth_providers:
+        type: list
+        elements: str
       hermes_agent_provider_env_names:
         type: dict
       hermes_agent_telegram_enabled:

@@ -53,7 +53,7 @@ def render(name: str, **overrides) -> str:
     context = dict(DEFAULTS)
     context["hermes_agent_provider_env_name"] = context[
         "hermes_agent_provider_env_names"
-    ][context["hermes_agent_provider"]]
+    ].get(context["hermes_agent_provider"], "")
     context.update(overrides)
     return env.get_template(name).render(context)
 
@@ -77,6 +77,14 @@ def assert_defaults() -> None:
         raise SystemExit("image repository must not include a tag")
     if not DEFAULTS["hermes_agent_preserve_state_on_disable"]:
         raise SystemExit("disable path must preserve state by default")
+    if DEFAULTS["hermes_agent_provider"] != "openai-codex":
+        raise SystemExit("reusable default provider must be openai-codex")
+    if DEFAULTS["hermes_agent_model"] != "gpt-5.6-luna":
+        raise SystemExit("reusable default model must be gpt-5.6-luna")
+    if DEFAULTS["hermes_agent_openai_runtime"] != "auto":
+        raise SystemExit("openai_runtime must stay auto")
+    if "openai-codex" not in DEFAULTS["hermes_agent_oauth_providers"]:
+        raise SystemExit("openai-codex must be an OAuth provider")
     for server in DEFAULTS["hermes_agent_dns_servers"]:
         if RFC1918_DNS_RE.match(server):
             raise SystemExit(f"DNS resolver {server} is not public")
@@ -149,7 +157,16 @@ def assert_full_capability_config() -> None:
         raise SystemExit("curator background review must be enabled")
     if config.get("agent", {}).get("disabled_toolsets"):
         raise SystemExit("full capability must not disable Telegram toolsets")
-    print("config: one Telegram admin, pairing off, full toolset")
+    if config["model"]["provider"] != "openai-codex":
+        raise SystemExit("full-capability default provider must be openai-codex")
+    if config["model"]["default"] != "gpt-5.6-luna":
+        raise SystemExit("everyday default must be gpt-5.6-luna")
+    if config["model"]["openai_runtime"] != "auto":
+        raise SystemExit("openai_runtime must stay auto, not codex_app_server")
+    aliases = config["model_aliases"]
+    if aliases["luna"]["model"] != "gpt-5.6-luna" or aliases["sol"]["model"] != "gpt-5.6-sol":
+        raise SystemExit("luna/sol Telegram aliases drifted")
+    print("config: one Telegram admin, pairing off, full toolset, Luna runtime")
 
 
 def assert_conservative_config() -> None:
@@ -180,19 +197,30 @@ def assert_conservative_config() -> None:
 
 
 def assert_secrets_and_egress() -> None:
-    env_text = render(
+    oauth_env = render(
+        "managed.env.j2",
+        hermes_agent_telegram_bot_token=SECRET_TOKEN,
+        hermes_agent_provider_api_key="",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_provider_env_name="",
+    )
+    if SECRET_TOKEN not in oauth_env:
+        raise SystemExit("managed env must hold the Telegram token")
+    if SECRET_KEY in oauth_env or "OPENROUTER_API_KEY=" in oauth_env:
+        raise SystemExit("oauth managed env must not hold a provider API key")
+    if "GATEWAY_ALLOW_ALL_USERS=false" not in oauth_env:
+        raise SystemExit("allow-all users must stay disabled")
+    if f"TELEGRAM_ALLOWED_USERS={TELEGRAM_USER}" not in oauth_env:
+        raise SystemExit("managed env must pin the single Telegram user")
+    keyed_env = render(
         "managed.env.j2",
         hermes_agent_telegram_bot_token=SECRET_TOKEN,
         hermes_agent_provider_api_key=SECRET_KEY,
         hermes_agent_telegram_user_id=TELEGRAM_USER,
         hermes_agent_provider_env_name="OPENROUTER_API_KEY",
     )
-    if SECRET_TOKEN not in env_text or SECRET_KEY not in env_text:
-        raise SystemExit("managed env must hold the runtime secrets")
-    if "GATEWAY_ALLOW_ALL_USERS=false" not in env_text:
-        raise SystemExit("allow-all users must stay disabled")
-    if f"TELEGRAM_ALLOWED_USERS={TELEGRAM_USER}" not in env_text:
-        raise SystemExit("managed env must pin the single Telegram user")
+    if SECRET_KEY not in keyed_env or "OPENROUTER_API_KEY=" not in keyed_env:
+        raise SystemExit("API-key providers must still render the provider secret")
     egress = render("egress.sh.j2")
     for network in (
         "10.0.0.0/8",
@@ -231,12 +259,14 @@ def assert_validation_contract() -> None:
         "hermes_agent_telegram_user_id | string is match('^[0-9]+$')",
         "(hermes_agent_telegram_user_id | string) == (hermes_agent_telegram_admin_id | string)",
         "hermes_agent_telegram_bot_token is not match('(?i)^replace')",
-        "hermes_agent_provider_api_key is not match('(?i)^replace')",
+        "hermes_agent_openai_runtime == 'auto'",
+        "hermes_agent_provider not in hermes_agent_oauth_providers",
+        "hermes_agent_provider_api_key | length == 0",
     )
     for snippet in required_snippets:
         if snippet not in VALIDATE:
             raise SystemExit(f"validate.yml missing {snippet}")
-    print("validate.yml rejects mutable tags, root, and REPLACE secrets")
+    print("validate.yml rejects mutable tags, root, app-server runtime, and REPLACE secrets")
 
 
 def assert_example_and_specs() -> None:
@@ -248,6 +278,8 @@ def assert_example_and_specs() -> None:
         raise SystemExit("fictional Hermes IP must stay in TEST-NET-1")
     if hermes["telegram_user_id"] != TELEGRAM_USER:
         raise SystemExit("example Telegram user ID drifted")
+    if hermes["provider"] != "openai-codex" or hermes["model"] != "gpt-5.6-luna":
+        raise SystemExit("example site must bind openai-codex / gpt-5.6-luna")
     if not hermes["enabled"] or not hermes["full_capability"]:
         raise SystemExit("example site must show the opt-in full-capability binding")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())

@@ -45,6 +45,10 @@
       owner: "{{ hermes_agent_runtime_user }}"
       group: "{{ hermes_agent_runtime_group }}"
       mode: "0750"
+    - path: "{{ hermes_agent_data_dir }}/home"
+      owner: "{{ hermes_agent_runtime_user }}"
+      group: "{{ hermes_agent_runtime_group }}"
+      mode: "0750"
   loop_control:
     label: "{{ item.path }}"
 
@@ -147,10 +151,17 @@
       Hermes Agent Compose must pin the digest, publish no ports, and keep
       host namespaces, the Docker socket, and extra capabilities out.
 
-- name: Assert Hermes Agent secrets stay out of Compose
+- name: Assert Hermes Agent Telegram secrets stay out of Compose
   ansible.builtin.assert:
     that:
       - hermes_agent_telegram_bot_token not in hermes_agent_compose_text
+    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
+  no_log: true
+
+- name: Assert Hermes Agent provider API keys stay out of Compose
+  when: hermes_agent_provider_api_key | length > 0
+  ansible.builtin.assert:
+    that:
       - hermes_agent_provider_api_key not in hermes_agent_compose_text
     fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
   no_log: true
@@ -174,9 +185,22 @@
       - hermes_agent_config.tool_loop_guardrails.hard_stop_enabled | bool
       - hermes_agent_config.model.provider == hermes_agent_provider
       - hermes_agent_config.model.default == hermes_agent_model
+      - hermes_agent_config.model.openai_runtime == 'auto'
+      - hermes_agent_config.model.openai_runtime != 'codex_app_server'
     fail_msg: >-
       Managed Hermes config must pin one Telegram admin/user, disable
-      pairing and groups, and keep the local terminal backend.
+      pairing and groups, keep the local terminal backend, and keep the
+      Hermes runtime (openai_runtime: auto).
+
+- name: Assert openai-codex Telegram model aliases
+  when: hermes_agent_provider == 'openai-codex'
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_config.model_aliases.luna.provider == 'openai-codex'
+      - hermes_agent_config.model_aliases.luna.model == 'gpt-5.6-luna'
+      - hermes_agent_config.model_aliases.sol.provider == 'openai-codex'
+      - hermes_agent_config.model_aliases.sol.model == 'gpt-5.6-sol'
+    fail_msg: openai-codex must ship luna and sol Telegram model aliases.
 
 - name: Assert full-capability Hermes Agent settings
   when: hermes_agent_full_capability | bool
@@ -217,6 +241,19 @@
       - hermes_agent_secret_stat.stat.gr_name == hermes_agent_runtime_group
       - hermes_agent_secret_stat.stat.mode == '0640'
     fail_msg: Hermes Agent secrets must be root:runtime mode 0640.
+
+- name: Stat the Hermes OAuth store
+  ansible.builtin.stat:
+    path: "{{ hermes_agent_data_dir }}/auth.json"
+  register: hermes_agent_auth_stat
+
+- name: Restrict Hermes OAuth store permissions
+  when: hermes_agent_auth_stat.stat.exists
+  ansible.builtin.file:
+    path: "{{ hermes_agent_data_dir }}/auth.json"
+    owner: "{{ hermes_agent_runtime_user }}"
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0600"
 
 - name: Pull the Hermes Agent image
   ansible.builtin.command:

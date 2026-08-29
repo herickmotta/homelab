@@ -51,9 +51,23 @@ When `hermes_agent_full_capability` is true, managed `config.yaml` sets:
   `hermes-telegram` toolset (terminal, files, web, browser, code execution,
   delegation, cron, memory, skills, session search)
 
-The site supplies `hermes_agent_provider`, `hermes_agent_model`,
-`hermes_agent_telegram_user_id` (same value as admin), and runtime secrets
-`hermes_agent_telegram_bot_token` plus `hermes_agent_provider_api_key`.
+The site supplies `hermes_agent_provider`, `hermes_agent_model`, and
+`hermes_agent_telegram_user_id` (same value as admin). Telegram's bot token
+is a SOPS secret. `openai-codex` authenticates with ChatGPT device-code OAuth
+into `$HERMES_HOME/auth.json` (`/opt/data/auth.json` in the container). Do
+not inject an OpenAI or OpenRouter API key for that provider. Keep
+`model.openai_runtime: auto` so Hermes retains memory, delegation, session
+search, and its complete tool loop. `/codex-runtime codex_app_server` is out
+of scope for this role.
+
+Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
+are rendered for `openai-codex`. After login:
+
+```text
+/model sol --once
+/model sol
+/model luna
+```
 
 Disable stops and removes the container and managed secrets. Persistent
 `/opt/hermes-agent/data` stays unless a site later chooses otherwise.
@@ -67,3 +81,18 @@ docker exec hermes-agent hermes import /opt/data/backups/hermes.zip --force
 
 Treat backup archives as secret. Health is `hermes version` and
 `hermes gateway status` inside the container.
+
+Device-code login is interactive and happens after the container is up:
+
+```bash
+docker exec -it hermes-agent hermes model
+```
+
+Select **ChatGPT or Codex Subscription**, open the URL, and authorize the
+ChatGPT account that has Codex access. Prefer `hermes model` over
+`hermes auth add openai-codex` at this pin: the latter can write only the
+credential pool while the runtime still reads `providers.tokens`. Treat
+`auth.json` as secret (mode `0600` on the data volume). Codex CLI is not
+required. Plan eligibility and how Hermes usage counts against Codex
+subscription limits are not documented upstream; prove a Luna turn and watch
+gateway logs for `429`, `invalid_grant`, quota, and re-auth failures.

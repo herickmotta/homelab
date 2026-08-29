@@ -32,4 +32,4 @@
         hermes_agent_telegram_user_id: "{{ site.hermes.telegram_user_id }}"
         hermes_agent_telegram_admin_id: "{{ site.hermes.telegram_user_id }}"
         hermes_agent_telegram_bot_token: "{{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}"
-        hermes_agent_provider_api_key: "{{ lookup('env', 'HERMES_PROVIDER_API_KEY') }}"
+        hermes_agent_provider_api_key: "{{ lookup('env', 'HERMES_PROVIDER_API_KEY') | default('', true) }}"

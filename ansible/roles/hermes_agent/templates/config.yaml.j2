@@ -4,6 +4,16 @@
 model:
   provider: {{ hermes_agent_provider | to_json }}
   default: {{ hermes_agent_model | to_json }}
+  openai_runtime: {{ hermes_agent_openai_runtime | to_json }}
+
+{% if hermes_agent_model_aliases %}
+model_aliases:
+{% for name, spec in hermes_agent_model_aliases.items() %}
+  {{ name }}:
+    provider: {{ spec.provider | to_json }}
+    model: {{ spec.model | to_json }}
+{% endfor %}
+{% endif %}
 
 unauthorized_dm_behavior: ignore
 telegram:

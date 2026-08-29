@@ -90,8 +90,10 @@ Roles:
   Agent container. Disabled and conservative by default. A site may enable
   the full upstream Telegram toolset, memory, skills, curator, cron, and
   delegation inside the container without Docker-socket, host-namespace,
-  or RFC1918 egress access. Telegram is one allowlisted administrator.
-  There is no dashboard, API server, or published port.
+  or RFC1918 egress access. Default inference is ChatGPT Codex OAuth
+  (`openai-codex`, Luna) with the normal Hermes runtime. Telegram is one
+  allowlisted administrator. There is no dashboard, API server, or
+  published port.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

@@ -45,9 +45,22 @@ hermes_agent_healthcheck_timeout: 10s
 hermes_agent_healthcheck_retries: 5
 hermes_agent_healthcheck_start_period: 90s
 
-hermes_agent_provider: openrouter
-hermes_agent_model: anthropic/claude-sonnet-4.5
+# openai-codex uses ChatGPT device-code OAuth in auth.json on the data volume.
+# Do not default openai_runtime to codex_app_server: that drops Hermes
+# delegate_task, memory, session_search, and todo from the live tool loop.
+hermes_agent_provider: openai-codex
+hermes_agent_model: gpt-5.6-luna
+hermes_agent_openai_runtime: auto
+hermes_agent_model_aliases:
+  luna:
+    provider: openai-codex
+    model: gpt-5.6-luna
+  sol:
+    provider: openai-codex
+    model: gpt-5.6-sol
 hermes_agent_provider_api_key: ""
+hermes_agent_oauth_providers:
+  - openai-codex
 hermes_agent_provider_env_names:
   openrouter: OPENROUTER_API_KEY
   openai: OPENAI_API_KEY

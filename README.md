@@ -75,7 +75,7 @@ flowchart TB
 
   subgraph outbound["Outbound only"]
     telegram["Telegram"]
-    provider["Cloud model provider"]
+    provider["ChatGPT Codex OAuth"]
   end
 
   away -->|"mesh VPN"| mesh
