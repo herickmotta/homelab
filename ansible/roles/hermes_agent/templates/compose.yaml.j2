@@ -1,0 +1,59 @@
+# Managed by herickmotta.homelab.hermes_agent.
+services:
+  hermes-agent:
+    image: "{{ hermes_agent_image_repository }}@{{ hermes_agent_image_digest }}"
+    container_name: "{{ hermes_agent_container_name }}"
+    restart: unless-stopped
+    init: false
+    privileged: false
+    command:
+      - gateway
+      - run
+    environment:
+      TZ: "{{ hermes_agent_timezone }}"
+      HERMES_HOME: "{{ hermes_agent_container_data_dir }}"
+      HERMES_MANAGED_DIR: "{{ hermes_agent_container_managed_dir }}"
+      HERMES_UID: "{{ hermes_agent_runtime_uid | string }}"
+      HERMES_GID: "{{ hermes_agent_runtime_gid | string }}"
+      HERMES_DASHBOARD: "0"
+      API_SERVER_ENABLED: "false"
+    volumes:
+      - {{ hermes_agent_data_dir }}:{{ hermes_agent_container_data_dir }}
+      - {{ hermes_agent_managed_dir }}:{{ hermes_agent_container_managed_dir }}:ro
+    dns:
+{% for server in hermes_agent_dns_servers %}
+      - {{ server }}
+{% endfor %}
+    networks:
+      - hermes
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "{{ hermes_agent_memory }}"
+    cpus: "{{ hermes_agent_cpus }}"
+    pids_limit: {{ hermes_agent_pids_limit | int }}
+    healthcheck:
+      test:
+        - CMD
+        - hermes
+        - version
+      interval: {{ hermes_agent_healthcheck_interval }}
+      timeout: {{ hermes_agent_healthcheck_timeout }}
+      retries: {{ hermes_agent_healthcheck_retries | int }}
+      start_period: {{ hermes_agent_healthcheck_start_period }}
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ hermes_agent_log_max_size }}"
+        max-file: "{{ hermes_agent_log_max_file }}"
+    labels:
+      homelab.role: hermes_agent
+      homelab.hermes.source_commit: "{{ hermes_agent_source_commit }}"
+      homelab.hermes.source_repository: "{{ hermes_agent_source_repository }}"
+
+networks:
+  hermes:
+    name: "{{ hermes_agent_network_name }}"
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: {{ hermes_agent_network_subnet }}

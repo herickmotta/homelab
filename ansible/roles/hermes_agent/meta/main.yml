@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  author: Herick Motta
+  role_name: hermes_agent
+  description: Deploy the pinned official Nous Research Hermes Agent container
+  license: MIT
+  min_ansible_version: "2.17"
+dependencies: []

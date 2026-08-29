@@ -1,0 +1,38 @@
+#!/bin/sh
+# Managed by herickmotta.homelab.hermes_agent.
+# Deny RFC1918 and link-local destinations from the Hermes Docker network.
+# Public Internet, including DNS at the Compose resolvers, remains allowed.
+# Later MCP destinations get explicit ACCEPT rules in this chain, before DROP.
+set -eu
+
+CHAIN="HERMES-AGENT-EGRESS"
+SUBNET="{{ hermes_agent_network_subnet }}"
+
+wait_for_docker_user() {
+  i=0
+  while [ "${i}" -lt 30 ]; do
+    if iptables -L DOCKER-USER -n >/dev/null 2>&1; then
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  echo "DOCKER-USER chain is missing; is Docker running?" >&2
+  return 1
+}
+
+wait_for_docker_user
+
+iptables -N "${CHAIN}" 2>/dev/null || iptables -F "${CHAIN}"
+
+if ! iptables -C DOCKER-USER -s "${SUBNET}" -j "${CHAIN}" >/dev/null 2>&1; then
+  iptables -I DOCKER-USER 1 -s "${SUBNET}" -j "${CHAIN}"
+fi
+
+iptables -A "${CHAIN}" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+iptables -A "${CHAIN}" -d 10.0.0.0/8 -j DROP
+iptables -A "${CHAIN}" -d 172.16.0.0/12 -j DROP
+iptables -A "${CHAIN}" -d 192.168.0.0/16 -j DROP
+iptables -A "${CHAIN}" -d 169.254.0.0/16 -j DROP
+iptables -A "${CHAIN}" -d 127.0.0.0/8 -j DROP
+iptables -A "${CHAIN}" -j RETURN

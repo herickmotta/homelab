@@ -15,11 +15,13 @@ for the repo split and how a site consumes this code. The diagram below is the
 
 ## Architecture
 
-Four guests on one Proxmox host. The network-plane guest is the only place for
+Guests on one Proxmox host. The network-plane guest is the only place for
 DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
 end. The application guest runs Compose workloads such as Frigate. The
-observability guest holds Grafana and longer-retention Prometheus. ZFS stays
-on the hypervisor, so destroying a guest does not destroy host datasets.
+observability guest holds Grafana and longer-retention Prometheus. Hermes is
+a dedicated guest for the official containerized assistant and is reached
+only through Telegram, not Caddy. ZFS stays on the hypervisor, so destroying
+a guest does not destroy host datasets.
 
 ```mermaid
 flowchart TB
@@ -63,8 +65,17 @@ flowchart TB
     loki["Loki 14d"]
   end
 
+  subgraph hermes["Hermes guest"]
+    agent["Official Hermes container"]
+  end
+
   subgraph cameras["Cameras"]
     stacked["Stacked dual-lens RTSP"]
+  end
+
+  subgraph outbound["Outbound only"]
+    telegram["Telegram"]
+    provider["ChatGPT Codex OAuth"]
   end
 
   away -->|"mesh VPN"| mesh
@@ -74,6 +85,7 @@ flowchart TB
   guard -->|"service probes"| nas
   guard -->|"service probes"| apps
   guard -->|"Grafana probe"| grafana
+  guard -->|"guest probe"| hermes
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
@@ -90,6 +102,7 @@ flowchart TB
   richProm -->|"Linux exporters"| net
   richProm -->|"Linux exporters"| nas
   richProm -->|"Linux exporters"| apps
+  richProm -->|"Linux exporter"| hermes
   richProm -->|"Linux exporter"| guard
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
@@ -97,8 +110,11 @@ flowchart TB
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
+  hermes -->|"Alloy logs"| loki
   host -->|"Alloy logs"| loki
   guard -->|"Alloy logs"| loki
+  agent -->|"no published ports"| telegram
+  agent -->|"no LAN listener"| provider
 
   durable --> virtio
   virtio --> smb
@@ -129,6 +145,10 @@ How traffic and data move:
   Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
   selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
   Sentinel.
+- Hermes runs the official pinned container on its own guest. Telegram and
+  the model provider are outbound only. The container cannot reach RFC1918
+  or link-local destinations, the Docker socket, or host credentials. There
+  is no Caddy route, dashboard, or public ingress for Hermes.
 
 ```mermaid
 flowchart LR
@@ -160,12 +180,12 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.12.1 ships
+under `examples/`. Collection `herickmotta.homelab` 0.13.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
-`netdata_agent`, `sentinel_base`, `github_actions_runner`, and
-`sentinel_monitoring`. Site repositories pin a
+`netdata_agent`, `sentinel_base`, `github_actions_runner`,
+`sentinel_monitoring`, and `hermes_agent`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
 only.
 

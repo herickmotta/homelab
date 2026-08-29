@@ -1,0 +1,97 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy the pinned official Nous Research Hermes Agent
+    options:
+      hermes_agent_enabled:
+        type: bool
+      hermes_agent_full_capability:
+        type: bool
+      hermes_agent_preserve_state_on_disable:
+        type: bool
+      hermes_agent_source_repository:
+        type: str
+      hermes_agent_source_commit:
+        type: str
+      hermes_agent_image_repository:
+        type: str
+      hermes_agent_image_digest:
+        type: str
+      hermes_agent_install_dir:
+        type: str
+      hermes_agent_data_dir:
+        type: str
+      hermes_agent_managed_dir:
+        type: str
+      hermes_agent_backup_dir:
+        type: str
+      hermes_agent_container_data_dir:
+        type: str
+      hermes_agent_container_managed_dir:
+        type: str
+      hermes_agent_runtime_user:
+        type: str
+      hermes_agent_runtime_group:
+        type: str
+      hermes_agent_runtime_uid:
+        type: int
+      hermes_agent_runtime_gid:
+        type: int
+      hermes_agent_container_name:
+        type: str
+      hermes_agent_profile:
+        type: str
+      hermes_agent_timezone:
+        type: str
+      hermes_agent_network_name:
+        type: str
+      hermes_agent_network_subnet:
+        type: str
+      hermes_agent_dns_servers:
+        type: list
+        elements: str
+      hermes_agent_cpus:
+        type: str
+      hermes_agent_memory:
+        type: str
+      hermes_agent_pids_limit:
+        type: int
+      hermes_agent_log_max_size:
+        type: str
+      hermes_agent_log_max_file:
+        type: str
+      hermes_agent_healthcheck_interval:
+        type: str
+      hermes_agent_healthcheck_timeout:
+        type: str
+      hermes_agent_healthcheck_retries:
+        type: int
+      hermes_agent_healthcheck_start_period:
+        type: str
+      hermes_agent_provider:
+        type: str
+      hermes_agent_model:
+        type: str
+      hermes_agent_openai_runtime:
+        type: str
+      hermes_agent_model_aliases:
+        type: dict
+      hermes_agent_provider_api_key:
+        type: str
+      hermes_agent_oauth_providers:
+        type: list
+        elements: str
+      hermes_agent_provider_env_names:
+        type: dict
+      hermes_agent_telegram_enabled:
+        type: bool
+      hermes_agent_telegram_user_id:
+        type: str
+      hermes_agent_telegram_admin_id:
+        type: str
+      hermes_agent_telegram_bot_token:
+        type: str
+      hermes_agent_egress_unit:
+        type: str
+      hermes_agent_egress_script:
+        type: str

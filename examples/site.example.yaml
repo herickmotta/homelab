@@ -64,6 +64,7 @@ site:
         - 114
         - 115
         - 116
+        - 117
       icmp_targets:
         - name: gateway
           address: 192.0.2.1
@@ -73,6 +74,10 @@ site:
           address: 192.0.2.10
           kind: hypervisor
           dependency: none
+        - name: hermes
+          address: 192.0.2.17
+          kind: service
+          dependency: pve
       http_targets:
         - name: adguard
           address: https://adguard.lab.example.test
@@ -140,6 +145,10 @@ site:
           address: 192.0.2.16:12345
           host: observe-example
           dependency: pve
+        - name: hermes
+          address: 192.0.2.17:12345
+          host: hermes-example
+          dependency: pve
         - name: pve
           address: 192.0.2.10:12345
           host: pve-example
@@ -153,6 +162,7 @@ site:
         - nas-example
         - apps-example
         - observe-example
+        - hermes-example
         - pve-example
         - sentinel-example
     host_metrics:
@@ -166,6 +176,9 @@ site:
         - name: apps
           address: 192.0.2.15:9100
           host: apps-example
+        - name: hermes
+          address: 192.0.2.17:9100
+          host: hermes-example
         - name: pve
           address: 192.0.2.10:9100
           host: pve-example
@@ -196,6 +209,12 @@ site:
               label: homelab.role=frigate
             - name: homeassistant
               label: homelab.role=homeassistant
+        hermes-example:
+          systemd_units:
+            - alloy.service
+          container_probes:
+            - name: hermes-agent
+              label: homelab.role=hermes_agent
         pve-example:
           systemd_units:
             - smartmontools.service
@@ -220,6 +239,9 @@ site:
           docker: true
           journal_units: []
         observe-example:
+          docker: true
+          journal_units: []
+        hermes-example:
           docker: true
           journal_units: []
         pve-example:
@@ -333,6 +355,23 @@ site:
       startup:
         order: 4
 
+    hermes:
+      hostname: hermes-example
+      vm_id: 117
+      ipv4: 192.0.2.17
+      groups:
+        - homelab_guest
+        - hermes_agent
+        - host_metrics
+        - log_shipper
+      cores: 2
+      memory_mb: 4096
+      disk_gb: 32
+      tags:
+        - hermes
+      startup:
+        order: 5
+
   storage:
     pools:
       iron:
@@ -426,6 +465,17 @@ site:
     trusted_proxies:
       - 192.0.2.12
       - 127.0.0.1
+
+  # Official Hermes Agent on a dedicated guest. The Telegram bot token stays
+  # in the site secret store. openai-codex authenticates with ChatGPT device
+  # login into the persistent data volume. The numeric Telegram user is also
+  # the administrator.
+  hermes:
+    enabled: true
+    full_capability: true
+    provider: openai-codex
+    model: gpt-5.6-luna
+    telegram_user_id: "123456789"
 
   frigate:
     media_path: /mnt/frigate

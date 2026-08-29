@@ -1,0 +1,52 @@
+---
+- name: Check for a Hermes Agent Compose project
+  ansible.builtin.stat:
+    path: "{{ hermes_agent_install_dir }}/compose.yaml"
+  register: hermes_agent_compose_stat
+
+- name: Stop the Hermes Agent Compose project
+  when: hermes_agent_compose_stat.stat.exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - down
+      - --remove-orphans
+    chdir: "{{ hermes_agent_install_dir }}"
+  register: hermes_agent_compose_down
+  changed_when: >-
+    hermes_agent_compose_down.rc == 0
+    and ('Removed' in (hermes_agent_compose_down.stderr ~ hermes_agent_compose_down.stdout)
+         or 'Stopped' in (hermes_agent_compose_down.stderr ~ hermes_agent_compose_down.stdout))
+  failed_when: false
+
+- name: Disable Hermes Agent egress policy
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_egress_unit }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+
+- name: Remove Hermes Agent managed files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hermes_agent_install_dir }}/compose.yaml"
+    - "{{ hermes_agent_install_dir }}/PIN.txt"
+    - "{{ hermes_agent_managed_dir }}/config.yaml"
+    - "{{ hermes_agent_managed_dir }}/.env"
+    - "{{ hermes_agent_egress_script }}"
+    - "/etc/systemd/system/{{ hermes_agent_egress_unit }}"
+
+- name: Reload systemd after removing the egress unit
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Leave Hermes Agent persistent state in place
+  when: hermes_agent_preserve_state_on_disable | bool
+  ansible.builtin.debug:
+    msg: >-
+      Hermes Agent is disabled. Persistent state in
+      {{ hermes_agent_data_dir }} was preserved.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Hermes Agent container egress policy
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={{ hermes_agent_egress_script }}
+ExecStop=/bin/sh -c 'iptables -D DOCKER-USER -s {{ hermes_agent_network_subnet }} -j HERMES-AGENT-EGRESS 2>/dev/null || true; iptables -F HERMES-AGENT-EGRESS 2>/dev/null || true; iptables -X HERMES-AGENT-EGRESS 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
