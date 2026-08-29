@@ -67,6 +67,9 @@ jobs:
           pip install jinja2 pyyaml
           python3 tests/observability/test_log_freshness.py
 
+      - name: Test Hermes Agent rendered contract
+        run: python3 tests/hermes_agent/test_rendered_contract.py
+
   ci:
     name: ci
     if: always()
