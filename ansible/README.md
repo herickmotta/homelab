@@ -86,11 +86,12 @@ Roles:
   not published through Caddy. It scrapes guest node exporters, Alloy, the
   Sentinel host Linux exporter, and hypervisor SMART and ZFS, and sends
   selected alerts to Sentinel Alertmanager. The Homelab overview dashboard
-  is the fleet/NAS view, including Sentinel CPU, memory, and root disk.
-  Optional read-only PVE exporter uses a token distinct from Sentinel.
-  Alertmanager stays on Sentinel. When expected log hosts are set, Prometheus
-  alerts per host if Alloy's `loki.write` send counter is stale while Alloy
-  is still scrapeable.
+  is the fleet/NAS view, while the Operations / Hermes evidence dashboard is
+  the stable read-only evidence contract for alerts, target health, storage,
+  services, Frigate, and log freshness. Optional read-only PVE exporter uses a
+  token distinct from Sentinel. Alertmanager stays on Sentinel. When expected
+  log hosts are set, Prometheus alerts per host if Alloy's `loki.write` send
+  counter is stale while Alloy is still scrapeable.
 - `herickmotta.homelab.hermes_agent`: pinned official Nous Research Hermes
   Agent container. Disabled and conservative by default. A site may enable
   the full upstream Telegram toolset, memory, skills, curator, cron, and
