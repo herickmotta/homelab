@@ -157,3 +157,7 @@ argument_specs:
       sentinel_monitoring_heartbeat_interval:
         type: str
         default: 1min
+      sentinel_monitoring_telegram_chat_id:
+        type: str
+      sentinel_monitoring_telegram_bot_token:
+        type: str

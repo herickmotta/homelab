@@ -76,6 +76,9 @@ jobs:
       - name: Test Grafana alert datasources
         run: python3 tests/observability/test_grafana_datasources.py
 
+      - name: Test Alertmanager Telegram paging
+        run: python3 tests/sentinel_monitoring/test_alertmanager_telegram.py
+
   ci:
     name: ci
     if: always()

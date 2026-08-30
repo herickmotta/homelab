@@ -117,7 +117,7 @@ groups:
           severity: warning
         annotations:
           summary: Alertmanager failed to deliver a notification
-          description: Raw email or another receiver failed. Hermes must not be the only path.
+          description: Email or Telegram paging failed. Hermes must not be the only path.
 
       - alert: TlsCertificateExpiring
         expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 21

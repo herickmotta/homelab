@@ -64,3 +64,9 @@
         sentinel_monitoring_smtp_from: "{{ site.storage.monitoring.smtp.from }}"
         sentinel_monitoring_smtp_require_tls: "{{ site.storage.monitoring.smtp.starttls }}"
         sentinel_monitoring_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') }}"
+        sentinel_monitoring_telegram_chat_id: "{{
+            site.monitoring.sentinel.telegram.chat_id | default('')
+          }}"
+        sentinel_monitoring_telegram_bot_token: "{{
+            lookup('env', 'ALERTMANAGER_TELEGRAM_BOT_TOKEN') | default('', true)
+          }}"

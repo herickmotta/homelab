@@ -54,6 +54,8 @@ site:
       retention_time: 72h
       retention_size: 10GB
       alertmanager_bind_address: "0.0.0.0:9093"
+      telegram:
+        chat_id: "-1001234567890"
       pve_exporter:
         enabled: true
         user: prometheus@pve
