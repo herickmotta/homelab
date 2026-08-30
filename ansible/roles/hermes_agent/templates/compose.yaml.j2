@@ -35,7 +35,7 @@ services:
       test:
         - CMD
         - hermes
-        - version
+        - --version
       interval: {{ hermes_agent_healthcheck_interval }}
       timeout: {{ hermes_agent_healthcheck_timeout }}
       retries: {{ hermes_agent_healthcheck_retries | int }}

@@ -140,6 +140,10 @@ def assert_compose_isolation() -> None:
     for item in forbidden:
         if item in text:
             raise SystemExit(f"compose must not contain {item!r}")
+    if "- version" in text and "- --version" not in text:
+        raise SystemExit("healthcheck must use hermes --version")
+    if "- --version" not in text:
+        raise SystemExit("healthcheck must call hermes --version")
     print("compose: digest pin, no ports, no host namespaces, no secrets")
 
 

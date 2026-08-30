@@ -143,7 +143,7 @@ docker exec hermes-agent hermes backup -o /opt/data/backups/hermes.zip
 docker exec hermes-agent hermes import /opt/data/backups/hermes.zip --force
 ```
 
-Treat backup archives as secret. Health is `hermes version` and
+Treat backup archives as secret. Health is `hermes --version` and
 `hermes gateway status` inside the container.
 
 Device-code login is interactive and happens after the container is up:
