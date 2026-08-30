@@ -34,3 +34,10 @@ Grafana access is the `grafana` MCP server at `http://grafana-mcp:8000/mcp`.
 Use that sidecar. Do not call Grafana or Caddy on the LAN. The Viewer token
 stays on the sidecar, not in this process.
 {% endif %}
+{% if hermes_agent_webhook_enabled | bool %}
+
+Alertmanager may POST a bounded payload to the host adapter. That adapter
+signs a loopback Hermes webhook. Those runs must only investigate with Grafana
+MCP. Do not use terminal, browser, or GitHub write on an automatic alert.
+Recommend a draft PR only after the operator asks. Raw email stays independent.
+{% endif %}

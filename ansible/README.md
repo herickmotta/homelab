@@ -75,8 +75,8 @@ Roles:
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default. A typed LAN bind can expose Alertmanager to the
-  observe guest only. A loopback Hermes webhook input exists but stays empty
-  until that role is enabled; email routing remains independent.
+  observe guest only. An optional Alertmanager webhook may POST a bearer
+  payload to the Hermes guest adapter; email routing remains independent.
   Compose recreates only when templates change or the project is
   not running.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
@@ -91,20 +91,27 @@ Roles:
   services, Frigate, and log freshness. Optional read-only PVE exporter uses a
   token distinct from Sentinel. Alertmanager stays on Sentinel. When expected
   log hosts are set, Prometheus alerts per host if Alloy's `loki.write` send
-  counter is stale while Alloy is still scrapeable.
+  counter is stale while Alloy is still scrapeable. Additional rules cover
+  ZFS pool health and capacity, SMART failure/pending/realloc delta,
+  exporter disappearance, guest root filesystem/inodes, and dropped
+  Alertmanager notifications.
 - `herickmotta.homelab.hermes_agent`: pinned official Nous Research Hermes
   Agent container. Disabled and conservative by default. A site may enable
   the full upstream Telegram toolset, memory, skills, curator, cron, and
   delegation inside the container without Docker-socket, host-namespace,
   or RFC1918 egress access. Default inference is ChatGPT Codex OAuth
   (`openai-codex`, Luna) with the normal Hermes runtime. Telegram is one
-  allowlisted administrator. There is no dashboard, API server, or
-  published port. Optional GitHub App installation tokens can clone
+  allowlisted administrator. There is no dashboard, API server, or Caddy
+  ingress. Optional GitHub App installation tokens can clone
   declared repositories and open pull requests; merge stays with the
   operator. Optional PVEAuditor access is GET-only to the hypervisor API
   on TCP 8006; other RFC1918 destinations stay dropped. Optional Grafana
   MCP is a same-network sidecar: Hermes talks to `grafana-mcp` over Docker
-  DNS; the sidecar holds the Viewer token and reaches Grafana on TCP 3000.
+  DNS; the sidecar holds the Viewer token and reaches Grafana on TCP 3000
+  with read-only prometheus and loki query tools. An optional host adapter
+  accepts Sentinel Alertmanager on a LAN port and signs HMAC-v2 to the
+  Hermes webhook on loopback; automatic runs keep an empty toolset and
+  deliver to Telegram. Raw email stays independent.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

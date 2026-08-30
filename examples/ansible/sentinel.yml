@@ -64,3 +64,9 @@
         sentinel_monitoring_smtp_from: "{{ site.storage.monitoring.smtp.from }}"
         sentinel_monitoring_smtp_require_tls: "{{ site.storage.monitoring.smtp.starttls }}"
         sentinel_monitoring_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') }}"
+        sentinel_monitoring_hermes_webhook_url: "{{
+            site.monitoring.sentinel.hermes_webhook_url | default('')
+          }}"
+        sentinel_monitoring_hermes_webhook_secret: "{{
+            lookup('env', 'HERMES_ALERT_BEARER') | default('', true)
+          }}"

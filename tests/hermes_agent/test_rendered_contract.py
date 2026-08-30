@@ -71,6 +71,8 @@ def assert_defaults() -> None:
         raise SystemExit("Proxmox API access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_grafana_enabled"]:
         raise SystemExit("Grafana MCP access must stay disabled until a site opts in")
+    if DEFAULTS["hermes_agent_webhook_enabled"]:
+        raise SystemExit("Alertmanager adapter must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_runtime_user"] in ("root", ""):
         raise SystemExit("runtime user must be a non-root identity")
     if int(DEFAULTS["hermes_agent_runtime_uid"]) <= 0:
@@ -459,6 +461,10 @@ def assert_grafana_mcp_sidecar() -> None:
         raise SystemExit("grafana-mcp must use --address, not -addr")
     if "--address" not in compose:
         raise SystemExit("grafana-mcp must pass --address")
+    if "--enabled-tools" not in compose:
+        raise SystemExit("grafana-mcp must pass --enabled-tools")
+    if "prometheus" not in compose or "loki" not in compose:
+        raise SystemExit("grafana-mcp must enable prometheus and loki query tools")
     env_file = DEFAULTS["hermes_agent_grafana_mcp_env_file"]
     if env_file not in compose:
         raise SystemExit("grafana-mcp env_file must stay outside the policy mount")
@@ -507,6 +513,74 @@ def assert_grafana_mcp_sidecar() -> None:
     print("grafana mcp: --address, sidecar env, subnet RETURN, apply checks")
 
 
+def assert_alert_adapter() -> None:
+    if DEFAULTS["hermes_agent_webhook_enabled"]:
+        raise SystemExit("Alertmanager adapter must stay disabled until a site opts in")
+    if DEFAULTS["hermes_agent_alert_env_file"] == (
+        DEFAULTS["hermes_agent_managed_dir"] + "/alert-adapter.env"
+    ):
+        raise SystemExit("adapter env must stay outside the Hermes policy mount")
+    bearer = "alert-bearer-secret-16"
+    hmac_secret = "hermes-hmac-secret-16"
+    compose = render(
+        "compose.yaml.j2",
+        hermes_agent_webhook_enabled=True,
+        hermes_agent_grafana_enabled=True,
+    )
+    if "127.0.0.1:8644:8644" not in compose:
+        raise SystemExit("Hermes webhook must bind loopback 8644 only")
+    if "8787:8787" in compose:
+        raise SystemExit("adapter LAN port must not be published by Compose")
+    config = render(
+        "config.yaml.j2",
+        hermes_agent_webhook_enabled=True,
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_telegram_admin_id=TELEGRAM_USER,
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_mcp_server_token="mcp-caller-secret-not-for-logs",
+    )
+    if "homelab-ops" not in config or "toolsets: []" not in config:
+        raise SystemExit("webhook route must be homelab-ops with an empty toolset")
+    if "deliver: telegram" not in config:
+        raise SystemExit("alert route must deliver to Telegram")
+    if hmac_secret in config or bearer in config:
+        raise SystemExit("Hermes config must not hold adapter secrets")
+    managed = render(
+        "managed.env.j2",
+        hermes_agent_telegram_bot_token=SECRET_TOKEN,
+        hermes_agent_provider_api_key="",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_provider_env_name="",
+        hermes_agent_webhook_enabled=True,
+        hermes_agent_webhook_hmac_secret=hmac_secret,
+    )
+    if "WEBHOOK_ENABLED=true" not in managed or hmac_secret not in managed:
+        raise SystemExit("managed .env must enable the loopback webhook and HMAC secret")
+    adapter_env = render(
+        "alert-adapter.env.j2",
+        hermes_agent_alert_ipv4="192.0.2.17",
+        hermes_agent_alert_allow_ipv4="192.0.2.11",
+        hermes_agent_alert_bearer_token=bearer,
+        hermes_agent_webhook_hmac_secret=hmac_secret,
+    )
+    if "ADAPTER_LISTEN_HOST=192.0.2.17" not in adapter_env:
+        raise SystemExit("adapter must bind the Hermes guest IPv4")
+    if "127.0.0.1:8644/webhooks/homelab-ops" not in adapter_env:
+        raise SystemExit("adapter must POST to loopback Hermes webhook")
+    if 'dest: "{{ hermes_agent_managed_dir }}/alert-adapter.env"' in PRESENT:
+        raise SystemExit("present.yml must not write adapter env into the policy mount")
+    if "alertmanager_adapter.py" not in PRESENT:
+        raise SystemExit("present.yml must install the adapter script")
+    if "{{ hermes_agent_alert_unit }}" not in PRESENT:
+        raise SystemExit("present.yml must install the adapter unit")
+    if "{{ hermes_agent_alert_env_file }}" not in ABSENT:
+        raise SystemExit("absent.yml must remove the adapter env file")
+    soul = render("SOUL.md.j2", hermes_agent_webhook_enabled=True)
+    if "loopback" not in soul or "Raw email" not in soul:
+        raise SystemExit("SOUL.md must describe the Alertmanager adapter boundary")
+    print("alert adapter: loopback webhook, LAN listener, secrets off Compose")
+
+
 def main() -> None:
     assert_defaults()
     assert_compose_isolation()
@@ -519,6 +593,7 @@ def main() -> None:
     assert_github_draft_pr_helpers()
     assert_pve_read_only_helpers()
     assert_grafana_mcp_sidecar()
+    assert_alert_adapter()
     print("hermes_agent rendered contract ok")
 
 

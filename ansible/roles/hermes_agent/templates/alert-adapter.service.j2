@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes Alertmanager adapter
+After=docker.service {{ hermes_agent_egress_unit }}
+Requires=docker.service
+
+[Service]
+Type=simple
+User={{ hermes_agent_runtime_user }}
+Group={{ hermes_agent_runtime_group }}
+EnvironmentFile={{ hermes_agent_alert_env_file }}
+ExecStart=/usr/bin/python3 {{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

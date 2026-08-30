@@ -68,6 +68,7 @@ flowchart TB
   subgraph hermes["Hermes guest"]
     agent["Official Hermes container"]
     grafanaMcp["Grafana MCP sidecar"]
+    adapter["Alertmanager adapter"]
   end
 
   subgraph cameras["Cameras"]
@@ -109,6 +110,8 @@ flowchart TB
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
   richProm -->|"selected alerts"| guard
+  guard -->|"bearer webhook"| adapter
+  adapter -->|"HMAC-v2 loopback"| agent
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
@@ -155,7 +158,8 @@ How traffic and data move:
   the model provider are outbound only. RFC1918 and link-local destinations
   stay dropped except an optional GET-only Proxmox API hole to the hypervisor
   on TCP 8006. There is no Docker socket, Caddy route, dashboard, or public
-  ingress for Hermes.
+  ingress for Hermes. An optional host adapter may listen on the guest LAN
+  for Sentinel Alertmanager; the Hermes webhook itself stays on loopback.
 
 ```mermaid
 flowchart LR
