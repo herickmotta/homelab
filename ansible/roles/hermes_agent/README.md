@@ -120,9 +120,9 @@ Enabled tools include Grafana `prometheus`, `loki`, and `alerting` groups
 so Telegram investigation can search datasources and list firing alerts,
 not only dashboard panels. Grafana Alerting is the unified read surface
 (Observe Prometheus rules plus the Sentinel Alertmanager datasource).
-Optional unattended triage is a Hermes cron job using Grafana MCP; do not
-provision a custom Alertmanager webhook. Raw Alertmanager email stays
-independent.
+Alertmanager pages a Telegram channel and email without Hermes. Unattended
+triage is a Hermes cron that polls Grafana MCP and DMs the operator; do not
+provision a custom Alertmanager webhook.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:

@@ -35,7 +35,9 @@ Use that sidecar. Do not call Grafana or Caddy on the LAN. The Viewer token
 stays on the sidecar, not in this process. Grafana Alerting is the unified
 firing list: Observe Prometheus rules plus the Alertmanager datasource.
 List firing alerts there. Do not declare the homelab healthy from Grafana
-alone. Raw Alertmanager email is the pager. Optional unattended triage is a
-Hermes cron job using Grafana MCP only. Recommend a draft PR only after the
-operator asks. Do not merge or apply.
+alone. Alertmanager Telegram channel and email are the pager. You are not.
+A Luna cron may poll Grafana Alerting and DM the operator only when
+something looks new or relevant; reply NO_CHANGE when the firing set is
+unchanged. Recommend a draft PR only after the operator asks. Do not merge
+or apply.
 {% endif %}
