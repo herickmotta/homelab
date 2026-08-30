@@ -134,3 +134,25 @@ argument_specs:
         type: bool
       hermes_agent_pve_port:
         type: int
+      hermes_agent_grafana_enabled:
+        type: bool
+      hermes_agent_grafana_ipv4:
+        type: str
+      hermes_agent_grafana_port:
+        type: int
+      hermes_agent_grafana_url:
+        type: str
+      hermes_agent_grafana_viewer_token:
+        type: str
+      hermes_agent_grafana_mcp_server_token:
+        type: str
+      hermes_agent_grafana_image_repository:
+        type: str
+      hermes_agent_grafana_image_digest:
+        type: str
+      hermes_agent_grafana_mcp_address:
+        type: str
+      hermes_agent_grafana_mcp_host:
+        type: str
+      hermes_agent_grafana_enabled_tools:
+        type: str

@@ -33,6 +33,9 @@ iptables -A "${CHAIN}" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
 {% if hermes_agent_pve_enabled | bool %}
 iptables -A "${CHAIN}" -d {{ hermes_agent_pve_ipv4 }} -p tcp --dport {{ hermes_agent_pve_port | int }} -j ACCEPT
 {% endif %}
+{% if hermes_agent_grafana_enabled | bool %}
+iptables -A "${CHAIN}" -d {{ hermes_agent_grafana_ipv4 }} -p tcp --dport {{ hermes_agent_grafana_port | int }} -j ACCEPT
+{% endif %}
 iptables -A "${CHAIN}" -d 10.0.0.0/8 -j DROP
 iptables -A "${CHAIN}" -d 172.16.0.0/12 -j DROP
 iptables -A "${CHAIN}" -d 192.168.0.0/16 -j DROP

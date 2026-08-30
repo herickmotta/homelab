@@ -50,6 +50,37 @@ services:
       homelab.hermes.source_commit: "{{ hermes_agent_source_commit }}"
       homelab.hermes.source_repository: "{{ hermes_agent_source_repository }}"
 
+{% if hermes_agent_grafana_enabled | bool %}
+  grafana-mcp:
+    image: "{{ hermes_agent_grafana_image_repository }}@{{ hermes_agent_grafana_image_digest }}"
+    restart: unless-stopped
+    env_file:
+      - "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    command:
+      - --transport
+      - streamable-http
+      - -addr
+      - "{{ hermes_agent_grafana_mcp_address }}"
+      - --allowed-hosts
+      - "{{ hermes_agent_grafana_mcp_host }}"
+      - --disable-write
+      - --enabled-tools
+      - "{{ hermes_agent_grafana_enabled_tools }}"
+    networks:
+      - hermes
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ hermes_agent_log_max_size }}"
+        max-file: "{{ hermes_agent_log_max_file }}"
+    labels:
+      homelab.role: grafana_mcp
+{% endif %}
+
 networks:
   hermes:
     name: "{{ hermes_agent_network_name }}"
