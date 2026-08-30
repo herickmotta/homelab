@@ -234,6 +234,7 @@
     mode: "0644"
   loop:
     - dashboards/overview.json
+    - dashboards/operations.json
     - dashboards/linux.json
     - dashboards/zfs.json
     - dashboards/smart.json
