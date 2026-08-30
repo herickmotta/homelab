@@ -6,10 +6,12 @@ Roles:
 
 - `herickmotta.homelab.guest_base`: Ubuntu guest baseline with Docker,
   Compose, qemu-guest-agent, and growpart so a later `disk_gb` increase
-  expands the root filesystem.
+  expands the root filesystem. Apply does not wait for first-boot SSH;
+  OpenTofu and a retry cover a brand-new guest.
 - `herickmotta.homelab.network_plane`: AdGuard Home, Caddy DNS-01, and
   Tailscale subnet routing on a dedicated guest. Caddy routes are a typed
-  hostname-to-upstream list; AdGuard remains the default route.
+  hostname-to-upstream list; AdGuard remains the default route. Compose
+  rebuilds only when templates change or the project is not running.
 - `herickmotta.homelab.application_runtime`: VirtioFS mounts on the shared
   application VM, including disposable datasets. Optional assert that the
   Intel render node exists after iGPU passthrough.
@@ -34,14 +36,13 @@ Roles:
   policy is reapplied by `systemd-tmpfiles` during boot and each Ansible run;
   no custom helper or service is installed. The role does not change BIOS
   settings or run PowerTOP auto-tuning.
-- `herickmotta.homelab.proxmox_host_storage`: non-destructive ZFS assertions
-  on a Proxmox host. It validates declared pools and serials, configures
-  smartd and packaged ZED, and enables OpenZFS monthly scrub timers. It never
-  creates or repairs pools.
+- `herickmotta.homelab.proxmox_host_storage`: configure smartd, packaged
+  ZED, and OpenZFS monthly scrub timers. It never creates or repairs pools.
+  Live serial/topology inspection is `--tags proof`, not the default apply.
 - `herickmotta.homelab.nas_server`: VirtioFS mounts and SMB3 shares on a
   replaceable NAS VM. Guest access and SMB1 stay disabled. The household
-  account uses a fixed UID/GID, and the role writes an SMB probe to each
-  share.
+  account uses a fixed UID/GID. Optional `nas_server_smb_integration_test`
+  writes an SMB probe to each share; it is off by default.
 - `herickmotta.homelab.host_metrics`: pinned `node_exporter` as a systemd
   unit on guests and the hypervisor. Optional `smartctl_exporter` and
   `zfs_exporter` on the hypervisor. Listen on a site IPv4, not loopback.
@@ -62,18 +63,22 @@ Roles:
   and enables a host firewall. Optional extra TCP ports can be opened from
   management CIDRs so observe can scrape a LAN node exporter. Source-specific
   ingress rules open a single host to a single port, used for observe to
-  Sentinel Alertmanager.
+  Sentinel Alertmanager. Site apply does not run this role; the bootstrap
+  playbook does.
 - `herickmotta.homelab.github_actions_runner`: install and register a
   repository-scoped Actions runner as a systemd service. The bootstrap archive
   and checksum are pinned; GitHub's default runner self-update remains enabled
   for service compatibility. First registration takes a short-lived token;
-  the token is never persisted in site configuration.
+  the token is never persisted in site configuration. Site apply does not
+  re-register the runner.
 - `herickmotta.homelab.sentinel_monitoring`: run a small Prometheus,
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default. A typed LAN bind can expose Alertmanager to the
   observe guest only. A loopback Hermes webhook input exists but stays empty
   until that role is enabled; email routing remains independent.
+  Compose recreates only when templates change or the project is
+  not running.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
   dedicated Proxmox guest. Retention is longer than Sentinel. Grafana binds
   the guest LAN for Caddy; Prometheus may bind the guest address for later

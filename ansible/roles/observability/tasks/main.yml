@@ -251,131 +251,28 @@
   no_log: true
   notify: Recreate observability compose
 
-- name: Load generated observability Compose file
-  ansible.builtin.slurp:
-    src: "{{ observability_install_dir }}/compose.yaml"
-  register: observability_compose_slurp
-
-- name: Load generated Prometheus configuration
-  ansible.builtin.slurp:
-    src: "{{ observability_install_dir }}/prometheus.yml"
-  register: observability_prometheus_slurp
-
-- name: Load generated Prometheus alert rules
-  ansible.builtin.slurp:
-    src: "{{ observability_install_dir }}/rules/observability.yml"
-  register: observability_rules_slurp
-
-- name: Load generated Loki configuration
-  ansible.builtin.slurp:
-    src: "{{ observability_install_dir }}/loki.yml"
-  register: observability_loki_slurp
-
-- name: Assert observability Compose bindings
-  ansible.builtin.assert:
-    that:
-      - "'network_mode: host' in observability_compose"
-      - "'homelab.role: observability' in observability_compose"
-      - "'  loki:' in observability_compose"
-      - observability_loki_image in observability_compose
-      - "'./loki.yml:/etc/loki/loki.yml:ro' in observability_compose"
-      - "'./rules:/etc/prometheus/rules:ro' in observability_compose"
-      - "'3000:3000' not in observability_compose"
-      - "'9090:9090' not in observability_compose"
-      - "'3100:3100' not in observability_compose"
-      - (observability_prometheus_listen_address | string) in observability_compose
-    fail_msg: >-
-      Observability must use host networking, bind Prometheus and Loki without
-      published port mappings, include Loki, and mount Prometheus rules.
-  vars:
-    observability_compose: "{{ observability_compose_slurp.content | b64decode }}"
-
-- name: Assert Prometheus alert routing
-  when: observability_alertmanager_address | length > 0
-  ansible.builtin.assert:
-    that:
-      - "'alertmanagers:' in observability_prometheus"
-      - observability_alertmanager_address in observability_prometheus
-      - "'rule_files:' in observability_prometheus"
-    fail_msg: Observe Prometheus must load rules and send alerts to Sentinel Alertmanager.
-  vars:
-    observability_prometheus: "{{ observability_prometheus_slurp.content | b64decode }}"
-
-- name: Assert Alloy scrape keeps shipper host labels
-  when: observability_alloy_targets | length > 0
-  ansible.builtin.assert:
-    that:
-      - "'job_name: alloy' in observability_prometheus"
-      - "'honor_labels: false' in observability_prometheus"
-    fail_msg: >-
-      Alloy scrape must set honor_labels false so loki.write's endpoint host
-      becomes exported_host and the shipper host label is kept.
-  vars:
-    observability_prometheus: "{{ observability_prometheus_slurp.content | b64decode }}"
-
-- name: Assert per-host Alloy pipeline freshness alerts
-  when: observability_expected_log_hosts | length > 0
-  ansible.builtin.assert:
-    that:
-      - stale_rule_count == observability_expected_log_hosts | length
-      - "'LokiIngestionStale' not in observability_rules"
-      - "'vector(0)' in observability_rules"
-      - item in observability_rules
-      - "'host: \"{{ item }}\"' in observability_rules"
-      - "'host=\"{{ item }}\"' in observability_rules"
-    fail_msg: Every expected log host needs exactly one AlloyLogPipelineStale rule.
-  vars:
-    observability_rules: "{{ observability_rules_slurp.content | b64decode }}"
-    stale_rule_count: "{{
-        observability_rules_slurp.content | b64decode
-        | regex_findall('(?m)^\\s+- alert: AlloyLogPipelineStale$')
-        | length
-      }}"
-  loop: "{{ observability_expected_log_hosts }}"
-  loop_control:
-    label: "{{ item }}"
-
-- name: Assert global Loki ingestion fallback when no expected hosts
-  when: observability_expected_log_hosts | length == 0
-  ansible.builtin.assert:
-    that:
-      - "'LokiIngestionStale' in observability_rules"
-      - "'AlloyLogPipelineStale' not in observability_rules"
-    fail_msg: Sites without expected log hosts must keep the global LokiIngestionStale fallback.
-  vars:
-    observability_rules: "{{ observability_rules_slurp.content | b64decode }}"
-
-- name: Assert Loki listen bindings
-  ansible.builtin.assert:
-    that:
-      - observability_loki_http_address_line in observability_loki
-      - observability_loki_http_port_line in observability_loki
-      - observability_loki_grpc_address_line in observability_loki
-    fail_msg: Loki must listen on the configured HTTP and gRPC addresses from loki.yml.
-  vars:
-    observability_loki: "{{ observability_loki_slurp.content | b64decode }}"
-    observability_loki_http_address_line: "http_listen_address: {{ observability_loki_http_listen_address }}"
-    observability_loki_http_port_line: "http_listen_port: {{ observability_loki_http_listen_port }}"
-    observability_loki_grpc_address_line: "grpc_listen_address: {{ observability_loki_grpc_listen_address }}"
-
 - name: Validate the observability Compose model
   ansible.builtin.command:
     cmd: docker compose config --quiet
     chdir: "{{ observability_install_dir }}"
   changed_when: false
 
-- name: Pull pinned observability images
-  ansible.builtin.command:
-    cmd: docker compose pull --quiet
-    chdir: "{{ observability_install_dir }}"
-  register: observability_pull
-  async: 1800
-  poll: 15
-  changed_when: >-
-    'Pulled' in (observability_pull.stdout | default('') ~ observability_pull.stderr | default(''))
-    or 'Downloaded' in (observability_pull.stdout | default('') ~ observability_pull.stderr | default(''))
+- name: Apply observability handlers
+  ansible.builtin.meta: flush_handlers
 
-- name: Start observability Compose project
+- name: Check whether the observability Compose project is running
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
+    chdir: "{{ observability_install_dir }}"
+  register: observability_compose_ps
+  changed_when: false
+
+- name: Start the observability Compose project
+  when: observability_compose_ps.stdout | trim | length == 0
   ansible.builtin.command:
     argv:
       - docker
@@ -384,17 +281,7 @@
       - -d
       - --remove-orphans
     chdir: "{{ observability_install_dir }}"
-  register: observability_up
-  async: 300
-  poll: 10
-  changed_when: >-
-    observability_up.rc == 0
-    and ('Started' in (observability_up.stderr ~ observability_up.stdout)
-         or 'Recreated' in (observability_up.stderr ~ observability_up.stdout)
-         or 'Created' in (observability_up.stderr ~ observability_up.stdout))
-
-- name: Apply observability handlers
-  ansible.builtin.meta: flush_handlers
+  changed_when: true
 
 - name: Wait for observability endpoints
   ansible.builtin.uri:

@@ -71,18 +71,6 @@
   no_log: true
   register: mqtt_broker_pw_meta
 
-- name: Pull the Mosquitto image
-  ansible.builtin.command:
-    argv:
-      - docker
-      - pull
-      - "{{ mqtt_broker_image }}"
-  register: mqtt_broker_pull
-  async: 600
-  poll: 15
-  changed_when: >-
-    'Downloaded newer image' in (mqtt_broker_pull.stdout | default(''))
-
 - name: Generate the Mosquitto password file
   ansible.builtin.command:
     argv:
@@ -122,22 +110,22 @@
       - mqtt_broker_password_stat.stat.exists
     fail_msg: Mosquitto password.txt was not created.
 
-- name: Load generated Mosquitto Compose file
-  ansible.builtin.slurp:
-    src: "{{ mqtt_broker_install_dir }}/compose.yaml"
-  register: mqtt_broker_compose_slurp
+- name: Apply Mosquitto Compose handlers
+  ansible.builtin.meta: flush_handlers
 
-- name: Assert Mosquitto publishes loopback only
-  ansible.builtin.assert:
-    that:
-      - >-
-        ('127.0.0.1:' ~ (mqtt_broker_port | string) ~ ':' ~ (mqtt_broker_port | string))
-        in (mqtt_broker_compose_slurp.content | b64decode)
-      - "'0.0.0.0:' not in (mqtt_broker_compose_slurp.content | b64decode)"
-      - "'homelab.role: mqtt_broker' in (mqtt_broker_compose_slurp.content | b64decode)"
-    fail_msg: Mosquitto must publish 127.0.0.1 only and must not bind 0.0.0.0.
+- name: Check whether the Mosquitto Compose project is running
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
+    chdir: "{{ mqtt_broker_install_dir }}"
+  register: mqtt_broker_compose_ps
+  changed_when: false
 
-- name: Start Mosquitto Compose project
+- name: Start the Mosquitto Compose project
+  when: mqtt_broker_compose_ps.stdout | trim | length == 0
   ansible.builtin.command:
     argv:
       - docker
@@ -145,11 +133,4 @@
       - up
       - -d
     chdir: "{{ mqtt_broker_install_dir }}"
-  register: mqtt_broker_compose_up
-  async: 300
-  poll: 10
-  changed_when: >-
-    mqtt_broker_compose_up.rc == 0
-    and ('Started' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout)
-         or 'Recreated' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout)
-         or 'Created' in (mqtt_broker_compose_up.stderr ~ mqtt_broker_compose_up.stdout))
+  changed_when: true

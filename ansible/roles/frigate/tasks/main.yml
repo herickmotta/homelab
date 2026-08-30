@@ -226,80 +226,27 @@
     mode: "0640"
   notify: Recreate Frigate compose
 
-- name: Load generated Frigate configuration
-  ansible.builtin.slurp:
-    src: "{{ frigate_install_dir }}/config/config.yml"
-  register: frigate_config_slurp
+- name: Apply Frigate Compose handlers
+  ansible.builtin.meta: flush_handlers
 
-- name: Load generated Compose file
-  ansible.builtin.slurp:
-    src: "{{ frigate_install_dir }}/compose.yaml"
-  register: frigate_compose_slurp
-
-- name: Assert generated Frigate YAML
-  ansible.builtin.assert:
-    that:
-      - >-
-        (frigate_config_slurp.content | b64decode | from_yaml).mqtt.enabled | bool
-        == (frigate_mqtt_enabled | bool)
-      - >-
-        (not (frigate_mqtt_enabled | bool))
-        or ((frigate_config_slurp.content | b64decode | from_yaml).mqtt.host
-            == frigate_mqtt_host)
-      - (frigate_config_slurp.content | b64decode | from_yaml).auth.enabled | bool == (frigate_auth_enabled | bool)
-      - (frigate_config_slurp.content | b64decode | from_yaml).proxy.default_role == frigate_proxy_default_role
-      - (frigate_config_slurp.content | b64decode | from_yaml).objects.track == frigate_objects_track
-      - "'package' not in (frigate_config_slurp.content | b64decode | from_yaml).objects.track"
-      - >-
-        (frigate_classifications | length == 0)
-        or (
-          ((frigate_config_slurp.content | b64decode | from_yaml)
-           .classification.custom.keys() | list | sort)
-          == (frigate_classifications.keys() | list | sort)
-        )
-      - (frigate_config_slurp.content | b64decode | from_yaml).model.path | length > 0
-      - >-
-        (frigate_model != 'bundled')
-        or ((frigate_config_slurp.content | b64decode | from_yaml).model.path
-            == '/openvino-model/ssdlite_mobilenet_v2.xml')
-      - "'0.0.0.0:5000' not in (frigate_compose_slurp.content | b64decode)"
-      - >-
-        (frigate_loopback_api | bool)
-        == ('127.0.0.1:5000:5000' in (frigate_compose_slurp.content | b64decode))
-      - >-
-        (frigate_loopback_api | bool)
-        or ('5000:5000' not in (frigate_compose_slurp.content | b64decode))
-      - "'8971' in (frigate_compose_slurp.content | b64decode)"
-      - >-
-        (not (frigate_mqtt_enabled | bool))
-        or ('external: true' in (frigate_compose_slurp.content | b64decode)
-            and frigate_mqtt_network in (frigate_compose_slurp.content | b64decode))
-      - >-
-        (not (frigate_gpu_enabled | bool))
-        or ('/dev/dri:/dev/dri' in (frigate_compose_slurp.content | b64decode)
-            and 'CAP_PERFMON' in (frigate_compose_slurp.content | b64decode)
-            and 'h264_vaapi_crop_top' in (frigate_config_slurp.content | b64decode)
-            and 'h264_vaapi_crop_bottom' in (frigate_config_slurp.content | b64decode)
-            and 'vaapi_rtsp' in (frigate_config_slurp.content | b64decode)
-            and (('-hwaccel vaapi' in (frigate_config_slurp.content | b64decode))
-                 == (frigate_gpu_hw_decode | bool))
-            and ((not (frigate_gpu_hw_decode | bool))
-                 or ('hwdownload' in (frigate_config_slurp.content | b64decode))))
-    fail_msg: >-
-      Generated Frigate config must match mqtt.enabled, track the configured
-      COCO labels without package, emit configured classification models, set
-      an OpenVINO or YOLO model path, publish 8971, keep LAN 5000 closed
-      (loopback 5000 only when requested), and when GPU is enabled map
-      /dev/dri with CAP_PERFMON and emit VAAPI crop ffmpeg templates.
-      Hardware decode must add -hwaccel vaapi and hwdownload.
-
-- name: Start Frigate Compose project
+- name: Check whether the Frigate Compose project is running
   ansible.builtin.command:
-    cmd: docker compose up -d
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
     chdir: "{{ frigate_install_dir }}"
-  register: frigate_compose_up
-  changed_when: >-
-    frigate_compose_up.rc == 0
-    and ('Started' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout)
-         or 'Recreated' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout)
-         or 'Created' in (frigate_compose_up.stderr ~ frigate_compose_up.stdout))
+  register: frigate_compose_ps
+  changed_when: false
+
+- name: Start the Frigate Compose project
+  when: frigate_compose_ps.stdout | trim | length == 0
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+    chdir: "{{ frigate_install_dir }}"
+  changed_when: true

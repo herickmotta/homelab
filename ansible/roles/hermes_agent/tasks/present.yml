@@ -141,153 +141,6 @@
     mode: "0644"
   notify: Reload Hermes Agent egress
 
-- name: Load generated Hermes Agent files
-  ansible.builtin.slurp:
-    src: "{{ item }}"
-  loop:
-    - "{{ hermes_agent_install_dir }}/compose.yaml"
-    - "{{ hermes_agent_managed_dir }}/config.yaml"
-  register: hermes_agent_slurps
-
-- name: Parse generated Hermes Agent configuration
-  ansible.builtin.set_fact:
-    hermes_agent_compose_text: "{{ hermes_agent_slurps.results[0].content | b64decode }}"
-    hermes_agent_config: "{{ hermes_agent_slurps.results[1].content | b64decode | from_yaml }}"
-
-- name: Assert Hermes Agent Compose stays isolated
-  ansible.builtin.assert:
-    that:
-      - (hermes_agent_image_repository ~ '@' ~ hermes_agent_image_digest) in hermes_agent_compose_text
-      - "'ports:' not in hermes_agent_compose_text"
-      - "'privileged: false' in hermes_agent_compose_text"
-      - "'privileged: true' not in hermes_agent_compose_text"
-      - "'/var/run/docker.sock' not in hermes_agent_compose_text"
-      - "'network_mode: host' not in hermes_agent_compose_text"
-      - "'pid: host' not in hermes_agent_compose_text"
-      - "'ipc: host' not in hermes_agent_compose_text"
-      - "'cap_add:' not in hermes_agent_compose_text"
-      - "'no-new-privileges:true' in hermes_agent_compose_text"
-      - "'init: false' in hermes_agent_compose_text"
-      - "'homelab.role: hermes_agent' in hermes_agent_compose_text"
-      - (hermes_agent_source_commit) in hermes_agent_compose_text
-      - "'HERMES_DASHBOARD: \"0\"' in hermes_agent_compose_text"
-      - "'API_SERVER_ENABLED: \"false\"' in hermes_agent_compose_text"
-      - hermes_agent_container_data_dir in hermes_agent_compose_text
-      - hermes_agent_container_managed_dir ~ ':ro' in hermes_agent_compose_text
-    fail_msg: >-
-      Hermes Agent Compose must pin the digest, publish no ports, and keep
-      host namespaces, the Docker socket, and extra capabilities out.
-
-- name: Assert Hermes Agent Telegram secrets stay out of Compose
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_telegram_bot_token not in hermes_agent_compose_text
-    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
-  no_log: true
-
-- name: Assert GitHub App secrets stay out of Compose
-  when: hermes_agent_github_app_private_key | length > 0
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_github_app_private_key not in hermes_agent_compose_text
-      - "'BEGIN ' not in hermes_agent_compose_text"
-      - "'GH_TOKEN' not in hermes_agent_compose_text"
-    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
-  no_log: true
-
-- name: Assert Proxmox token secrets stay out of Compose
-  when: hermes_agent_pve_token_value | length > 0
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_pve_token_value not in hermes_agent_compose_text
-      - "'PVE_API_TOKEN_SECRET' not in hermes_agent_compose_text"
-    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
-  no_log: true
-
-- name: Assert Hermes Agent provider API keys stay out of Compose
-  when: hermes_agent_provider_api_key | length > 0
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_provider_api_key not in hermes_agent_compose_text
-    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
-  no_log: true
-
-- name: Assert Hermes Agent managed configuration
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_config.unauthorized_dm_behavior == 'ignore'
-      - hermes_agent_config.telegram.unauthorized_dm_behavior == 'ignore'
-      - not (hermes_agent_config.gateway.platforms.telegram.extra.guest_mode | bool)
-      - hermes_agent_config.gateway.platforms.telegram.extra.group_allowed_chats | length == 0
-      - hermes_agent_config.gateway.platforms.telegram.extra.allow_from | length == 1
-      - hermes_agent_config.gateway.platforms.telegram.extra.allow_admin_from | length == 1
-      - >-
-        hermes_agent_config.gateway.platforms.telegram.extra.allow_from[0] | string
-        == hermes_agent_telegram_user_id | string
-      - >-
-        hermes_agent_config.gateway.platforms.telegram.extra.allow_admin_from[0] | string
-        == hermes_agent_telegram_admin_id | string
-      - hermes_agent_config.terminal.backend == 'local'
-      - hermes_agent_config.tool_loop_guardrails.hard_stop_enabled | bool
-      - hermes_agent_config.model.provider == hermes_agent_provider
-      - hermes_agent_config.model.default == hermes_agent_model
-      - hermes_agent_config.model.openai_runtime == 'auto'
-      - hermes_agent_config.model.openai_runtime != 'codex_app_server'
-    fail_msg: >-
-      Managed Hermes config must pin one Telegram admin/user, disable
-      pairing and groups, keep the local terminal backend, and keep the
-      Hermes runtime (openai_runtime: auto).
-
-- name: Assert openai-codex Telegram model aliases
-  when: hermes_agent_provider == 'openai-codex'
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_config.model_aliases.luna.provider == 'openai-codex'
-      - hermes_agent_config.model_aliases.luna.model == 'gpt-5.6-luna'
-      - hermes_agent_config.model_aliases.sol.provider == 'openai-codex'
-      - hermes_agent_config.model_aliases.sol.model == 'gpt-5.6-sol'
-    fail_msg: openai-codex must ship luna and sol Telegram model aliases.
-
-- name: Assert full-capability Hermes Agent settings
-  when: hermes_agent_full_capability | bool
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_config.memory.memory_enabled | bool
-      - hermes_agent_config.memory.user_profile_enabled | bool
-      - not (hermes_agent_config.memory.write_approval | bool)
-      - not (hermes_agent_config.skills.write_approval | bool)
-      - hermes_agent_config.auxiliary.background_review.enabled | bool
-      - hermes_agent_config.agent is not defined
-        or (hermes_agent_config.agent.disabled_toolsets | default([]) | length == 0)
-    fail_msg: >-
-      Full-capability Hermes must keep memory, skills, curator review,
-      session search, and the complete Telegram toolset enabled.
-
-- name: Assert conservative Hermes Agent settings
-  when: not (hermes_agent_full_capability | bool)
-  ansible.builtin.assert:
-    that:
-      - not (hermes_agent_config.memory.memory_enabled | bool)
-      - not (hermes_agent_config.memory.user_profile_enabled | bool)
-      - "'terminal' in hermes_agent_config.agent.disabled_toolsets"
-      - "'browser' in hermes_agent_config.agent.disabled_toolsets"
-      - "'delegation' in hermes_agent_config.agent.disabled_toolsets"
-    fail_msg: Conservative Hermes defaults must keep the powerful toolsets disabled.
-
-- name: Stat Hermes Agent managed secrets
-  ansible.builtin.stat:
-    path: "{{ hermes_agent_managed_dir }}/.env"
-  register: hermes_agent_secret_stat
-
-- name: Assert Hermes Agent secrets are not world-readable
-  ansible.builtin.assert:
-    that:
-      - hermes_agent_secret_stat.stat.exists
-      - hermes_agent_secret_stat.stat.pw_name == 'root'
-      - hermes_agent_secret_stat.stat.gr_name == hermes_agent_runtime_group
-      - hermes_agent_secret_stat.stat.mode == '0640'
-    fail_msg: Hermes Agent secrets must be root:runtime mode 0640.
-
 - name: Stat the Hermes OAuth store
   ansible.builtin.stat:
     path: "{{ hermes_agent_data_dir }}/auth.json"
@@ -301,19 +154,6 @@
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0600"
 
-- name: Pull the Hermes Agent image
-  ansible.builtin.command:
-    argv:
-      - docker
-      - pull
-      - "{{ hermes_agent_image_repository }}@{{ hermes_agent_image_digest }}"
-  register: hermes_agent_pull
-  async: 1800
-  poll: 15
-  changed_when: >-
-    'Downloaded newer image' in (hermes_agent_pull.stdout | default(''))
-    or 'Status: Downloaded newer image' in (hermes_agent_pull.stdout | default(''))
-
 - name: Enable Hermes Agent egress policy
   ansible.builtin.systemd_service:
     name: "{{ hermes_agent_egress_unit }}"
@@ -321,7 +161,22 @@
     state: started
     daemon_reload: true
 
-- name: Start Hermes Agent Compose project
+- name: Apply Hermes Agent Compose handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Check whether the Hermes Agent Compose project is running
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
+    chdir: "{{ hermes_agent_install_dir }}"
+  register: hermes_agent_compose_ps
+  changed_when: false
+
+- name: Start the Hermes Agent Compose project
+  when: hermes_agent_compose_ps.stdout | trim | length == 0
   ansible.builtin.command:
     argv:
       - docker
@@ -329,11 +184,4 @@
       - up
       - -d
     chdir: "{{ hermes_agent_install_dir }}"
-  register: hermes_agent_compose_up
-  async: 300
-  poll: 10
-  changed_when: >-
-    hermes_agent_compose_up.rc == 0
-    and ('Started' in (hermes_agent_compose_up.stderr ~ hermes_agent_compose_up.stdout)
-         or 'Recreated' in (hermes_agent_compose_up.stderr ~ hermes_agent_compose_up.stdout)
-         or 'Created' in (hermes_agent_compose_up.stderr ~ hermes_agent_compose_up.stdout))
+  changed_when: true

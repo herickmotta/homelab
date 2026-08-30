@@ -27,7 +27,8 @@ argument_specs:
         default: /etc/samba/smb.conf
       nas_server_smb_integration_test:
         type: bool
-        default: true
+        default: false
+        description: Write an SMB3 probe to each share. Off for normal apply.
       nas_server_retired_units:
         type: list
         elements: str

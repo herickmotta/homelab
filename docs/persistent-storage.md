@@ -60,17 +60,18 @@ bootstrap documentation.
 
 ## Ansible
 
-`herickmotta.homelab.proxmox_host_storage` is non-destructive. It asserts
-declared serials, pool topology, datasets, and mountpoints; configures smartd
-short/long tests; edits the packaged ZED `zed.rc` with `lineinfile` only;
-enables OpenZFS `zfs-scrub-monthly@<pool>.timer`; and sets a stable numeric
-owner on NAS-exported datasets. It never creates, destroys, imports, replaces,
-or clears ZFS topology.
+`herickmotta.homelab.proxmox_host_storage` is non-destructive. Default
+apply writes smartd, packaged ZED `zed.rc` via `lineinfile`, OpenZFS
+`zfs-scrub-monthly@<pool>.timer`, and a stable numeric owner on NAS-exported
+datasets. Live serial, topology, and mountpoint inspection is
+`ansible-playbook --tags proof`. The role never creates, destroys, imports,
+replaces, or clears ZFS topology.
 
 `herickmotta.homelab.nas_server` mounts declared VirtioFS filesystems, creates
-the household Samba account with a fixed UID/GID, configures SMB3 without
-guest access or SMB1, and writes a probe file to each share to confirm the
-file appears on the matching guest path only.
+the household Samba account with a fixed UID/GID, and configures SMB3 without
+guest access or SMB1. An optional SMB probe (`nas_server_smb_integration_test`)
+can confirm each share writes only to its matching guest path; it is off
+by default.
 
 `herickmotta.homelab.host_metrics` installs pinned `node_exporter`,
 optional `smartctl_exporter`, and optional `zfs_exporter` as systemd

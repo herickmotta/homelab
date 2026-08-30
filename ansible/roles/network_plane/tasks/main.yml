@@ -91,6 +91,7 @@
     name: tailscale
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Enable tailscaled
   ansible.builtin.service:
@@ -193,14 +194,28 @@
   no_log: true
   notify: Recreate network-plane adguard
 
-- name: Start network-plane Compose project
+- name: Apply network-plane Compose handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Check whether the network-plane Compose project is running
   ansible.builtin.command:
-    cmd: docker compose up -d --build
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
     chdir: "{{ network_plane_install_dir }}"
-  register: network_plane_compose_up
-  changed_when: >-
-    network_plane_compose_up.rc == 0
-    and ('Started' in
-         (network_plane_compose_up.stderr ~ network_plane_compose_up.stdout)
-         or 'Built' in
-         (network_plane_compose_up.stderr ~ network_plane_compose_up.stdout))
+  register: network_plane_compose_ps
+  changed_when: false
+
+- name: Start the network-plane Compose project
+  when: network_plane_compose_ps.stdout | trim | length == 0
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --build
+    chdir: "{{ network_plane_install_dir }}"
+  changed_when: true

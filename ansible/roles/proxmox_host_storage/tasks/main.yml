@@ -117,141 +117,146 @@
       SMTP alerting needs destination, host, and password together. Leave all
       empty to keep smartd, ZED, and Netdata without mail.
 
-- name: Inspect declared disk by-id paths
-  ansible.builtin.stat:
-    path: "{{ item.by_id }}"
-  register: proxmox_host_storage_disk_stat
-  loop: "{{ proxmox_host_storage_disks }}"
-  loop_control:
-    label: "{{ item.serial }}"
+- name: Prove declared ZFS disks, pools, and datasets
+  tags:
+    - never
+    - proof
+  block:
+    - name: Inspect declared disk by-id paths
+      ansible.builtin.stat:
+        path: "{{ item.by_id }}"
+      register: proxmox_host_storage_disk_stat
+      loop: "{{ proxmox_host_storage_disks }}"
+      loop_control:
+        label: "{{ item.serial }}"
 
-- name: Require declared disks to be present
-  ansible.builtin.assert:
-    that:
-      - item.stat.exists
-    fail_msg: >-
-      Declared disk {{ item.item.serial }} is missing at {{ item.item.by_id }}.
-  loop: "{{ proxmox_host_storage_disk_stat.results }}"
-  loop_control:
-    label: "{{ item.item.serial }}"
+    - name: Require declared disks to be present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: >-
+          Declared disk {{ item.item.serial }} is missing at {{ item.item.by_id }}.
+      loop: "{{ proxmox_host_storage_disk_stat.results }}"
+      loop_control:
+        label: "{{ item.item.serial }}"
 
-- name: Inspect declared pools
-  ansible.builtin.command:
-    argv:
-      - zpool
-      - list
-      - -H
-      - -o
-      - name,health
-      - "{{ item.value.name | default(item.key) }}"
-  register: proxmox_host_storage_pool_list
-  changed_when: false
-  failed_when: false
-  loop: "{{ proxmox_host_storage_pools | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
+    - name: Inspect declared pools
+      ansible.builtin.command:
+        argv:
+          - zpool
+          - list
+          - -H
+          - -o
+          - name,health
+          - "{{ item.value.name | default(item.key) }}"
+      register: proxmox_host_storage_pool_list
+      changed_when: false
+      failed_when: false
+      loop: "{{ proxmox_host_storage_pools | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
 
-- name: Require declared pools to be imported
-  ansible.builtin.assert:
-    that:
-      - item.rc == 0
-      - item.stdout | length > 0
-    fail_msg: >-
-      Pool {{ item.item.key }} is not imported. Create it with the documented
-      destructive bootstrap; this role will not.
-  loop: "{{ proxmox_host_storage_pool_list.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
+    - name: Require declared pools to be imported
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+          - item.stdout | length > 0
+        fail_msg: >-
+          Pool {{ item.item.key }} is not imported. Create it with the documented
+          destructive bootstrap; this role will not.
+      loop: "{{ proxmox_host_storage_pool_list.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
 
-- name: Inspect pool topology
-  ansible.builtin.command:
-    argv:
-      - zpool
-      - status
-      - -P
-      - "{{ item.value.name | default(item.key) }}"
-  register: proxmox_host_storage_pool_status
-  changed_when: false
-  loop: "{{ proxmox_host_storage_pools | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
+    - name: Inspect pool topology
+      ansible.builtin.command:
+        argv:
+          - zpool
+          - status
+          - -P
+          - "{{ item.value.name | default(item.key) }}"
+      register: proxmox_host_storage_pool_status
+      changed_when: false
+      loop: "{{ proxmox_host_storage_pools | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
 
-- name: Assert pool topology and member disks
-  ansible.builtin.assert:
-    that:
-      - item.item.value.topology != "raidz1" or "raidz1" in item.stdout
-      - item.item.value.topology != "stripe" or "raidz" not in item.stdout
-      - >-
-        item.item.value.disks
-        | map(attribute='by_id')
-        | reject('in', item.stdout)
-        | list
-        | length == 0
-    fail_msg: >-
-      Pool {{ item.item.key }} topology or member disks do not match the
-      declared serial-based layout.
-  loop: "{{ proxmox_host_storage_pool_status.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
+    - name: Assert pool topology and member disks
+      ansible.builtin.assert:
+        that:
+          - item.item.value.topology != "raidz1" or "raidz1" in item.stdout
+          - item.item.value.topology != "stripe" or "raidz" not in item.stdout
+          - >-
+            item.item.value.disks
+            | map(attribute='by_id')
+            | reject('in', item.stdout)
+            | list
+            | length == 0
+        fail_msg: >-
+          Pool {{ item.item.key }} topology or member disks do not match the
+          declared serial-based layout.
+      loop: "{{ proxmox_host_storage_pool_status.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
 
-- name: Inspect declared datasets
-  ansible.builtin.command:
-    argv:
-      - zfs
-      - list
-      - -H
-      - -o
-      - name,mounted,mountpoint
-      - "{{ item.value.dataset }}"
-  register: proxmox_host_storage_dataset_list
-  changed_when: false
-  failed_when: false
-  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
+    - name: Inspect declared datasets
+      ansible.builtin.command:
+        argv:
+          - zfs
+          - list
+          - -H
+          - -o
+          - name,mounted,mountpoint
+          - "{{ item.value.dataset }}"
+      register: proxmox_host_storage_dataset_list
+      changed_when: false
+      failed_when: false
+      loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
 
-- name: Require declared datasets to be mounted
-  ansible.builtin.assert:
-    that:
-      - item.rc == 0
-      - (item.stdout.split('\t') | length) >= 3
-      - item.stdout.split('\t')[1] == "yes"
-      - item.stdout.split('\t')[2] == item.item.value.mountpoint
-    fail_msg: >-
-      Dataset {{ item.item.key }} is missing, unmounted, or not at
-      {{ item.item.value.mountpoint }}.
-  loop: "{{ proxmox_host_storage_dataset_list.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
+    - name: Require declared datasets to be mounted
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+          - (item.stdout.split('\t') | length) >= 3
+          - item.stdout.split('\t')[1] == "yes"
+          - item.stdout.split('\t')[2] == item.item.value.mountpoint
+        fail_msg: >-
+          Dataset {{ item.item.key }} is missing, unmounted, or not at
+          {{ item.item.value.mountpoint }}.
+      loop: "{{ proxmox_host_storage_dataset_list.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
 
-- name: Inspect dataset filesystems
-  ansible.builtin.command:
-    argv:
-      - findmnt
-      - -n
-      - -o
-      - FSTYPE,SOURCE
-      - "{{ item.value.mountpoint }}"
-  register: proxmox_host_storage_dataset_findmnt
-  changed_when: false
-  failed_when: false
-  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
+    - name: Inspect dataset filesystems
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - -n
+          - -o
+          - FSTYPE,SOURCE
+          - "{{ item.value.mountpoint }}"
+      register: proxmox_host_storage_dataset_findmnt
+      changed_when: false
+      failed_when: false
+      loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
 
-- name: Require dataset mountpoints to be ZFS
-  ansible.builtin.assert:
-    that:
-      - item.rc == 0
-      - (item.stdout.split() | length) >= 2
-      - item.stdout.split()[0] == "zfs"
-      - item.stdout.split()[1] == item.item.value.dataset
-    fail_msg: >-
-      {{ item.item.value.mountpoint }} must be ZFS dataset
-      {{ item.item.value.dataset }}.
-  loop: "{{ proxmox_host_storage_dataset_findmnt.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
+    - name: Require dataset mountpoints to be ZFS
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+          - (item.stdout.split() | length) >= 2
+          - item.stdout.split()[0] == "zfs"
+          - item.stdout.split()[1] == item.item.value.dataset
+        fail_msg: >-
+          {{ item.item.value.mountpoint }} must be ZFS dataset
+          {{ item.item.value.dataset }}.
+      loop: "{{ proxmox_host_storage_dataset_findmnt.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
 
 - name: Stop retired custom storage monitors
   ansible.builtin.systemd_service:

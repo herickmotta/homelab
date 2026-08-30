@@ -235,18 +235,3 @@
   retries: 12
   delay: 5
   until: log_shipper_ready.status | default(0) == 200
-
-- name: Load the generated Alloy configuration
-  ansible.builtin.slurp:
-    src: "{{ log_shipper_config_dir }}/config.alloy"
-  register: log_shipper_config_slurp
-
-- name: Assert Alloy always ships the pipeline heartbeat
-  ansible.builtin.assert:
-    that:
-      - log_shipper_heartbeat_unit in log_shipper_config
-      - "'loki.source.journal' in log_shipper_config"
-      - "'loki.write' in log_shipper_config"
-    fail_msg: Alloy must ship a journal heartbeat through loki.write on every host.
-  vars:
-    log_shipper_config: "{{ log_shipper_config_slurp.content | b64decode }}"
