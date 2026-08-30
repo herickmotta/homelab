@@ -504,8 +504,8 @@ def assert_grafana_mcp_sidecar() -> None:
     soul = render("SOUL.md.j2", hermes_agent_grafana_enabled=True)
     if "grafana-mcp" not in soul or "Viewer token" not in soul:
         raise SystemExit("SOUL.md must describe sidecar-only Grafana access")
-    if "Alerting" not in soul or "pager" not in soul:
-        raise SystemExit("SOUL.md must describe Grafana Alerting as the firing list")
+    if "Alerting" not in soul or "Telegram channel" not in soul or "pager" not in soul:
+        raise SystemExit("SOUL.md must describe channel+email paging and Grafana Alerting")
     check = (ROLE / "files/check-grafana-mcp.py").read_text()
     if "socket.gethostbyname" not in check or "healthz" not in check:
         raise SystemExit("acceptance helper must resolve grafana-mcp and hit healthz")
