@@ -8,6 +8,9 @@ datasources:
     url: http://{{ observability_prometheus_listen_address }}
     isDefault: true
     editable: false
+    jsonData:
+      manageAlerts: true
+      prometheusType: Prometheus
   - name: Loki
     uid: loki
     type: loki
@@ -16,3 +19,14 @@ datasources:
     editable: false
     jsonData:
       maxLines: 1000
+{% if observability_alertmanager_address | length > 0 %}
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://{{ observability_alertmanager_address }}
+    editable: false
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+{% endif %}

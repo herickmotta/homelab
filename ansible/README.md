@@ -75,8 +75,8 @@ Roles:
   Alertmanager, Blackbox exporter, node exporter, and optional read-only PVE
   exporter on the Sentinel. Retention is bounded and component endpoints bind
   to loopback by default. A typed LAN bind can expose Alertmanager to the
-  observe guest only. An optional Alertmanager webhook may POST a bearer
-  payload to the Hermes guest adapter; email routing remains independent.
+  observe guest only so Grafana can use it as a read-only Alerting
+  datasource. Email routing remains independent of Grafana and Hermes.
   Compose recreates only when templates change or the project is
   not running.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
@@ -108,10 +108,8 @@ Roles:
   on TCP 8006; other RFC1918 destinations stay dropped. Optional Grafana
   MCP is a same-network sidecar: Hermes talks to `grafana-mcp` over Docker
   DNS; the sidecar holds the Viewer token and reaches Grafana on TCP 3000
-  with read-only prometheus and loki query tools. An optional host adapter
-  accepts Sentinel Alertmanager on a LAN port and signs HMAC-v2 to the
-  Hermes webhook on loopback; automatic runs keep an empty toolset and
-  deliver to Telegram. Raw email stays independent.
+  with read-only prometheus, loki, and alerting query tools. Grafana
+  Alerting is the unified firing view. Raw email stays independent.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).
