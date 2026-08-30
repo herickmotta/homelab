@@ -62,7 +62,9 @@ Alertmanager stays loopback unless a site sets a LAN bind address, typically
 `0.0.0.0:9093`. That listener is not on Caddy and is not a management UI.
 A host firewall rule must allow only the observability guest to reach it.
 Sentinel Prometheus continues to use loopback. Raw email and Proxmox-down
-inhibition stay on this Alertmanager regardless of observe or Hermes.
+inhibition stay on this Alertmanager regardless of observe or Hermes. A site
+may also send a bearer webhook to the Hermes guest adapter; that path is
+optional and never replaces email.
 
 Grafana, longer Prometheus retention, detailed application metrics, and
 later log search belong on the Proxmox observability guest

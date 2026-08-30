@@ -79,13 +79,21 @@
     fail_msg: Configure the Hermes webhook URL and bearer secret together or leave both empty.
   no_log: true
 
-- name: Require a loopback Hermes webhook URL
+- name: Require a LAN Hermes webhook URL
   when: sentinel_monitoring_hermes_webhook_url | length > 0
   ansible.builtin.assert:
     that:
-      - sentinel_monitoring_hermes_webhook_url is match('^http://127\\.0\\.0\\.1:[0-9]+/')
+      - >-
+        sentinel_monitoring_hermes_webhook_url is match(
+          '^http://([0-9]{1,3}\\.){3}[0-9]{1,3}:[0-9]+/alerts$'
+        )
+      - sentinel_monitoring_hermes_webhook_url is not match('^http://127\\.')
+      - sentinel_monitoring_hermes_webhook_url is not match('^http://0\\.0\\.0\\.0')
       - sentinel_monitoring_hermes_webhook_secret | length >= 16
-    fail_msg: The Hermes webhook must be a loopback HTTP URL with a bearer secret of at least 16 characters.
+    fail_msg: >-
+      The Hermes webhook must be http://<hermes-ipv4>:<port>/alerts with a
+      bearer secret of at least 16 characters. Loopback is rejected because
+      Alertmanager runs on Sentinel and Hermes is a dedicated guest.
   no_log: true
 
 - name: Require read-only Proxmox exporter credentials

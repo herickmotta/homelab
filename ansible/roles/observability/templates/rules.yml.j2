@@ -151,3 +151,167 @@ groups:
         annotations:
           summary: "systemd unit {{ '{{ $labels.name }}' }} is not active on {{ '{{ $labels.host }}' }}"
           description: A collected critical unit left the active state.
+
+      - alert: ZfsPoolUnhealthy
+        expr: zfs_pool_health != 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "ZFS pool {{ '{{ $labels.pool }}' }} is not online"
+          description: Observe reports a ZFS pool health state other than online.
+
+      - alert: ZfsPoolSpaceLow
+        expr: >-
+          zfs_pool_allocated_bytes / zfs_pool_size_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "ZFS pool {{ '{{ $labels.pool }}' }} is more than 85 percent allocated"
+          description: Dataset growth or a failed scrub consumer may fill the pool.
+
+      - alert: SmartDeviceFailed
+        expr: smartctl_device_smart_status == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "SMART failed on {{ '{{ $labels.device }}' }}"
+          description: The disk reported a failed SMART health status.
+
+      - alert: SmartPendingSectors
+        expr: >-
+          smartctl_device_attribute{attribute_name="Current_Pending_Sector",
+          attribute_value_type="raw"} > 0
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "Pending sectors on {{ '{{ $labels.device }}' }}"
+          description: SMART current pending sector count is above zero.
+
+      - alert: SmartReallocatedSectors
+        expr: >-
+          smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",
+          attribute_value_type="raw"} > 0
+          unless on(device) smartctl_device{accepted_degraded="true"}
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "Reallocated sectors on {{ '{{ $labels.device }}' }}"
+          description: Standing reallocations on a disk that is not accepted_degraded.
+
+      - alert: SmartReallocatedSectorsRising
+        expr: >-
+          increase(smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",
+          attribute_value_type="raw"}[1h]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Reallocated sector count rose on {{ '{{ $labels.device }}' }}"
+          description: A delta is alertable even on accepted_degraded disks.
+
+      - alert: LinuxExporterDown
+        expr: up{job="node",host="sentinel"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: none
+        annotations:
+          summary: "Linux exporter on {{ '{{ $labels.host }}' }} is down"
+          description: Observe cannot scrape node_exporter on the Sentinel.
+
+      - alert: LinuxExporterDown
+        expr: >-
+          up{job=~"observe|smartctl|zfs|pve|pve_exporter"} == 0
+          or up{job="node",host!="sentinel"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Exporter {{ '{{ $labels.job }}' }} is down"
+          description: Observe lost a Linux, SMART, ZFS, or Proxmox scrape target.
+
+      - alert: GuestRootFilesystemLow
+        expr: >-
+          100 * node_filesystem_avail_bytes{job="node", host="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_size_bytes{job="node", host="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"} < 15
+        for: 10m
+        labels:
+          severity: warning
+          dependency: none
+        annotations:
+          summary: Sentinel root filesystem has less than 15 percent free
+          description: Guest Linux disk pressure on the independent Sentinel.
+
+      - alert: GuestRootFilesystemLow
+        expr: >-
+          100 * node_filesystem_avail_bytes{job="node", host!="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_size_bytes{job="node", host!="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"} < 15
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "Root filesystem on {{ '{{ $labels.host }}' }} has less than 15 percent free"
+          description: Guest root disk pressure. ObserveDiskSpaceLow covers the observe guest.
+
+      - alert: GuestRootInodesLow
+        expr: >-
+          100 * node_filesystem_files_free{job="node", host="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_files{job="node", host="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"} < 10
+        for: 10m
+        labels:
+          severity: warning
+          dependency: none
+        annotations:
+          summary: Sentinel root inodes are below 10 percent free
+          description: Inode exhaustion can fail deploys before byte capacity does.
+
+      - alert: GuestRootInodesLow
+        expr: >-
+          100 * node_filesystem_files_free{job=~"node|observe", host!="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_files{job=~"node|observe", host!="sentinel",
+          mountpoint="/", fstype!~"tmpfs|overlay|squashfs"} < 10
+        for: 10m
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "Root inodes on {{ '{{ $labels.host }}' }} are below 10 percent free"
+          description: Inode exhaustion can fail deploys before byte capacity does.
+
+      - alert: ObservePrometheusRuleEvaluationFailures
+        expr: increase(prometheus_rule_evaluation_failures_total{job="prometheus"}[10m]) > 0
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: Observe Prometheus failed to evaluate an alert rule
+          description: Inspect Prometheus logs and the rendered rules file.
+
+      - alert: ObserveAlertNotificationsDropped
+        expr: increase(prometheus_notifications_dropped_total{job="prometheus"}[15m]) > 0
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: Observe Prometheus dropped Alertmanager notifications
+          description: The rich plane could not deliver alerts to Sentinel Alertmanager.

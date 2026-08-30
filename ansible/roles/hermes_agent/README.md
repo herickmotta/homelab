@@ -116,6 +116,24 @@ MCP caller token, and Grafana's guest IPv4 on port 3000. The role then:
 Listen with `--address`, not `-addr`. Do not put
 `GRAFANA_SERVICE_ACCOUNT_TOKEN` in the Hermes process. Do not route
 through Caddy; the hole is Grafana's own `:3000`. Write tools stay off.
+Enabled tools include Grafana `prometheus` and `loki` query groups so
+Telegram investigation can search datasources, not only dashboard panels.
+
+## Optional Alertmanager adapter
+
+Defaults keep the webhook **off**. A site may set
+`hermes_agent_webhook_enabled: true` with Grafana MCP already enabled, the
+Hermes guest IPv4, the Sentinel allow-from IPv4, a bearer token, and a
+distinct HMAC secret. The role then:
+
+- publishes Hermes webhook `127.0.0.1:8644` only
+- runs a host Python adapter on the guest IPv4 port `8787`
+- accepts Alertmanager bearer POSTs from the Sentinel address
+- signs HMAC-v2 to `http://127.0.0.1:8644/webhooks/homelab-ops`
+- binds that route to an empty toolset and Telegram delivery
+
+Do not publish the webhook on the LAN. Do not put adapter secrets in
+Compose. Raw Alertmanager email stays independent.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:

@@ -54,6 +54,7 @@ site:
       retention_time: 72h
       retention_size: 10GB
       alertmanager_bind_address: "0.0.0.0:9093"
+      hermes_webhook_url: ""
       pve_exporter:
         enabled: true
         user: prometheus@pve
@@ -481,6 +482,8 @@ site:
     pve:
       enabled: false
     grafana:
+      enabled: false
+    webhook:
       enabled: false
 
   frigate:

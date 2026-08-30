@@ -11,3 +11,10 @@
     state: restarted
     enabled: true
     daemon_reload: true
+
+- name: Reload Hermes Alertmanager adapter
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_alert_unit }}"
+    state: restarted
+    enabled: true
+    daemon_reload: true

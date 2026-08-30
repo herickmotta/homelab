@@ -95,6 +95,66 @@
     path: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
     state: absent
 
+- name: Install Python for the Alertmanager adapter
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.apt:
+    name: python3
+    state: present
+
+- name: Install the Alertmanager adapter
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.copy:
+    src: alertmanager_adapter.py
+    dest: "{{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0755"
+
+- name: Install Alertmanager adapter secrets
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: alert-adapter.env.j2
+    dest: "{{ hermes_agent_alert_env_file }}"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+  no_log: true
+  notify: Reload Hermes Alertmanager adapter
+
+- name: Install the Alertmanager adapter unit
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: alert-adapter.service.j2
+    dest: "/etc/systemd/system/{{ hermes_agent_alert_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Hermes Alertmanager adapter
+
+- name: Stop the Alertmanager adapter when disabled
+  when: not (hermes_agent_webhook_enabled | bool)
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_alert_unit }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+
+- name: Remove leftover adapter secrets from the Hermes policy mount
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/alert-adapter.env"
+    state: absent
+
+- name: Remove the Alertmanager adapter when disabled
+  when: not (hermes_agent_webhook_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hermes_agent_alert_env_file }}"
+    - "{{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py"
+    - "/etc/systemd/system/{{ hermes_agent_alert_unit }}"
+
 - name: Remove Grafana MCP secrets when disabled
   when: not (hermes_agent_grafana_enabled | bool)
   ansible.builtin.file:
@@ -199,6 +259,14 @@
 - name: Enable Hermes Agent egress policy
   ansible.builtin.systemd_service:
     name: "{{ hermes_agent_egress_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable the Alertmanager adapter
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_alert_unit }}"
     enabled: true
     state: started
     daemon_reload: true
