@@ -43,3 +43,9 @@ sentinel_monitoring_smtp_require_tls: true
 
 sentinel_monitoring_heartbeat_url: ""
 sentinel_monitoring_heartbeat_interval: 1min
+
+sentinel_monitoring_telegram_chat_id: ""
+sentinel_monitoring_telegram_bot_token: ""
+sentinel_monitoring_mail_enabled: false
+sentinel_monitoring_telegram_enabled: false
+sentinel_monitoring_default_receiver: discard

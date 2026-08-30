@@ -77,8 +77,9 @@ Roles:
   to loopback by default. A typed LAN bind can expose Alertmanager to the
   observe guest only so Grafana can use it as a read-only Alerting
   datasource. Email routing remains independent of Grafana and Hermes.
-  Compose recreates only when templates change or the project is
-  not running.
+  An optional Telegram channel receiver pages the same alerts without a
+  model; email stays configured when Telegram is enabled. Compose recreates
+  only when templates change or the project is not running.
 - `herickmotta.homelab.observability`: Prometheus, Grafana, and Loki on a
   dedicated Proxmox guest. Retention is longer than Sentinel. Grafana binds
   the guest LAN for Caddy; Prometheus may bind the guest address for later

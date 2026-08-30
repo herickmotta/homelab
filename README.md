@@ -110,6 +110,7 @@ flowchart TB
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
   richProm -->|"selected alerts"| guard
+  guard -->|"Alertmanager Telegram"| telegram
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki

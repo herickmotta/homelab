@@ -28,9 +28,17 @@ inhibit_rules:
 
 receivers:
   - name: discard
+{% if sentinel_monitoring_mail_enabled | bool or sentinel_monitoring_telegram_enabled | bool %}
+  - name: notify
 {% if sentinel_monitoring_mail_enabled | bool %}
-  - name: email
     email_configs:
       - to: {{ sentinel_monitoring_email_destination | to_json }}
         send_resolved: true
+{% endif %}
+{% if sentinel_monitoring_telegram_enabled | bool %}
+    telegram_configs:
+      - bot_token: {{ sentinel_monitoring_telegram_bot_token | to_json }}
+        chat_id: {{ sentinel_monitoring_telegram_chat_id | int }}
+        send_resolved: true
+{% endif %}
 {% endif %}

@@ -59,9 +59,44 @@
     fail_msg: Configure all Sentinel SMTP fields together or leave all empty.
   no_log: true
 
+- name: Decide whether Telegram paging is configured
+  ansible.builtin.set_fact:
+    sentinel_monitoring_telegram_enabled: >-
+      {{
+        sentinel_monitoring_telegram_chat_id | length > 0
+        and sentinel_monitoring_telegram_bot_token | length > 0
+      }}
+
+- name: Reject partial Telegram paging configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (
+          sentinel_monitoring_telegram_chat_id | length > 0
+          or sentinel_monitoring_telegram_bot_token | length > 0
+        )
+        or sentinel_monitoring_telegram_enabled | bool
+      - >-
+        not (sentinel_monitoring_telegram_enabled | bool)
+        or (
+          sentinel_monitoring_telegram_chat_id is match('^-100[0-9]+$')
+          and sentinel_monitoring_telegram_bot_token is not match('(?i)^replace')
+        )
+    fail_msg: >-
+      Configure Sentinel Telegram chat_id and bot token together, or leave
+      both empty. chat_id must be a channel id such as -100…. Do not reuse
+      the Hermes bot token.
+  no_log: true
+
 - name: Select the default Alertmanager receiver
   ansible.builtin.set_fact:
-    sentinel_monitoring_default_receiver: "{{ 'email' if sentinel_monitoring_mail_enabled | bool else 'discard' }}"
+    sentinel_monitoring_default_receiver: >-
+      {{
+        'notify'
+        if (sentinel_monitoring_mail_enabled | bool
+            or sentinel_monitoring_telegram_enabled | bool)
+        else 'discard'
+      }}
 
 - name: Validate the Alertmanager LAN bind address
   when: sentinel_monitoring_alertmanager_bind_address | length > 0

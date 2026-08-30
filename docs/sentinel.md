@@ -61,11 +61,12 @@ Prometheus, exporters, and their APIs bind to loopback by default.
 Alertmanager stays loopback unless a site sets a LAN bind address, typically
 `0.0.0.0:9093`. That listener is not on Caddy and is not a management UI.
 A host firewall rule must allow only the observability guest to reach it.
-Sentinel Prometheus continues to use loopback. Raw email and Proxmox-down
-inhibition stay on this Alertmanager regardless of observe or Hermes.
-Grafana on the observability guest may proxy Alertmanager as a read-only
-datasource so Alerting is the unified firing view. That path never replaces
-email and is not a Caddy route.
+Sentinel Prometheus continues to use loopback. Raw email, an optional
+Telegram channel, and Proxmox-down inhibition stay on this Alertmanager
+regardless of observe or Hermes. Grafana on the observability guest may
+proxy Alertmanager as a read-only datasource so Alerting is the unified
+firing view. That path never replaces email or Telegram paging and is not
+a Caddy route.
 
 Grafana, longer Prometheus retention, detailed application metrics, and
 later log search belong on the Proxmox observability guest
