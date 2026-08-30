@@ -178,24 +178,6 @@
     chdir: "{{ sentinel_monitoring_install_dir }}"
   changed_when: false
 
-- name: Pull pinned Sentinel monitoring images
-  ansible.builtin.command:
-    cmd: docker compose pull --quiet
-    chdir: "{{ sentinel_monitoring_install_dir }}"
-  register: sentinel_monitoring_pull
-  changed_when: >-
-    'Pulled' in (sentinel_monitoring_pull.stdout ~ sentinel_monitoring_pull.stderr)
-    or 'Downloaded' in (sentinel_monitoring_pull.stdout ~ sentinel_monitoring_pull.stderr)
-
-- name: Start Sentinel monitoring
-  ansible.builtin.command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ sentinel_monitoring_install_dir }}"
-  register: sentinel_monitoring_up
-  changed_when: >-
-    'Started' in (sentinel_monitoring_up.stdout ~ sentinel_monitoring_up.stderr)
-    or 'Created' in (sentinel_monitoring_up.stdout ~ sentinel_monitoring_up.stderr)
-
 - name: Install external heartbeat command
   when: sentinel_monitoring_heartbeat_url | length > 0
   ansible.builtin.template:
@@ -258,6 +240,29 @@
 
 - name: Apply Sentinel monitoring handlers
   ansible.builtin.meta: flush_handlers
+
+- name: Check whether the Sentinel monitoring Compose project is running
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
+    chdir: "{{ sentinel_monitoring_install_dir }}"
+  register: sentinel_monitoring_compose_ps
+  changed_when: false
+
+- name: Start Sentinel monitoring
+  when: sentinel_monitoring_compose_ps.stdout | trim | length == 0
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --remove-orphans
+    chdir: "{{ sentinel_monitoring_install_dir }}"
+  changed_when: true
 
 - name: Wait for Sentinel monitoring endpoints
   ansible.builtin.uri:

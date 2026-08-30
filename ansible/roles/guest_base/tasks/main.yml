@@ -1,10 +1,6 @@
 ---
-# Common first boot. OpenTofu enables the qemu-guest-agent virtio channel;
+# Common guest baseline. OpenTofu enables the qemu-guest-agent virtio channel;
 # this role installs and starts the guest-side package.
-- name: Wait for SSH after cloud-init
-  ansible.builtin.wait_for_connection:
-    timeout: 600
-
 - name: Gather facts
   ansible.builtin.setup:
 
@@ -17,6 +13,7 @@
       - cloud-guest-utils
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Check for QEMU guest-agent virtio port
   ansible.builtin.stat:

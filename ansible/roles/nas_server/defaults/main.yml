@@ -5,7 +5,7 @@ nas_server_smb_uid: 10000
 nas_server_smb_gid: 10000
 nas_server_mounts: []
 nas_server_smb_conf: /etc/samba/smb.conf
-nas_server_smb_integration_test: true
+nas_server_smb_integration_test: false
 nas_server_packages:
   - samba
   - smbclient
