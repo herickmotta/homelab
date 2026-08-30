@@ -1,0 +1,16 @@
+---
+- name: Create the managed bin directory for PVE helpers
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/bin"
+    state: directory
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Install the GET-only Proxmox helper
+  ansible.builtin.copy:
+    src: pve-get
+    dest: "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"

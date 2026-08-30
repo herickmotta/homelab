@@ -1,0 +1,44 @@
+#!/bin/sh
+# GET-only Proxmox API helper. Path is relative to /api2/json/.
+set -eu
+
+usage() {
+  printf '%s\n' "usage: pve-get <api-path>" >&2
+  printf '%s\n' "example: pve-get version" >&2
+  printf '%s\n' "example: pve-get nodes/pve/qemu" >&2
+  exit 1
+}
+
+[ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] && usage
+[ "$#" -eq 1 ] || usage
+
+path=$1
+path=${path#/}
+path=${path#api2/json/}
+path=${path#/}
+
+case "$path" in
+  "" | *..* | *[[:space:]]* | *'*'* | *'?'*)
+    printf '%s\n' "refused: invalid API path" >&2
+    exit 1
+    ;;
+  *status/start | *status/stop | *status/shutdown | *status/reboot | *status/reset)
+    printf '%s\n' "refused: this helper is GET-only" >&2
+    exit 1
+    ;;
+esac
+
+: "${PVE_API_ENDPOINT:?PVE_API_ENDPOINT is unset}"
+: "${PVE_API_TOKEN_ID:?PVE_API_TOKEN_ID is unset}"
+: "${PVE_API_TOKEN_SECRET:?PVE_API_TOKEN_SECRET is unset}"
+
+verify_args="-k"
+if [ "${PVE_API_VERIFY_SSL:-0}" = "1" ]; then
+  verify_args=""
+fi
+
+# shellcheck disable=SC2086
+curl -sS ${verify_args} -X GET \
+  -H "Authorization: PVEAPIToken=${PVE_API_TOKEN_ID}=${PVE_API_TOKEN_SECRET}" \
+  "${PVE_API_ENDPOINT%/}/api2/json/${path}"
+printf '\n'

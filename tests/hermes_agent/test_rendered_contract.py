@@ -67,6 +67,8 @@ def assert_defaults() -> None:
         raise SystemExit("role defaults must stay disabled and conservative")
     if DEFAULTS["hermes_agent_github_enabled"]:
         raise SystemExit("GitHub App access must stay disabled until a site opts in")
+    if DEFAULTS["hermes_agent_pve_enabled"]:
+        raise SystemExit("Proxmox API access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_runtime_user"] in ("root", ""):
         raise SystemExit("runtime user must be a non-root identity")
     if int(DEFAULTS["hermes_agent_runtime_uid"]) <= 0:
@@ -239,6 +241,8 @@ def assert_secrets_and_egress() -> None:
             raise SystemExit(f"egress must drop {network}")
     if "Later MCP destinations get explicit ACCEPT" not in egress:
         raise SystemExit("egress must document later MCP exceptions")
+    if "-p tcp --dport 8006 -j ACCEPT" in egress:
+        raise SystemExit("default egress must not punch a Proxmox hole")
     print("secrets stay in 0640 env; egress drops RFC1918 and link-local")
 
 
@@ -272,6 +276,9 @@ def assert_validation_contract() -> None:
         "hermes_agent_github_app_id | string is match('^[0-9]+$')",
         "'PRIVATE KEY' in hermes_agent_github_app_private_key",
         "item.url is match(\"^https://github.com/.+\\\\.git$\")",
+        "hermes_agent_pve_enabled | bool",
+        "hermes_agent_pve_user is match('^[A-Za-z0-9._-]+@pve$')",
+        "hermes_agent_pve_token_value is not match('(?i)^replace')",
     )
     for snippet in required_snippets:
         if snippet not in VALIDATE:
@@ -294,6 +301,8 @@ def assert_example_and_specs() -> None:
         raise SystemExit("example site must show the opt-in full-capability binding")
     if hermes.get("github", {}).get("enabled"):
         raise SystemExit("example site must keep GitHub App access disabled")
+    if hermes.get("pve", {}).get("enabled"):
+        raise SystemExit("example site must keep Proxmox API access disabled")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())
     options = specs["argument_specs"]["main"]["options"]
     for key in DEFAULTS:
@@ -342,6 +351,54 @@ def assert_github_draft_pr_helpers() -> None:
     print("github draft-PR helpers: token mint, no merge, no PEM in env")
 
 
+def assert_pve_read_only_helpers() -> None:
+    helper = (ROLE / "files/pve-get").read_text()
+    if "-X GET" not in helper or "PVEAPIToken=" not in helper:
+        raise SystemExit("pve-get must be a GET-only Proxmox client")
+    if "status/start" not in helper:
+        raise SystemExit("pve-get must refuse guest start paths")
+    pve_env = render(
+        "managed.env.j2",
+        hermes_agent_telegram_bot_token=SECRET_TOKEN,
+        hermes_agent_provider_api_key="",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_provider_env_name="",
+        hermes_agent_pve_enabled=True,
+        hermes_agent_pve_ipv4="192.0.2.10",
+        hermes_agent_pve_user="hermes@pve",
+        hermes_agent_pve_token_name="hermes",
+        hermes_agent_pve_token_value="pve-secret-not-for-compose",
+    )
+    if "PVE_API_ENDPOINT=https://192.0.2.10:8006" not in pve_env:
+        raise SystemExit("enabled PVE env must pin the hypervisor API")
+    if "PVE_API_TOKEN_ID=hermes@pve!hermes" not in pve_env:
+        raise SystemExit("enabled PVE env must pin the token id")
+    if "PVE_API_TOKEN_SECRET=pve-secret-not-for-compose" not in pve_env:
+        raise SystemExit("managed env must hold the PVE token secret")
+    compose = render(
+        "compose.yaml.j2",
+        hermes_agent_pve_enabled=True,
+        hermes_agent_pve_token_value="pve-secret-not-for-compose",
+    )
+    if "pve-secret-not-for-compose" in compose or "PVE_API_TOKEN_SECRET" in compose:
+        raise SystemExit("Compose must not hold the PVE token")
+    egress = render(
+        "egress.sh.j2",
+        hermes_agent_pve_enabled=True,
+        hermes_agent_pve_ipv4="192.0.2.10",
+    )
+    accept = "-d 192.0.2.10 -p tcp --dport 8006 -j ACCEPT"
+    if accept not in egress:
+        raise SystemExit("enabled PVE egress must ACCEPT hypervisor :8006 before DROP")
+    drop_at = egress.find("-d 192.168.0.0/16 -j DROP")
+    if drop_at < 0 or egress.find(accept) > drop_at:
+        raise SystemExit("PVE ACCEPT must be inserted before RFC1918 DROP")
+    soul = render("SOUL.md.j2", hermes_agent_pve_enabled=True)
+    if "pve-get" not in soul or "PVEAuditor" not in soul:
+        raise SystemExit("SOUL.md must describe GET-only Proxmox access")
+    print("pve read-only: GET helper, :8006 hole, secret stays out of Compose")
+
+
 def main() -> None:
     assert_defaults()
     assert_compose_isolation()
@@ -352,6 +409,7 @@ def main() -> None:
     assert_validation_contract()
     assert_example_and_specs()
     assert_github_draft_pr_helpers()
+    assert_pve_read_only_helpers()
     print("hermes_agent rendered contract ok")
 
 

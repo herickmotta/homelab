@@ -478,6 +478,8 @@ site:
     telegram_user_id: "123456789"
     github:
       enabled: false
+    pve:
+      enabled: false
 
   frigate:
     media_path: /mnt/frigate
