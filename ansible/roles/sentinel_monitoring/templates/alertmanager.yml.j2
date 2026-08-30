@@ -17,12 +17,6 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-{% if sentinel_monitoring_hermes_webhook_url | length > 0 %}
-  routes:
-    - receiver: hermes
-      continue: true
-    - receiver: "{{ sentinel_monitoring_default_receiver }}"
-{% endif %}
 
 inhibit_rules:
   - source_matchers:
@@ -39,14 +33,4 @@ receivers:
     email_configs:
       - to: {{ sentinel_monitoring_email_destination | to_json }}
         send_resolved: true
-{% endif %}
-{% if sentinel_monitoring_hermes_webhook_url | length > 0 %}
-  - name: hermes
-    webhook_configs:
-      - url: {{ sentinel_monitoring_hermes_webhook_url | to_json }}
-        send_resolved: true
-        http_config:
-          authorization:
-            type: Bearer
-            credentials: {{ sentinel_monitoring_hermes_webhook_secret | to_json }}
 {% endif %}

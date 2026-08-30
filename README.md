@@ -68,7 +68,6 @@ flowchart TB
   subgraph hermes["Hermes guest"]
     agent["Official Hermes container"]
     grafanaMcp["Grafana MCP sidecar"]
-    adapter["Alertmanager adapter"]
   end
 
   subgraph cameras["Cameras"]
@@ -101,6 +100,7 @@ flowchart TB
   frigate --> mqtt
   grafana --> richProm
   grafana --> loki
+  grafana -->|"Alertmanager datasource"| guard
   richProm -->|"PVE and self"| host
   richProm -->|"Linux exporters"| net
   richProm -->|"Linux exporters"| nas
@@ -110,8 +110,6 @@ flowchart TB
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
   richProm -->|"selected alerts"| guard
-  guard -->|"bearer webhook"| adapter
-  adapter -->|"HMAC-v2 loopback"| agent
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
@@ -153,13 +151,14 @@ How traffic and data move:
   journal and Docker logs to Loki on the observability guest. Grafana
   Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
   selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
-  Sentinel.
+  Sentinel. Grafana on observe provisions a read-only Alertmanager
+  datasource so Alerting is the unified firing view.
 - Hermes runs the official pinned container on its own guest. Telegram and
   the model provider are outbound only. RFC1918 and link-local destinations
   stay dropped except an optional GET-only Proxmox API hole to the hypervisor
   on TCP 8006. There is no Docker socket, Caddy route, dashboard, or public
-  ingress for Hermes. An optional host adapter may listen on the guest LAN
-  for Sentinel Alertmanager; the Hermes webhook itself stays on loopback.
+  ingress for Hermes. Hermes reads firing alerts through Grafana MCP. It is
+  not on the Alertmanager notification path.
 
 ```mermaid
 flowchart LR

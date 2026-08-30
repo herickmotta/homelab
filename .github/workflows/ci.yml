@@ -73,8 +73,8 @@ jobs:
       - name: Test Hermes Agent rendered contract
         run: python3 tests/hermes_agent/test_rendered_contract.py
 
-      - name: Test Alertmanager adapter
-        run: python3 tests/hermes_agent/test_alert_adapter.py
+      - name: Test Grafana alert datasources
+        run: python3 tests/observability/test_grafana_datasources.py
 
   ci:
     name: ci

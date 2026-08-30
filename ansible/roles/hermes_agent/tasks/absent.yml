@@ -28,9 +28,9 @@
     daemon_reload: true
   failed_when: false
 
-- name: Disable the Alertmanager adapter
+- name: Stop leftover Alertmanager adapter
   ansible.builtin.systemd_service:
-    name: "{{ hermes_agent_alert_unit }}"
+    name: hermes-alert-adapter.service
     enabled: false
     state: stopped
     daemon_reload: true
@@ -54,12 +54,12 @@
     - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
     - "{{ hermes_agent_managed_dir }}/bin/pve-get"
     - "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
-    - "{{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py"
-    - "{{ hermes_agent_alert_env_file }}"
+    - "{{ hermes_agent_install_dir }}/alert-adapter.env"
     - "{{ hermes_agent_managed_dir }}/alert-adapter.env"
+    - "{{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py"
     - "{{ hermes_agent_egress_script }}"
     - "/etc/systemd/system/{{ hermes_agent_egress_unit }}"
-    - "/etc/systemd/system/{{ hermes_agent_alert_unit }}"
+    - /etc/systemd/system/hermes-alert-adapter.service
 
 - name: Reload systemd after removing the egress unit
   ansible.builtin.systemd_service:

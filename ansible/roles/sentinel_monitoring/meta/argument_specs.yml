@@ -40,10 +40,6 @@ argument_specs:
         type: str
       sentinel_monitoring_alertmanager_bind_address:
         type: str
-      sentinel_monitoring_hermes_webhook_url:
-        type: str
-      sentinel_monitoring_hermes_webhook_secret:
-        type: str
       sentinel_monitoring_blackbox_listen_address:
         type: str
       sentinel_monitoring_node_exporter_listen_address:

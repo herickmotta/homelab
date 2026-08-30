@@ -57,6 +57,11 @@ argument_specs:
         type: str
       observability_alertmanager_address:
         type: str
+        description: >-
+          Sentinel Alertmanager host:port. Prometheus sends alerts there.
+          When set, Grafana also provisions a read-only Alertmanager
+          datasource so Alerting is the unified firing view. Do not put
+          Alertmanager on Caddy.
       observability_alert_for:
         type: str
         default: 2m

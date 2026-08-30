@@ -117,16 +117,3 @@ hermes_agent_grafana_image_digest: "sha256:f21a19cebbfa7c3a76ef1746171e5ffc36010
 hermes_agent_grafana_mcp_address: ":8000"
 hermes_agent_grafana_mcp_host: grafana-mcp:8000
 hermes_agent_grafana_enabled_tools: search,dashboard,folder,navigation,rendering,runpanelquery,alerting,prometheus,loki
-
-# Optional Alertmanager → Hermes adapter. Disabled until a site supplies a
-# LAN bind, Sentinel allow-from IPv4, bearer token, and HMAC secret. Hermes
-# webhook listens on loopback only; the adapter is the LAN listener.
-hermes_agent_webhook_enabled: false
-hermes_agent_webhook_port: 8644
-hermes_agent_webhook_hmac_secret: ""
-hermes_agent_alert_ipv4: ""
-hermes_agent_alert_port: 8787
-hermes_agent_alert_allow_ipv4: ""
-hermes_agent_alert_bearer_token: ""
-hermes_agent_alert_env_file: /opt/hermes-agent/alert-adapter.env
-hermes_agent_alert_unit: hermes-alert-adapter.service
