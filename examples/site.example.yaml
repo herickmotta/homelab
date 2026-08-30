@@ -480,6 +480,8 @@ site:
       enabled: false
     pve:
       enabled: false
+    grafana:
+      enabled: false
 
   frigate:
     media_path: /mnt/frigate

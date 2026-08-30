@@ -32,9 +32,11 @@ values or world-readable managed scope.
 
 A `DOCKER-USER` chain `HERMES-AGENT-EGRESS` drops RFC1918 and link-local
 destinations from the dedicated Compose subnet while leaving public Internet
-(Telegram, the model provider, web/browser, public DNS, time) allowed. Later
-MCP destinations need explicit ACCEPT rules in that chain before the DROP
-lines. Compose DNS is public resolvers, not a LAN resolver.
+(Telegram, the model provider, web/browser, public DNS, time) allowed. The
+Compose subnet itself is RETURNed so sidecars on that network stay reachable.
+Later LAN MCP destinations need explicit ACCEPT rules in that chain before
+the DROP lines. Containers still use Docker embedded DNS (Compose names);
+upstream resolvers are public, not a LAN resolver.
 
 Telegram is one numeric allowlisted user who is also `allow_admin_from`.
 Pairing (`unauthorized_dm_behavior: ignore`), guest mode, group allowlists, and
@@ -92,6 +94,28 @@ name, token secret, and hypervisor IPv4. The role then:
 
 Do not reuse the OpenTofu, Observe, or Sentinel tokens. Do not open SSH or
 the rest of the LAN. Guest power and config remain denied by `PVEAuditor`.
+
+## Optional read-only Grafana MCP
+
+Defaults keep Grafana access **off**. A site may set
+`hermes_agent_grafana_enabled: true` with a Viewer service-account token, an
+MCP caller token, and Grafana's guest IPv4 on port 3000. The role then:
+
+- runs official `grafana/mcp-grafana` on the Hermes Compose network
+- writes Viewer and MCP caller tokens to
+  `hermes_agent_grafana_mcp_env_file` (`0640` `root:root`), **not** the
+  Hermes policy mount or managed `.env`
+- points Hermes `mcp_servers.grafana` at `http://grafana-mcp:8000/mcp`
+  with the caller token only
+- ACCEPTs TCP 3000 to that one Grafana IPv4, and RETURNs the Compose
+  subnet so Hermes can reach the sidecar
+- at apply time, `docker compose exec` from `hermes-agent` must resolve
+  `grafana-mcp`, reach `/healthz`, see `401` without a caller token, and
+  `initialize` with the caller token. Those checks do not print secrets.
+
+Listen with `--address`, not `-addr`. Do not put
+`GRAFANA_SERVICE_ACCOUNT_TOKEN` in the Hermes process. Do not route
+through Caddy; the hole is Grafana's own `:3000`. Write tools stay off.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:

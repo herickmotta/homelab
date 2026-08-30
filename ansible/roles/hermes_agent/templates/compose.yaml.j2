@@ -55,11 +55,11 @@ services:
     image: "{{ hermes_agent_grafana_image_repository }}@{{ hermes_agent_grafana_image_digest }}"
     restart: unless-stopped
     env_file:
-      - "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+      - "{{ hermes_agent_grafana_mcp_env_file }}"
     command:
       - --transport
       - streamable-http
-      - -addr
+      - --address
       - "{{ hermes_agent_grafana_mcp_address }}"
       - --allowed-hosts
       - "{{ hermes_agent_grafana_mcp_host }}"

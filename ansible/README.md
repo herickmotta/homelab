@@ -102,7 +102,9 @@ Roles:
   published port. Optional GitHub App installation tokens can clone
   declared repositories and open pull requests; merge stays with the
   operator. Optional PVEAuditor access is GET-only to the hypervisor API
-  on TCP 8006; other RFC1918 destinations stay dropped.
+  on TCP 8006; other RFC1918 destinations stay dropped. Optional Grafana
+  MCP is a same-network sidecar: Hermes talks to `grafana-mcp` over Docker
+  DNS; the sidecar holds the Viewer token and reaches Grafana on TCP 3000.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

@@ -30,6 +30,8 @@ if ! iptables -C DOCKER-USER -s "${SUBNET}" -j "${CHAIN}" >/dev/null 2>&1; then
 fi
 
 iptables -A "${CHAIN}" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+# Same-Compose destinations are RFC1918. RETURN them before the 172.16/12 DROP.
+iptables -A "${CHAIN}" -d "${SUBNET}" -j RETURN
 {% if hermes_agent_pve_enabled | bool %}
 iptables -A "${CHAIN}" -d {{ hermes_agent_pve_ipv4 }} -p tcp --dport {{ hermes_agent_pve_port | int }} -j ACCEPT
 {% endif %}
