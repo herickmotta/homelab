@@ -110,6 +110,8 @@ hermes_agent_grafana_port: 3000
 hermes_agent_grafana_url: ""
 hermes_agent_grafana_viewer_token: ""
 hermes_agent_grafana_mcp_server_token: ""
+# Host path only. Do not place this file in the Hermes policy mount.
+hermes_agent_grafana_mcp_env_file: /opt/hermes-agent/grafana-mcp.env
 hermes_agent_grafana_image_repository: grafana/mcp-grafana
 hermes_agent_grafana_image_digest: "sha256:f21a19cebbfa7c3a76ef1746171e5ffc3601064e432f593e7c6cb526e5216e5f"
 hermes_agent_grafana_mcp_address: ":8000"

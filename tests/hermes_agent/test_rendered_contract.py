@@ -69,6 +69,8 @@ def assert_defaults() -> None:
         raise SystemExit("GitHub App access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_pve_enabled"]:
         raise SystemExit("Proxmox API access must stay disabled until a site opts in")
+    if DEFAULTS["hermes_agent_grafana_enabled"]:
+        raise SystemExit("Grafana MCP access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_runtime_user"] in ("root", ""):
         raise SystemExit("runtime user must be a non-root identity")
     if int(DEFAULTS["hermes_agent_runtime_uid"]) <= 0:
@@ -243,6 +245,8 @@ def assert_secrets_and_egress() -> None:
         raise SystemExit("egress must document later MCP exceptions")
     if "-p tcp --dport 8006 -j ACCEPT" in egress:
         raise SystemExit("default egress must not punch a Proxmox hole")
+    if '-d "${SUBNET}" -j RETURN' not in egress:
+        raise SystemExit("default egress must RETURN the Compose subnet")
     print("secrets stay in 0640 env; egress drops RFC1918 and link-local")
 
 
@@ -279,6 +283,8 @@ def assert_validation_contract() -> None:
         "hermes_agent_pve_enabled | bool",
         "hermes_agent_pve_user is match('^[A-Za-z0-9._-]+@pve$')",
         "hermes_agent_pve_token_value is not match('(?i)^replace')",
+        "hermes_agent_grafana_enabled | bool",
+        "hermes_agent_grafana_viewer_token is not match('(?i)^replace')",
     )
     for snippet in required_snippets:
         if snippet not in VALIDATE:
@@ -303,6 +309,8 @@ def assert_example_and_specs() -> None:
         raise SystemExit("example site must keep GitHub App access disabled")
     if hermes.get("pve", {}).get("enabled"):
         raise SystemExit("example site must keep Proxmox API access disabled")
+    if hermes.get("grafana", {}).get("enabled"):
+        raise SystemExit("example site must keep Grafana MCP access disabled")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())
     options = specs["argument_specs"]["main"]["options"]
     for key in DEFAULTS:
@@ -399,6 +407,102 @@ def assert_pve_read_only_helpers() -> None:
     print("pve read-only: GET helper, :8006 hole, secret stays out of Compose")
 
 
+def assert_grafana_mcp_sidecar() -> None:
+    viewer = "glsa-viewer-secret-not-for-hermes"
+    caller = "mcp-caller-secret-not-for-logs"
+    grafana_env = render(
+        "grafana-mcp.env.j2",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_url="http://192.0.2.15:3000",
+        hermes_agent_grafana_viewer_token=viewer,
+        hermes_agent_grafana_mcp_server_token=caller,
+    )
+    if f"GRAFANA_URL=http://192.0.2.15:3000" not in grafana_env:
+        raise SystemExit("grafana-mcp env must pin the Grafana URL")
+    if f"GRAFANA_SERVICE_ACCOUNT_TOKEN={viewer}" not in grafana_env:
+        raise SystemExit("grafana-mcp env must hold the Viewer token")
+    if f"MCP_GRAFANA_SERVER_TOKEN={caller}" not in grafana_env:
+        raise SystemExit("grafana-mcp env must hold the MCP caller token")
+    managed = render(
+        "managed.env.j2",
+        hermes_agent_telegram_bot_token=SECRET_TOKEN,
+        hermes_agent_provider_api_key="",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_provider_env_name="",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_url="http://192.0.2.15:3000",
+        hermes_agent_grafana_viewer_token=viewer,
+        hermes_agent_grafana_mcp_server_token=caller,
+    )
+    if "GRAFANA_SERVICE_ACCOUNT_TOKEN=" in managed or viewer in managed:
+        raise SystemExit("Hermes managed .env must not hold the Grafana Viewer token")
+    if caller in managed:
+        raise SystemExit("Hermes managed .env must not hold the MCP caller token")
+    config = render(
+        "config.yaml.j2",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_mcp_server_token=caller,
+    )
+    if "url: \"http://grafana-mcp:8000/mcp\"" not in config:
+        raise SystemExit("Hermes config must point at Docker DNS grafana-mcp")
+    if f"Bearer {caller}" not in config:
+        raise SystemExit("Hermes config must send the MCP caller token")
+    if viewer in config or "GRAFANA_SERVICE_ACCOUNT_TOKEN" in config:
+        raise SystemExit("Hermes config must not hold the Grafana Viewer token")
+    compose = render(
+        "compose.yaml.j2",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_viewer_token=viewer,
+        hermes_agent_grafana_mcp_server_token=caller,
+    )
+    if re.search(r"^\s+- -addr\s*$", compose, re.M):
+        raise SystemExit("grafana-mcp must use --address, not -addr")
+    if "--address" not in compose:
+        raise SystemExit("grafana-mcp must pass --address")
+    env_file = DEFAULTS["hermes_agent_grafana_mcp_env_file"]
+    if env_file not in compose:
+        raise SystemExit("grafana-mcp env_file must stay outside the policy mount")
+    if DEFAULTS["hermes_agent_managed_dir"] + "/grafana-mcp.env" in compose:
+        raise SystemExit("grafana-mcp env must not live in the Hermes policy mount")
+    if viewer in compose or caller in compose:
+        raise SystemExit("Compose must not hold Grafana or MCP tokens")
+    egress = render(
+        "egress.sh.j2",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_ipv4="192.0.2.15",
+    )
+    if '-d "${SUBNET}" -j RETURN' not in egress:
+        raise SystemExit("egress must RETURN the Compose subnet before RFC1918 DROP")
+    accept = "-d 192.0.2.15 -p tcp --dport 3000 -j ACCEPT"
+    if accept not in egress:
+        raise SystemExit("enabled Grafana egress must ACCEPT :3000 before DROP")
+    drop_at = egress.find("-d 172.16.0.0/12 -j DROP")
+    if drop_at < 0 or egress.find('-d "${SUBNET}" -j RETURN') > drop_at:
+        raise SystemExit("Compose subnet RETURN must be inserted before 172.16/12 DROP")
+    if egress.find(accept) > drop_at:
+        raise SystemExit("Grafana ACCEPT must be inserted before RFC1918 DROP")
+    if 'dest: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"' in PRESENT:
+        raise SystemExit("present.yml must not write grafana-mcp.env into the policy mount")
+    if "check-grafana-mcp.py" not in PRESENT or 'python3' not in PRESENT:
+        raise SystemExit("present.yml must accept grafana-mcp from hermes-agent")
+    if "{{ hermes_agent_grafana_mcp_env_file }}" not in ABSENT:
+        raise SystemExit("absent.yml must remove the Grafana MCP env file")
+    if "{{ hermes_agent_managed_dir }}/grafana-mcp.env" not in ABSENT:
+        raise SystemExit("absent.yml must remove leftover policy-mount Grafana env")
+    soul = render("SOUL.md.j2", hermes_agent_grafana_enabled=True)
+    if "grafana-mcp" not in soul or "Viewer token" not in soul:
+        raise SystemExit("SOUL.md must describe sidecar-only Grafana access")
+    check = (ROLE / "files/check-grafana-mcp.py").read_text()
+    if "socket.gethostbyname" not in check or "healthz" not in check:
+        raise SystemExit("acceptance helper must resolve grafana-mcp and hit healthz")
+    if "print(" in check and "token" in check.lower() and "MCP_CALLER_TOKEN" in check:
+        # allow reading the env name, not printing the value
+        for line in check.splitlines():
+            if "print(" in line and "token" in line.lower() and "MCP_CALLER_TOKEN" not in line and "missing" not in line:
+                raise SystemExit(f"acceptance helper must not print tokens: {line}")
+    print("grafana mcp: --address, sidecar env, subnet RETURN, apply checks")
+
+
 def main() -> None:
     assert_defaults()
     assert_compose_isolation()
@@ -410,6 +514,7 @@ def main() -> None:
     assert_example_and_specs()
     assert_github_draft_pr_helpers()
     assert_pve_read_only_helpers()
+    assert_grafana_mcp_sidecar()
     print("hermes_agent rendered contract ok")
 
 

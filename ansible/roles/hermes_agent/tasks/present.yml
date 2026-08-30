@@ -83,17 +83,22 @@
   when: hermes_agent_grafana_enabled | bool
   ansible.builtin.template:
     src: grafana-mcp.env.j2
-    dest: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    dest: "{{ hermes_agent_grafana_mcp_env_file }}"
     owner: root
-    group: "{{ hermes_agent_runtime_group }}"
+    group: root
     mode: "0640"
   no_log: true
   notify: Recreate Hermes Agent compose
 
+- name: Remove leftover Grafana MCP secrets from the Hermes policy mount
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    state: absent
+
 - name: Remove Grafana MCP secrets when disabled
   when: not (hermes_agent_grafana_enabled | bool)
   ansible.builtin.file:
-    path: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    path: "{{ hermes_agent_grafana_mcp_env_file }}"
     state: absent
 
 - name: Install Hermes Agent identity
@@ -202,3 +207,45 @@
       - -d
     chdir: "{{ hermes_agent_install_dir }}"
   changed_when: true
+
+- name: Prove Hermes can reach the Grafana MCP sidecar
+  when: hermes_agent_grafana_enabled | bool
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - hermes-agent
+      - python3
+      - -
+      - reach
+    chdir: "{{ hermes_agent_install_dir }}"
+    stdin: "{{ lookup('file', role_path ~ '/files/check-grafana-mcp.py') }}"
+  register: hermes_agent_grafana_mcp_reach
+  retries: 18
+  delay: 5
+  until: hermes_agent_grafana_mcp_reach.rc == 0
+  changed_when: false
+
+- name: Prove Hermes can authenticate to Grafana MCP
+  when: hermes_agent_grafana_enabled | bool
+  no_log: true
+  environment:
+    MCP_CALLER_TOKEN: "{{ hermes_agent_grafana_mcp_server_token }}"
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - -e
+      - MCP_CALLER_TOKEN
+      - hermes-agent
+      - python3
+      - -
+      - auth
+    chdir: "{{ hermes_agent_install_dir }}"
+    stdin: "{{ lookup('file', role_path ~ '/files/check-grafana-mcp.py') }}"
+  register: hermes_agent_grafana_mcp_auth
+  changed_when: false

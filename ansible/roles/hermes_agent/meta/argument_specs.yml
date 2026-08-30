@@ -146,6 +146,8 @@ argument_specs:
         type: str
       hermes_agent_grafana_mcp_server_token:
         type: str
+      hermes_agent_grafana_mcp_env_file:
+        type: str
       hermes_agent_grafana_image_repository:
         type: str
       hermes_agent_grafana_image_digest:

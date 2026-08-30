@@ -28,3 +28,9 @@ API paths such as `version`, `nodes`, and `nodes/<node>/qemu`. Do not start,
 stop, migrate, or reconfigure guests. Do not call the OpenTofu token or
 apply path. Guest-agent fields may 403 until that privilege is granted.
 {% endif %}
+{% if hermes_agent_grafana_enabled | bool %}
+
+Grafana access is the `grafana` MCP server at `http://grafana-mcp:8000/mcp`.
+Use that sidecar. Do not call Grafana or Caddy on the LAN. The Viewer token
+stays on the sidecar, not in this process.
+{% endif %}

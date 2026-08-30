@@ -55,3 +55,17 @@
             if (site.hermes.pve.enabled | default(false) | bool)
             else ''
           }}"
+        hermes_agent_grafana_enabled: "{{ site.hermes.grafana.enabled | default(false) | bool }}"
+        hermes_agent_grafana_ipv4: "{{ site.hermes.grafana.ipv4 | default('') }}"
+        hermes_agent_grafana_port: "{{ site.hermes.grafana.port | default(3000) | int }}"
+        hermes_agent_grafana_url: "{{ site.hermes.grafana.url | default('') }}"
+        hermes_agent_grafana_viewer_token: "{{
+            lookup('env', 'GRAFANA_HERMES_VIEWER_TOKEN') | default('', true)
+            if (site.hermes.grafana.enabled | default(false) | bool)
+            else ''
+          }}"
+        hermes_agent_grafana_mcp_server_token: "{{
+            lookup('env', 'GRAFANA_HERMES_MCP_SERVER_TOKEN') | default('', true)
+            if (site.hermes.grafana.enabled | default(false) | bool)
+            else ''
+          }}"
