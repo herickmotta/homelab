@@ -98,8 +98,11 @@
 - name: Remove Grafana MCP secrets when disabled
   when: not (hermes_agent_grafana_enabled | bool)
   ansible.builtin.file:
-    path: "{{ hermes_agent_grafana_mcp_env_file }}"
+    path: "{{ item }}"
     state: absent
+  loop:
+    - "{{ hermes_agent_grafana_mcp_env_file }}"
+    - "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
 
 - name: Install Hermes Agent identity
   ansible.builtin.template:
@@ -108,6 +111,23 @@
     owner: "{{ hermes_agent_runtime_user }}"
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0644"
+
+- name: Create the Hermes Agent managed bin directory
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/bin"
+    state: directory
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Install the Grafana MCP acceptance helper
+  when: hermes_agent_grafana_enabled | bool
+  ansible.builtin.copy:
+    src: check-grafana-mcp.py
+    dest: "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0755"
 
 - name: Configure optional GitHub App draft-PR access
   when: hermes_agent_github_enabled | bool
@@ -213,15 +233,13 @@
   ansible.builtin.command:
     argv:
       - docker
-      - compose
       - exec
-      - -T
+      - -u
+      - "{{ hermes_agent_runtime_uid | string }}"
       - hermes-agent
       - python3
-      - -
+      - "{{ hermes_agent_container_managed_dir }}/bin/check-grafana-mcp.py"
       - reach
-    chdir: "{{ hermes_agent_install_dir }}"
-    stdin: "{{ lookup('file', role_path ~ '/files/check-grafana-mcp.py') }}"
   register: hermes_agent_grafana_mcp_reach
   retries: 18
   delay: 5
@@ -236,16 +254,14 @@
   ansible.builtin.command:
     argv:
       - docker
-      - compose
       - exec
-      - -T
+      - -u
+      - "{{ hermes_agent_runtime_uid | string }}"
       - -e
       - MCP_CALLER_TOKEN
       - hermes-agent
       - python3
-      - -
+      - "{{ hermes_agent_container_managed_dir }}/bin/check-grafana-mcp.py"
       - auth
-    chdir: "{{ hermes_agent_install_dir }}"
-    stdin: "{{ lookup('file', role_path ~ '/files/check-grafana-mcp.py') }}"
   register: hermes_agent_grafana_mcp_auth
   changed_when: false

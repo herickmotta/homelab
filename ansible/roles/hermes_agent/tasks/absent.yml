@@ -45,6 +45,7 @@
     - "{{ hermes_agent_managed_dir }}/bin/gh-bin"
     - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
     - "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    - "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
     - "{{ hermes_agent_egress_script }}"
     - "/etc/systemd/system/{{ hermes_agent_egress_unit }}"
 

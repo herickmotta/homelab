@@ -187,7 +187,7 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.16.1 ships
+under `examples/`. Collection `herickmotta.homelab` 0.16.2 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
