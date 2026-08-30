@@ -109,7 +109,7 @@ MCP caller token, and Grafana's guest IPv4 on port 3000. The role then:
   with the caller token only
 - ACCEPTs TCP 3000 to that one Grafana IPv4, and RETURNs the Compose
   subnet so Hermes can reach the sidecar
-- at apply time, `docker compose exec` from `hermes-agent` must resolve
+- at apply time, `docker exec` from `hermes-agent` must resolve
   `grafana-mcp`, reach `/healthz`, see `401` without a caller token, and
   `initialize` with the caller token. Those checks do not print secrets.
 

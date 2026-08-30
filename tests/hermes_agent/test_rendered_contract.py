@@ -483,10 +483,14 @@ def assert_grafana_mcp_sidecar() -> None:
         raise SystemExit("Grafana ACCEPT must be inserted before RFC1918 DROP")
     if 'dest: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"' in PRESENT:
         raise SystemExit("present.yml must not write grafana-mcp.env into the policy mount")
-    if "check-grafana-mcp.py" not in PRESENT or 'python3' not in PRESENT:
-        raise SystemExit("present.yml must accept grafana-mcp from hermes-agent")
+    if "python3" in PRESENT and "\n      - -\n" in PRESENT:
+        raise SystemExit("acceptance must not pipe the helper through python3 -")
+    if "/bin/check-grafana-mcp.py" not in PRESENT:
+        raise SystemExit("present.yml must docker exec the Grafana MCP helper from hermes-agent")
     if "{{ hermes_agent_grafana_mcp_env_file }}" not in ABSENT:
         raise SystemExit("absent.yml must remove the Grafana MCP env file")
+    if "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py" not in ABSENT:
+        raise SystemExit("absent.yml must remove the Grafana MCP acceptance helper")
     if "{{ hermes_agent_managed_dir }}/grafana-mcp.env" not in ABSENT:
         raise SystemExit("absent.yml must remove leftover policy-mount Grafana env")
     soul = render("SOUL.md.j2", hermes_agent_grafana_enabled=True)
