@@ -78,3 +78,13 @@ agent:
     - skills
     - session_search
 {% endif %}
+
+{% if hermes_agent_grafana_enabled | bool %}
+mcp_servers:
+  grafana:
+    url: "http://grafana-mcp:8000/mcp"
+    headers:
+      Authorization: "Bearer {{ hermes_agent_grafana_mcp_server_token }}"
+    timeout: 120
+    connect_timeout: 30
+{% endif %}

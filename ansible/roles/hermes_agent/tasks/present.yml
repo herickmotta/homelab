@@ -79,6 +79,23 @@
   no_log: true
   notify: Recreate Hermes Agent compose
 
+- name: Install Grafana MCP secrets
+  when: hermes_agent_grafana_enabled | bool
+  ansible.builtin.template:
+    src: grafana-mcp.env.j2
+    dest: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+  no_log: true
+  notify: Recreate Hermes Agent compose
+
+- name: Remove Grafana MCP secrets when disabled
+  when: not (hermes_agent_grafana_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
+    state: absent
+
 - name: Install Hermes Agent identity
   ansible.builtin.template:
     src: SOUL.md.j2

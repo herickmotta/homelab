@@ -162,5 +162,35 @@
   ansible.builtin.assert:
     that:
       - hermes_agent_pve_token_value | length == 0
-    fail_msg: Do not pass a Proxmox token when Proxmox access is disabled.
+    fail_msg: Do not pass a Proxmox token when read-only API access is disabled.
+  no_log: true
+
+- name: Require Grafana binding when read-only MCP access is enabled
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_grafana_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_grafana_ipv4 is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+      - hermes_agent_grafana_port | int == 3000
+      - hermes_agent_grafana_url is match('^https?://[^ ]+$')
+      - hermes_agent_grafana_viewer_token | length > 0
+      - hermes_agent_grafana_viewer_token is not match('(?i)^replace')
+      - hermes_agent_grafana_mcp_server_token | length > 0
+      - hermes_agent_grafana_mcp_server_token is not match('(?i)^replace')
+      - hermes_agent_grafana_image_repository == 'grafana/mcp-grafana'
+      - hermes_agent_grafana_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - hermes_agent_grafana_enabled_tools is search('runpanelquery')
+    fail_msg: >-
+      Enabled Grafana MCP needs a Grafana IPv4, port 3000, URL, Viewer token,
+      immutable official image, and panel-query tool. Egress is TCP 3000 only.
+  no_log: true
+
+- name: Reject Grafana secrets when read-only MCP access is disabled
+  when: not (hermes_agent_grafana_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_grafana_viewer_token | length == 0
+      - hermes_agent_grafana_mcp_server_token | length == 0
+    fail_msg: Do not pass a Grafana Viewer token when Grafana MCP is disabled.
   no_log: true
