@@ -120,3 +120,17 @@ argument_specs:
         type: str
       hermes_agent_github_cli_archive_sha256:
         type: str
+      hermes_agent_pve_enabled:
+        type: bool
+      hermes_agent_pve_ipv4:
+        type: str
+      hermes_agent_pve_user:
+        type: str
+      hermes_agent_pve_token_name:
+        type: str
+      hermes_agent_pve_token_value:
+        type: str
+      hermes_agent_pve_verify_ssl:
+        type: bool
+      hermes_agent_pve_port:
+        type: int

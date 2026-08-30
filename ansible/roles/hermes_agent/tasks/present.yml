@@ -104,6 +104,16 @@
     - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
     - "{{ hermes_agent_data_dir }}/home/.gitconfig"
 
+- name: Configure optional read-only Proxmox API access
+  when: hermes_agent_pve_enabled | bool
+  ansible.builtin.include_tasks: pve.yml
+
+- name: Remove the Proxmox helper when read-only API access is disabled
+  when: not (hermes_agent_pve_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    state: absent
+
 - name: Install Hermes Agent Compose file
   ansible.builtin.template:
     src: compose.yaml.j2
@@ -182,6 +192,15 @@
       - hermes_agent_github_app_private_key not in hermes_agent_compose_text
       - "'BEGIN ' not in hermes_agent_compose_text"
       - "'GH_TOKEN' not in hermes_agent_compose_text"
+    fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
+  no_log: true
+
+- name: Assert Proxmox token secrets stay out of Compose
+  when: hermes_agent_pve_token_value | length > 0
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_pve_token_value not in hermes_agent_compose_text
+      - "'PVE_API_TOKEN_SECRET' not in hermes_agent_compose_text"
     fail_msg: Hermes Agent secrets must not appear in Compose or command arguments.
   no_log: true
 

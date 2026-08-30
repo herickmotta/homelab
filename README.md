@@ -117,6 +117,7 @@ flowchart TB
   agent -->|"no published ports"| telegram
   agent -->|"no LAN listener"| provider
   agent -->|"App installation token"| github
+  agent -->|"PVEAuditor GET :8006"| host
 
   durable --> virtio
   virtio --> smb
@@ -148,9 +149,10 @@ How traffic and data move:
   selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
   Sentinel.
 - Hermes runs the official pinned container on its own guest. Telegram and
-  the model provider are outbound only. The container cannot reach RFC1918
-  or link-local destinations, the Docker socket, or host credentials. There
-  is no Caddy route, dashboard, or public ingress for Hermes.
+  the model provider are outbound only. RFC1918 and link-local destinations
+  stay dropped except an optional GET-only Proxmox API hole to the hypervisor
+  on TCP 8006. There is no Docker socket, Caddy route, dashboard, or public
+  ingress for Hermes.
 
 ```mermaid
 flowchart LR
@@ -182,7 +184,7 @@ repository.
 `bpg/proxmox` 0.111.1. `modules/proxmox-guests` composes a stable map of
 those guests from private site configuration and can attach VirtioFS
 directory mappings and optional PCI resource mappings. Fictional usage is
-under `examples/`. Collection `herickmotta.homelab` 0.14.0 ships
+under `examples/`. Collection `herickmotta.homelab` 0.15.0 ships
 `guest_base`, `network_plane`, `application_runtime`, `frigate`,
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,

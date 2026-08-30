@@ -95,7 +95,8 @@ Roles:
   allowlisted administrator. There is no dashboard, API server, or
   published port. Optional GitHub App installation tokens can clone
   declared repositories and open pull requests; merge stays with the
-  operator.
+  operator. Optional PVEAuditor access is GET-only to the hypervisor API
+  on TCP 8006; other RFC1918 destinations stay dropped.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

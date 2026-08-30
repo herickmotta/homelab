@@ -139,3 +139,28 @@
       - hermes_agent_github_app_private_key | length == 0
     fail_msg: Do not pass a GitHub App private key when GitHub access is disabled.
   no_log: true
+
+- name: Require Proxmox binding when read-only API access is enabled
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_pve_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_pve_ipv4 is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+      - hermes_agent_pve_user is match('^[A-Za-z0-9._-]+@pve$')
+      - hermes_agent_pve_token_name is match('^[A-Za-z0-9._-]+$')
+      - hermes_agent_pve_port | int == 8006
+      - hermes_agent_pve_token_value | length > 0
+      - hermes_agent_pve_token_value is not match('(?i)^replace')
+    fail_msg: >-
+      Enabled Proxmox access needs a hypervisor IPv4, hermes@pve-style user,
+      token name, and a non-placeholder token secret. Egress is TCP 8006 only.
+  no_log: true
+
+- name: Reject Proxmox secrets when read-only API access is disabled
+  when: not (hermes_agent_pve_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_pve_token_value | length == 0
+    fail_msg: Do not pass a Proxmox token when Proxmox access is disabled.
+  no_log: true

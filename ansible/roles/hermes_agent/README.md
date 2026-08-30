@@ -79,6 +79,20 @@ App. This role does not grant Administration, Actions write, Secrets, or
 Workflows. Do not put `GH_TOKEN` in Compose. Do not bind-mount operator
 workstations or `.git` credentials.
 
+## Optional read-only Proxmox API
+
+Defaults keep Proxmox access **off**. A site may set
+`hermes_agent_pve_enabled: true` with a dedicated `PVEAuditor` user, token
+name, token secret, and hypervisor IPv4. The role then:
+
+- writes `PVE_API_*` into the managed `0640` `.env`, never Compose
+- installs `pve-get`, a GET-only wrapper around `/api2/json/`
+- ACCEPTs TCP 8006 to that one IPv4 in `HERMES-AGENT-EGRESS` before the
+  RFC1918 DROP rules
+
+Do not reuse the OpenTofu, Observe, or Sentinel tokens. Do not open SSH or
+the rest of the LAN. Guest power and config remain denied by `PVEAuditor`.
+
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:
 

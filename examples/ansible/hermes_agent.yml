@@ -45,3 +45,13 @@
             if (site.hermes.github.enabled | default(false) | bool)
             else ''
           }}"
+        hermes_agent_pve_enabled: "{{ site.hermes.pve.enabled | default(false) | bool }}"
+        hermes_agent_pve_ipv4: "{{ site.hypervisor.endpoint_ipv4 }}"
+        hermes_agent_pve_user: "{{ site.hermes.pve.user | default('') }}"
+        hermes_agent_pve_token_name: "{{ site.hermes.pve.token_name | default('') }}"
+        hermes_agent_pve_verify_ssl: "{{ site.hermes.pve.verify_ssl | default(false) | bool }}"
+        hermes_agent_pve_token_value: "{{
+            lookup('env', 'PVE_HERMES_TOKEN_VALUE') | default('', true)
+            if (site.hermes.pve.enabled | default(false) | bool)
+            else ''
+          }}"

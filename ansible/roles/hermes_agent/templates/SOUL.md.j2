@@ -21,3 +21,10 @@ open pull requests. Never merge. Never run `gh pr merge`. Never push `main`
 or `master`. The operator reviews and merges. Sentinel apply is the deploy
 path. Do not request workflow, secret, administration, or apply credentials.
 {% endif %}
+{% if hermes_agent_pve_enabled | bool %}
+
+Proxmox access is a dedicated PVEAuditor token. Use `pve-get` for GET-only
+API paths such as `version`, `nodes`, and `nodes/<node>/qemu`. Do not start,
+stop, migrate, or reconfigure guests. Do not call the OpenTofu token or
+apply path. Guest-agent fields may 403 until that privilege is granted.
+{% endif %}

@@ -91,3 +91,14 @@ hermes_agent_github_repos_dir: /opt/hermes-agent/data/repos
 hermes_agent_github_container_repos_dir: /opt/data/repos
 hermes_agent_github_cli_version: "2.98.0"
 hermes_agent_github_cli_archive_sha256: "3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de"
+
+# Optional read-only Proxmox API. Disabled until a site supplies a distinct
+# PVEAuditor token and the hypervisor IPv4. Egress stays denied except TCP
+# 8006 to that one address.
+hermes_agent_pve_enabled: false
+hermes_agent_pve_ipv4: ""
+hermes_agent_pve_user: ""
+hermes_agent_pve_token_name: ""
+hermes_agent_pve_token_value: ""
+hermes_agent_pve_verify_ssl: false
+hermes_agent_pve_port: 8006
