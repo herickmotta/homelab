@@ -36,6 +36,17 @@
     daemon_reload: true
   failed_when: false
 
+- name: Stop the Grafana Hermes relay
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+  loop:
+    - "{{ hermes_agent_relay_unit }}"
+    - "{{ hermes_agent_relay_ingress_unit }}"
+
 - name: Remove Hermes Agent managed files
   ansible.builtin.file:
     path: "{{ item }}"
@@ -60,6 +71,11 @@
     - "{{ hermes_agent_egress_script }}"
     - "/etc/systemd/system/{{ hermes_agent_egress_unit }}"
     - /etc/systemd/system/hermes-alert-adapter.service
+    - "{{ hermes_agent_relay_script }}"
+    - "{{ hermes_agent_relay_env_file }}"
+    - "{{ hermes_agent_relay_ingress_script }}"
+    - "/etc/systemd/system/{{ hermes_agent_relay_unit }}"
+    - "/etc/systemd/system/{{ hermes_agent_relay_ingress_unit }}"
 
 - name: Reload systemd after removing the egress unit
   ansible.builtin.systemd_service:

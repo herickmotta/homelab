@@ -158,3 +158,35 @@ argument_specs:
         type: str
       hermes_agent_grafana_enabled_tools:
         type: str
+      hermes_agent_webhook_enabled:
+        type: bool
+      hermes_agent_webhook_port:
+        type: int
+      hermes_agent_webhook_route:
+        type: str
+      hermes_agent_webhook_secret:
+        type: str
+      hermes_agent_relay_listen_host:
+        type: str
+      hermes_agent_relay_listen_port:
+        type: int
+      hermes_agent_relay_allow_from:
+        type: str
+      hermes_agent_relay_grafana_hmac_secret:
+        type: str
+      hermes_agent_relay_max_body_bytes:
+        type: int
+      hermes_agent_relay_rate_per_minute:
+        type: int
+      hermes_agent_relay_unit:
+        type: str
+      hermes_agent_relay_ingress_unit:
+        type: str
+      hermes_agent_relay_script:
+        type: str
+      hermes_agent_relay_env_file:
+        type: str
+      hermes_agent_relay_ingress_script:
+        type: str
+      hermes_agent_relay_state_dir:
+        type: str

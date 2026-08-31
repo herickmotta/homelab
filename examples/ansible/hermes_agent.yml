@@ -69,3 +69,15 @@
             if (site.hermes.grafana.enabled | default(false) | bool)
             else ''
           }}"
+        hermes_agent_webhook_enabled: "{{ site.hermes.webhook.enabled | default(false) | bool }}"
+        hermes_agent_relay_allow_from: "{{ site.guests.observability.ipv4 }}"
+        hermes_agent_webhook_secret: "{{
+            lookup('env', 'HERMES_ALERT_WEBHOOK_SECRET') | default('', true)
+            if (site.hermes.webhook.enabled | default(false) | bool)
+            else ''
+          }}"
+        hermes_agent_relay_grafana_hmac_secret: "{{
+            lookup('env', 'GRAFANA_WEBHOOK_HMAC_SECRET') | default('', true)
+            if (site.hermes.webhook.enabled | default(false) | bool)
+            else ''
+          }}"

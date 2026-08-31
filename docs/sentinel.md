@@ -48,25 +48,25 @@ procedure after a reinstall.
 Sentinel monitoring is deliberately small:
 
 - Prometheus keeps 72 hours and 10 GB by default;
-- Blackbox probes ICMP, HTTP(S), and TCP endpoints;
-- typed direct scrapes can retain a small service signal such as Frigate
-  camera input FPS;
+- Blackbox probes the hypervisor (ICMP and API) and observe-plane liveness
+  (Grafana, Observe Prometheus, Loki);
 - the PVE exporter uses a dedicated `PVEAuditor` token;
 - node exporter reports Sentinel disk and memory pressure;
-- Alertmanager groups notifications and inhibits guest alerts while the
+- Alertmanager groups notifications and inhibits observe alerts while the
   hypervisor is unreachable;
 - an optional systemd timer pings an external dead-man service.
+
+Household HTTPS, DNS, SMB, Frigate, and Home Assistant probes belong on the
+observability guest. Sentinel does not scrape Frigate FPS or page those
+services.
 
 Prometheus, exporters, and their APIs bind to loopback by default.
 Alertmanager stays loopback unless a site sets a LAN bind address, typically
 `0.0.0.0:9093`. That listener is not on Caddy and is not a management UI.
-A host firewall rule must allow only the observability guest to reach it.
-Sentinel Prometheus continues to use loopback. Raw email, an optional
-Telegram channel, and Proxmox-down inhibition stay on this Alertmanager
-regardless of observe or Hermes. Grafana on the observability guest may
-proxy Alertmanager as a read-only datasource so Alerting is the unified
-firing view. That path never replaces email or Telegram paging and is not
-a Caddy route.
+A host firewall rule must allow only the observability guest to reach it
+so Grafana can use it as a read-only Alerting datasource. Survival paging
+(email and optional Telegram channel) stays on this Alertmanager. Grafana
+and Hermes never replace that path.
 
 Grafana, longer Prometheus retention, detailed application metrics, and
 later log search belong on the Proxmox observability guest

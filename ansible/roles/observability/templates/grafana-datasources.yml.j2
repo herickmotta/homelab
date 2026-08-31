@@ -19,12 +19,12 @@ datasources:
     editable: false
     jsonData:
       maxLines: 1000
-{% if observability_alertmanager_address | length > 0 %}
+{% if observability_external_alertmanager_address | default('') | length > 0 %}
   - name: Alertmanager
     uid: alertmanager
     type: alertmanager
     access: proxy
-    url: http://{{ observability_alertmanager_address }}
+    url: http://{{ observability_external_alertmanager_address }}
     editable: false
     jsonData:
       implementation: prometheus

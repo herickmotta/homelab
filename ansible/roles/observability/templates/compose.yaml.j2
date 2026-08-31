@@ -113,3 +113,25 @@ services:
     labels:
       homelab.role: observability
 {% endif %}
+
+{% if observability_blackbox_enabled | bool %}
+  blackbox-exporter:
+    image: "{{ observability_blackbox_image }}"
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+      - --web.listen-address={{ observability_blackbox_listen_address }}
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    mem_limit: 128m
+    cpus: "0.25"
+    labels:
+      homelab.role: observability
+{% endif %}

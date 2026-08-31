@@ -86,7 +86,10 @@ Roles:
   read-only consumers; Loki listens on the guest LAN for Alloy push and is
   not published through Caddy. It scrapes guest node exporters, Alloy, the
   Sentinel host Linux exporter, and hypervisor SMART and ZFS, and sends
-  selected alerts to Sentinel Alertmanager. The Homelab overview dashboard
+  selected alerts to Grafana Alerting, which pages a Telegram channel and
+  email and then a Hermes HMAC relay. Sentinel Alertmanager pages only
+  Proxmox health and observe-plane liveness. Grafana keeps a read-only
+  Sentinel Alertmanager datasource. The Homelab overview dashboard
   is the fleet/NAS view, while the Operations / Hermes evidence dashboard is
   the stable read-only evidence contract for alerts, target health, storage,
   services, Frigate, and log freshness. Optional read-only PVE exporter uses a
@@ -110,7 +113,9 @@ Roles:
   MCP is a same-network sidecar: Hermes talks to `grafana-mcp` over Docker
   DNS; the sidecar holds the Viewer token and reaches Grafana on TCP 3000
   with read-only prometheus, loki, and alerting query tools. Grafana
-  Alerting is the unified firing view. Raw email stays independent.
+  Alerting is the household notify path. An optional host relay accepts
+  Grafana HMAC from the observe guest and signs Hermes HMAC-v2 on
+  loopback. Raw Sentinel email/channel stays independent for survival.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

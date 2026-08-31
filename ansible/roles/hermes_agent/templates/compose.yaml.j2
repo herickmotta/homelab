@@ -49,6 +49,10 @@ services:
       homelab.role: hermes_agent
       homelab.hermes.source_commit: "{{ hermes_agent_source_commit }}"
       homelab.hermes.source_repository: "{{ hermes_agent_source_repository }}"
+{% if hermes_agent_webhook_enabled | bool %}
+    ports:
+      - "127.0.0.1:{{ hermes_agent_webhook_port | int }}:{{ hermes_agent_webhook_port | int }}"
+{% endif %}
 
 {% if hermes_agent_grafana_enabled | bool %}
   grafana-mcp:

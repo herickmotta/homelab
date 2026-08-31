@@ -8,13 +8,16 @@ global:
 
 rule_files:
   - /etc/prometheus/rules/*.yml
-{% if observability_alertmanager_address | length > 0 %}
+{% if observability_grafana_alertmanager_host | default('') | length > 0 %}
 
 alerting:
   alertmanagers:
-    - static_configs:
+    - scheme: http
+      path_prefix: "{{ observability_grafana_alertmanager_path_prefix | default('/api/alertmanager/grafana') }}"
+      api_version: v2
+      static_configs:
         - targets:
-            - "{{ observability_alertmanager_address }}"
+            - "{{ observability_grafana_alertmanager_host }}"
 {% endif %}
 
 scrape_configs:
@@ -81,7 +84,7 @@ scrape_configs:
           target_name: zfs
 {% endif %}
 
-{% if observability_alloy_targets | length > 0 %}
+{% if observability_alloy_targets | default([]) | length > 0 %}
   # loki.write exports host as the Loki endpoint. honor_labels false keeps the
   # scrape shipper host and renames the endpoint label to exported_host.
   - job_name: alloy
@@ -124,7 +127,79 @@ scrape_configs:
         replacement: "{{ observability_pve_exporter_listen_address }}"
 {% endif %}
 
-{% for target in observability_metrics_targets %}
+{% if observability_http_targets | default([]) | length > 0 %}
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx
+    static_configs:
+{% for target in observability_http_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('pve') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ observability_blackbox_listen_address }}"
+{% endif %}
+
+{% if observability_tcp_targets | default([]) | length > 0 %}
+  - job_name: blackbox_tcp
+    metrics_path: /probe
+    params:
+      module:
+        - tcp_connect
+    static_configs:
+{% for target in observability_tcp_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('pve') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ observability_blackbox_listen_address }}"
+{% endif %}
+
+{% if observability_icmp_targets | default([]) | length > 0 %}
+  - job_name: blackbox_icmp
+    metrics_path: /probe
+    params:
+      module:
+        - icmp_ipv4
+    static_configs:
+{% for target in observability_icmp_targets %}
+      - targets:
+          - "{{ target.address }}"
+        labels:
+          target_name: "{{ target.name }}"
+          target_kind: "{{ target.kind | default('endpoint') }}"
+          dependency: "{{ target.dependency | default('pve') }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ observability_blackbox_listen_address }}"
+{% endif %}
+
+{% for target in observability_metrics_targets | default([]) %}
   - job_name: "metrics_{{ target.name }}"
     scheme: "{{ target.scheme | default('http') }}"
     metrics_path: "{{ target.metrics_path | default('/metrics') }}"

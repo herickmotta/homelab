@@ -49,14 +49,18 @@
         sentinel_monitoring_icmp_targets: "{{ site.monitoring.sentinel.icmp_targets }}"
         sentinel_monitoring_http_targets: "{{ site.monitoring.sentinel.http_targets }}"
         sentinel_monitoring_tcp_targets: "{{ site.monitoring.sentinel.tcp_targets }}"
-        sentinel_monitoring_metrics_targets: "{{ site.monitoring.sentinel.metrics_targets }}"
+        sentinel_monitoring_metrics_targets: "{{
+            site.monitoring.sentinel.metrics_targets | default([])
+          }}"
         sentinel_monitoring_pve_enabled: "{{ site.monitoring.sentinel.pve_exporter.enabled }}"
         sentinel_monitoring_pve_target: "{{ site.hypervisor.endpoint_ipv4 }}"
         sentinel_monitoring_pve_user: "{{ site.monitoring.sentinel.pve_exporter.user }}"
         sentinel_monitoring_pve_token_name: "{{ site.monitoring.sentinel.pve_exporter.token_name }}"
         sentinel_monitoring_pve_token_value: "{{ lookup('env', 'PVE_MONITOR_TOKEN_VALUE') }}"
         sentinel_monitoring_pve_verify_ssl: "{{ site.monitoring.sentinel.pve_exporter.verify_ssl }}"
-        sentinel_monitoring_critical_guest_ids: "{{ site.monitoring.sentinel.critical_guest_ids }}"
+        sentinel_monitoring_critical_guest_ids: "{{
+            site.monitoring.sentinel.critical_guest_ids | default([])
+          }}"
         sentinel_monitoring_email_destination: "{{ site.storage.monitoring.email_destination }}"
         sentinel_monitoring_smtp_host: "{{ site.storage.monitoring.smtp.host }}"
         sentinel_monitoring_smtp_port: "{{ site.storage.monitoring.smtp.port }}"

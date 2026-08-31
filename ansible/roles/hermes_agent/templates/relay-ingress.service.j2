@@ -1,0 +1,13 @@
+[Unit]
+Description=iptables allowlist for the Grafana Hermes relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={{ hermes_agent_relay_ingress_script }}
+ExecStop=/bin/sh -c 'iptables -D INPUT -p tcp --dport {{ hermes_agent_relay_listen_port | int }} -j HERMES-RELAY-INGRESS 2>/dev/null || true; iptables -F HERMES-RELAY-INGRESS 2>/dev/null || true; iptables -X HERMES-RELAY-INGRESS 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target

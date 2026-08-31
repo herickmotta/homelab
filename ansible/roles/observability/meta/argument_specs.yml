@@ -55,16 +55,59 @@ argument_specs:
         default: 127.0.0.1:3100
       observability_prometheus_listen_address:
         type: str
-      observability_alertmanager_address:
+      observability_grafana_alertmanager_host:
         type: str
         description: >-
-          Sentinel Alertmanager host:port. Prometheus sends alerts there.
-          When set, Grafana also provisions a read-only Alertmanager
-          datasource so Alerting is the unified firing view. Do not put
-          Alertmanager on Caddy.
+          Grafana Unified Alerting AM host:port for Observe Prometheus.
+          Empty disables Prometheus-to-Grafana alerting. Typical loopback
+          is 127.0.0.1:3000. Do not send Observe alerts to Sentinel AM.
+      observability_grafana_alertmanager_path_prefix:
+        type: str
+        default: /api/alertmanager/grafana
+      observability_external_alertmanager_address:
+        type: str
+        description: >-
+          Sentinel Alertmanager host:port for a Grafana read-only
+          datasource. Grafana must not send Grafana-managed alerts there.
+          Do not put Alertmanager on Caddy.
       observability_alert_for:
         type: str
         default: 2m
+      observability_blackbox_image:
+        type: str
+      observability_blackbox_listen_address:
+        type: str
+      observability_http_targets:
+        type: list
+        elements: dict
+      observability_tcp_targets:
+        type: list
+        elements: dict
+      observability_icmp_targets:
+        type: list
+        elements: dict
+      observability_smtp_host:
+        type: str
+      observability_smtp_port:
+        type: int
+      observability_smtp_username:
+        type: str
+      observability_smtp_password:
+        type: str
+      observability_smtp_from:
+        type: str
+      observability_smtp_require_tls:
+        type: bool
+      observability_email_destination:
+        type: str
+      observability_telegram_chat_id:
+        type: str
+      observability_telegram_bot_token:
+        type: str
+      observability_webhook_url:
+        type: str
+      observability_webhook_hmac_secret:
+        type: str
       observability_alloy_targets:
         type: list
         elements: dict

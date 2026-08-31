@@ -1,0 +1,21 @@
+[Unit]
+Description=Grafana to Hermes HMAC webhook relay
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ hermes_agent_runtime_user }}
+Group={{ hermes_agent_runtime_group }}
+EnvironmentFile={{ hermes_agent_relay_env_file }}
+ExecStart=/usr/bin/python3 {{ hermes_agent_relay_script }}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ hermes_agent_relay_state_dir }}
+
+[Install]
+WantedBy=multi-user.target

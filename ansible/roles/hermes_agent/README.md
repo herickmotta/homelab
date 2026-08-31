@@ -23,7 +23,8 @@ update. Upgrades change the reviewed digest and matching source commit.
 
 The container runs the image entrypoint (s6 as PID 1, then `s6-setuidgid hermes`,
 UID 10000). It is not privileged, does not use host namespaces, does not mount
-the Docker socket or host `/home`/`/etc`/`/root`, and publishes no ports.
+the Docker socket or host `/home`/`/etc`/`/root`, and publishes no ports
+unless the Grafana webhook is enabled (`127.0.0.1:8644` only).
 
 Managed policy lives on the host under `hermes_agent_managed_dir` and is mounted
 read-only at `/opt/hermes-policy`. Persistent Hermes state is `/opt/data`.
@@ -118,11 +119,11 @@ Listen with `--address`, not `-addr`. Do not put
 through Caddy; the hole is Grafana's own `:3000`. Write tools stay off.
 Enabled tools include Grafana `prometheus`, `loki`, and `alerting` groups
 so Telegram investigation can search datasources and list firing alerts,
-not only dashboard panels. Grafana Alerting is the unified read surface
-(Observe Prometheus rules plus the Sentinel Alertmanager datasource).
-Alertmanager pages a Telegram channel and email without Hermes. Unattended
-triage is a Hermes cron that polls Grafana MCP and DMs the operator; do not
-provision a custom Alertmanager webhook.
+not only dashboard panels. Grafana Alerting pages the household channel and
+email. Optional `hermes_agent_webhook_enabled` runs a host relay that
+accepts Grafana HMAC from one observe IPv4, signs Nous HMAC-v2, and POSTs
+to loopback `:8644`. Compose publishes `127.0.0.1:8644` only then. There is
+no Alertmanager webhook and no poll cron.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:

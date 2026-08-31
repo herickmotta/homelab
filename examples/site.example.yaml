@@ -61,25 +61,44 @@ site:
         user: prometheus@pve
         token_name: sentinel
         verify_ssl: false
-      critical_guest_ids:
-        - 112
-        - 114
-        - 115
-        - 116
-        - 117
       icmp_targets:
-        - name: gateway
-          address: 192.0.2.1
-          kind: network
-          dependency: none
         - name: pve-example
           address: 192.0.2.10
           kind: hypervisor
           dependency: none
-        - name: hermes
-          address: 192.0.2.17
+      http_targets:
+        - name: grafana
+          address: https://grafana.lab.example.test
           kind: service
           dependency: pve
+        - name: observe-prometheus
+          address: http://192.0.2.16:9090/-/ready
+          kind: service
+          dependency: pve
+        - name: observe-loki
+          address: http://192.0.2.16:3100/ready
+          kind: service
+          dependency: pve
+      tcp_targets:
+        - name: proxmox-api
+          address: 192.0.2.10:8006
+          kind: pve_api
+          dependency: pve
+      # Observe guest only. Household VMs page from Grafana, not Sentinel.
+      critical_guest_ids:
+        - 116
+    observability:
+      site_label: example
+      retention_time: 15d
+      retention_size: 40GB
+      grafana_root_url: https://grafana.lab.example.test
+      loki_retention_period: 336h
+      prometheus_listen_address: "192.0.2.16:9090"
+      grafana_alertmanager_host: "127.0.0.1:3000"
+      external_alertmanager_address: "192.0.2.11:9093"
+      telegram:
+        chat_id: "-1001234567890"
+      webhook_url: "http://192.0.2.17:8787/grafana"
       http_targets:
         - name: adguard
           address: https://adguard.lab.example.test
@@ -93,32 +112,15 @@ site:
           address: https://ha.lab.example.test
           kind: service
           dependency: pve
-        - name: grafana
-          address: https://grafana.lab.example.test
+      tcp_targets:
+        - name: dns
+          address: 192.0.2.12:53
           kind: service
           dependency: pve
-      tcp_targets:
-        - name: proxmox-api
-          address: 192.0.2.10:8006
-          kind: pve_api
+        - name: smb
+          address: 192.0.2.14:445
+          kind: service
           dependency: pve
-      metrics_targets:
-        - name: frigate
-          address: 192.0.2.15:8971
-          scheme: http
-          metrics_path: /api/metrics
-          keep_metrics:
-            - frigate_camera_fps
-            - frigate_process_fps
-          dependency: pve
-    observability:
-      site_label: example
-      retention_time: 15d
-      retention_size: 40GB
-      grafana_root_url: https://grafana.lab.example.test
-      loki_retention_period: 336h
-      prometheus_listen_address: "192.0.2.16:9090"
-      alertmanager_address: "192.0.2.11:9093"
       pve_exporter:
         enabled: true
         user: observe@pve
@@ -483,6 +485,8 @@ site:
     pve:
       enabled: false
     grafana:
+      enabled: false
+    webhook:
       enabled: false
 
   frigate:
