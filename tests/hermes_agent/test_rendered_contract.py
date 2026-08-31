@@ -369,6 +369,8 @@ def assert_pve_read_only_helpers() -> None:
         raise SystemExit("pve-get must be a GET-only Proxmox client")
     if "status/start" not in helper:
         raise SystemExit("pve-get must refuse guest start paths")
+    if 'pvedir=$(CDPATH= cd -- "${bindir}/../pve" && pwd)' not in helper:
+        raise SystemExit("pve-get must read credentials from managed/pve files")
     pve_env = render(
         "managed.env.j2",
         hermes_agent_telegram_bot_token=SECRET_TOKEN,
@@ -381,12 +383,17 @@ def assert_pve_read_only_helpers() -> None:
         hermes_agent_pve_token_name="hermes",
         hermes_agent_pve_token_value="pve-secret-not-for-compose",
     )
-    if "PVE_API_ENDPOINT=https://192.0.2.10:8006" not in pve_env:
-        raise SystemExit("enabled PVE env must pin the hypervisor API")
-    if "PVE_API_TOKEN_ID=hermes@pve!hermes" not in pve_env:
-        raise SystemExit("enabled PVE env must pin the token id")
-    if "PVE_API_TOKEN_SECRET=pve-secret-not-for-compose" not in pve_env:
-        raise SystemExit("managed env must hold the PVE token secret")
+    if "PVE_API_TOKEN_SECRET=" in pve_env or "PVE_API_TOKEN_ID=" in pve_env:
+        raise SystemExit("managed env must not hold PVE TOKEN/SECRET names")
+    if "pve-secret-not-for-compose" in pve_env:
+        raise SystemExit("managed env must not hold the PVE token secret")
+    if "/opt/hermes-policy/bin" not in pve_env:
+        raise SystemExit("PVE helper must be first on PATH")
+    pve_tasks = (ROLE / "tasks/pve.yml").read_text()
+    if "managed_dir }}/pve/token-secret" not in pve_tasks:
+        raise SystemExit("pve.yml must install the token secret as a file")
+    if "no_log: true" not in pve_tasks:
+        raise SystemExit("pve.yml must no_log the token secret task")
     compose = render(
         "compose.yaml.j2",
         hermes_agent_pve_enabled=True,
@@ -408,6 +415,10 @@ def assert_pve_read_only_helpers() -> None:
     soul = render("SOUL.md.j2", hermes_agent_pve_enabled=True)
     if "pve-get" not in soul or "PVEAuditor" not in soul:
         raise SystemExit("SOUL.md must describe GET-only Proxmox access")
+    if "/opt/hermes-policy/bin/pve-get" not in soul or "execute_code" not in soul:
+        raise SystemExit("SOUL.md must point Hermes at the deployed pve-get binary")
+    if "{{ hermes_agent_managed_dir }}/pve" not in ABSENT:
+        raise SystemExit("absent.yml must remove managed/pve credentials")
     print("pve read-only: GET helper, :8006 hole, secret stays out of Compose")
 
 

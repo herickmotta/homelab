@@ -7,6 +7,14 @@
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0750"
 
+- name: Create the managed PVE credential directory
+  ansible.builtin.file:
+    path: "{{ hermes_agent_managed_dir }}/pve"
+    state: directory
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
 - name: Install the GET-only Proxmox helper
   ansible.builtin.copy:
     src: pve-get
@@ -14,3 +22,36 @@
     owner: root
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0750"
+
+- name: Install the Proxmox API endpoint
+  ansible.builtin.copy:
+    dest: "{{ hermes_agent_managed_dir }}/pve/endpoint"
+    content: "https://{{ hermes_agent_pve_ipv4 }}:{{ hermes_agent_pve_port | int }}\n"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+
+- name: Install the Proxmox API token id
+  ansible.builtin.copy:
+    dest: "{{ hermes_agent_managed_dir }}/pve/token-id"
+    content: "{{ hermes_agent_pve_user }}!{{ hermes_agent_pve_token_name }}\n"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+
+- name: Install the Proxmox API token secret
+  ansible.builtin.copy:
+    dest: "{{ hermes_agent_managed_dir }}/pve/token-secret"
+    content: "{{ hermes_agent_pve_token_value }}\n"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+  no_log: true
+
+- name: Install the Proxmox TLS verify flag
+  ansible.builtin.copy:
+    dest: "{{ hermes_agent_managed_dir }}/pve/verify-ssl"
+    content: "{{ '1' if (hermes_agent_pve_verify_ssl | bool) else '0' }}\n"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"

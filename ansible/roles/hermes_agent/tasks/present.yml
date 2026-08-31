@@ -264,8 +264,11 @@
 - name: Remove the Proxmox helper when read-only API access is disabled
   when: not (hermes_agent_pve_enabled | bool)
   ansible.builtin.file:
-    path: "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    path: "{{ item }}"
     state: absent
+  loop:
+    - "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    - "{{ hermes_agent_managed_dir }}/pve"
 
 - name: Install Hermes Agent Compose file
   ansible.builtin.template:
