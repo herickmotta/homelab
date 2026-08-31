@@ -156,7 +156,10 @@ How traffic and data move:
   journal and Docker logs to Loki on the observability guest. Docker
   streams include Compose service, network, and container IP labels.
   Node exporters publish `homelab_docker_*` inventory (health, restarts,
-  IPs, published ports, gateways) so Grafana MCP can debug without SSH.
+  IPs, published ports, gateways) and `homelab_local_tcp_up` host connect
+  probes (target `address`, no payload) so Grafana MCP can debug without
+  SSH. Host probes to a published port appear inside the container as the
+  Docker bridge gateway.
   Grafana Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
   household alerts to a loopback Alertmanager on the observability guest
   (Grafana 13.2 cannot ingest Prometheus AM v2 POSTs). That Alertmanager

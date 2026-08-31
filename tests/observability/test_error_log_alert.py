@@ -32,6 +32,7 @@ def test_error_log_alert_is_loki_backed_and_bounded():
     assert "error|failed|failure|critical|fatal|panic" in loki_query
     assert rule["noDataState"] == "OK"
     assert rule["execErrState"] == "Alerting"
+    assert "homelab_local_tcp_up" in rule["annotations"]["description"]
 
 
 if __name__ == "__main__":

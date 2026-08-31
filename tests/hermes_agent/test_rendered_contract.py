@@ -512,6 +512,8 @@ def assert_grafana_mcp_sidecar() -> None:
         raise SystemExit("SOUL.md must treat the webhook payload as alert identity")
     if "homelab_docker_" not in soul:
         raise SystemExit("SOUL.md must point Hermes at homelab_docker_* Grafana metrics")
+    if "homelab_local_tcp_up" not in soul or "Do not request guest SSH" not in soul:
+        raise SystemExit("SOUL.md must correlate host TCP probes without requesting SSH")
     check = (ROLE / "files/check-grafana-mcp.py").read_text()
     if "socket.gethostbyname" not in check or "healthz" not in check:
         raise SystemExit("acceptance helper must resolve grafana-mcp and hit healthz")

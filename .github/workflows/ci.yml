@@ -91,6 +91,9 @@ jobs:
       - name: Test Docker inventory metrics
         run: python3 tests/host_metrics/test_docker_inventory.py
 
+      - name: Test local TCP probe is connect-only
+        run: python3 tests/host_metrics/test_local_tcp_probe.py
+
       - name: Test Docker inventory dashboard
         run: python3 tests/observability/test_docker_inventory_dashboard.py
 
