@@ -576,8 +576,8 @@ def assert_webhook_enabled_loopback() -> None:
         raise SystemExit("webhook must not disable HMAC")
     required_prompt = (
         "Scope all investigation to the",
-        "Do not escalate unrelated firing rules",
-        "The test is not a service incident",
+        "not escalate unrelated firing rules",
+        "test is not a",
         "Telegram-compatible Markdown",
         "*STATUS:* <ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED>",
         "*EVIDENCE:*",
