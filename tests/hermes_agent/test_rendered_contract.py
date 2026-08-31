@@ -575,11 +575,12 @@ def assert_webhook_enabled_loopback() -> None:
     if "INSECURE_NO_AUTH" in config:
         raise SystemExit("webhook must not disable HMAC")
     required_prompt = (
-        "STATUS: ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED",
-        "maximum 12 short lines",
-        "Investigate before replying",
-        "RESOURCE, requested operation, observed error",
-        "Do not use GitHub",
+        "Scope all investigation to the",
+        "not escalate unrelated firing rules",
+        "test is not a",
+        "Telegram-compatible Markdown",
+        "*STATUS:* <ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED>",
+        "*EVIDENCE:*",
         "Internal payload for investigation only",
         "{__raw__}",
         "{alert_summary}",

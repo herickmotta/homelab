@@ -54,8 +54,16 @@ gateway:
               Alert identity from this webhook (use this first):
               {alert_summary}
 
-              Investigate before replying. If the alert is firing, or the
-              payload suggests impact, use the available read-only Grafana MCP
+              Investigate before replying. Scope all investigation to the
+              alert name, labels, fingerprint, and event in this payload. Do
+              not escalate unrelated firing rules discovered while looking at
+              Grafana; each alert gets its own webhook event. If the payload
+              is a Grafana contact-point test (for example TestAlert or
+              "Notification test"), validate delivery only. The test is not a
+              service incident, and the absence of a matching alert rule or
+              dashboard is expected.
+
+              For a real firing alert, use the available read-only Grafana MCP
               evidence (prometheus, loki, dashboards/panels) and pve-get when
               a guest or hypervisor looks involved. Do not stop at the webhook
               fields when more investigation is needed. For resolved events,
@@ -79,20 +87,25 @@ gateway:
               annotations. The raw payload is context only and must not be
               repeated in the Telegram response.
 
-              Telegram response: maximum 12 short lines, no preamble, using
-              exactly this structure:
-              STATUS: ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED
-              ALERT: <alert name and firing/resolved state>
-              TARGET: <host/service, or unknown>
-              RESULT: <one-line observed condition and impact>
-              EVIDENCE: <up to 2 concise observed facts>
-              NEXT: <one safe operator check, or access needed>
-              CONFIDENCE: HIGH | MEDIUM | LOW
+              Telegram response: maximum 12 short lines, no preamble. Use
+              Telegram-compatible Markdown exactly as follows:
+              *STATUS:* <ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED>
+              *ALERT:* <alert name and firing/resolved state>
+              *TARGET:* <host/service, or unknown>
+              *RESULT:* <one-line observed condition and impact>
+              *EVIDENCE:*
+              • <observed fact>
+              • <optional second observed fact>
+              *NEXT:* <one safe operator check, or access needed>
+              *CONFIDENCE:* <HIGH | MEDIUM | LOW>
 
               Use ACTION_REQUIRED only when operator intervention or a
-              follow-up check is warranted. Use NO_ACTION only when the alert
-              is resolved or evidence shows no meaningful impact. If more
-              investigation is warranted, perform it before choosing a status.
+              follow-up check is warranted. Use NO_ACTION for an intentional
+              notification test with no delivery problem, or when evidence
+              shows a resolved alert has no meaningful impact. Use
+              ACCESS_BLOCKED when a required resource cannot be inspected.
+              If more investigation is warranted, perform it before choosing
+              a status.
 
               Internal payload for investigation only (never quote it back):
               {__raw__}
