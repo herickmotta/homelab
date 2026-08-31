@@ -71,6 +71,8 @@ def main() -> None:
         observability_node_exporter_listen_address="127.0.0.1:9100",
         observability_grafana_alertmanager_host="127.0.0.1:3000",
         observability_grafana_alertmanager_path_prefix="/api/alertmanager/grafana",
+        observability_alerting_enabled=True,
+        observability_local_alertmanager_address="127.0.0.1:9094",
         observability_node_targets=[],
         observability_smartctl_address="",
         observability_zfs_address="",
@@ -87,9 +89,11 @@ def main() -> None:
     )
     if "192.0.2.11:9093" in prom:
         raise SystemExit("Observe Prometheus must not send alerts to Sentinel AM")
-    if "/api/alertmanager/grafana" not in prom or "127.0.0.1:3000" not in prom:
-        raise SystemExit("Observe Prometheus must send alerts to Grafana AM")
-    print("grafana datasources: Sentinel AM read-only; Prom alerts to Grafana AM")
+    if "/api/alertmanager/grafana" in prom:
+        raise SystemExit("Observe Prometheus must not POST Prometheus AM v2 to Grafana 13")
+    if "127.0.0.1:9094" not in prom:
+        raise SystemExit("Observe Prometheus must send alerts to loopback Alertmanager")
+    print("grafana datasources: Sentinel AM read-only; Prom alerts to observe AM")
 
 
 if __name__ == "__main__":

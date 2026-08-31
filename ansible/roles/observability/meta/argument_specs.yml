@@ -58,12 +58,16 @@ argument_specs:
       observability_grafana_alertmanager_host:
         type: str
         description: >-
-          Grafana Unified Alerting AM host:port for Observe Prometheus.
-          Empty disables Prometheus-to-Grafana alerting. Typical loopback
-          is 127.0.0.1:3000. Do not send Observe alerts to Sentinel AM.
+          Unused for Prometheus notify. Grafana 13.2 cannot ingest Prometheus
+          AM v2 POST arrays. Kept as a documented Grafana AM API host.
       observability_grafana_alertmanager_path_prefix:
         type: str
         default: /api/alertmanager/grafana
+      observability_alertmanager_image:
+        type: str
+      observability_local_alertmanager_address:
+        type: str
+        description: Loopback host:port for Observe Alertmanager (Prometheus notify).
       observability_external_alertmanager_address:
         type: str
         description: >-

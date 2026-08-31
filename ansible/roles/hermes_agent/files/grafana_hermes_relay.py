@@ -121,7 +121,7 @@ def make_handler(settings: dict):
             if peer != allow_from:
                 self._reject(403, "source")
                 return
-            if self.path.rstrip("/") != "/grafana":
+            if self.path.rstrip("/") not in ("/grafana", "/alertmanager"):
                 self._reject(404, "path")
                 return
             length = int(self.headers.get("Content-Length") or "0")
@@ -129,20 +129,30 @@ def make_handler(settings: dict):
                 self._reject(413, "size")
                 return
             body = self.rfile.read(length)
-            timestamp = self.headers.get("X-Grafana-Alerting-Timestamp")
-            provided = self.headers.get("X-Grafana-Alerting-Signature") or ""
-            expected = grafana_signature(grafana_secret, body, timestamp)
-            if not hmac.compare_digest(provided, expected):
-                self._reject(401, "hmac")
-                return
-            if timestamp:
-                try:
-                    age = abs(time.time() - int(timestamp))
-                except ValueError:
-                    self._reject(401, "timestamp")
+            path = self.path.rstrip("/")
+            if path == "/grafana":
+                timestamp = self.headers.get("X-Grafana-Alerting-Timestamp")
+                provided = self.headers.get("X-Grafana-Alerting-Signature") or ""
+                expected = grafana_signature(grafana_secret, body, timestamp)
+                if not hmac.compare_digest(provided, expected):
+                    self._reject(401, "hmac")
                     return
-                if age > MAX_SKEW_SECONDS:
-                    self._reject(401, "replay")
+                if timestamp:
+                    try:
+                        age = abs(time.time() - int(timestamp))
+                    except ValueError:
+                        self._reject(401, "timestamp")
+                        return
+                    if age > MAX_SKEW_SECONDS:
+                        self._reject(401, "replay")
+                        return
+            else:
+                auth = self.headers.get("Authorization") or ""
+                expected_auth = "Bearer " + grafana_secret.decode()
+                if len(auth) != len(expected_auth) or not hmac.compare_digest(
+                    auth, expected_auth
+                ):
+                    self._reject(401, "bearer")
                     return
             if not limiter.allow():
                 self._reject(429, "rate")

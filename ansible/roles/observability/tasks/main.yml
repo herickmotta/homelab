@@ -306,6 +306,28 @@
     mode: "0644"
   notify: Recreate observability compose
 
+- name: Install Observe Alertmanager configuration
+  when: observability_alerting_enabled | bool
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ observability_install_dir }}/alertmanager.yml"
+    owner: root
+    group: "65534"
+    mode: "0640"
+  no_log: true
+  notify: Recreate observability compose
+
+- name: Remove Observe Alertmanager configuration when unused
+  when: not (observability_alerting_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ observability_install_dir }}/alertmanager.yml"
+    state: absent
+
+- name: Remove leftover Grafana AM password file
+  ansible.builtin.file:
+    path: "{{ observability_install_dir }}/grafana-am.password"
+    state: absent
+
 - name: Install Prometheus alert rules
   ansible.builtin.template:
     src: rules.yml.j2
