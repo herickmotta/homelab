@@ -504,8 +504,10 @@ def assert_grafana_mcp_sidecar() -> None:
     soul = render("SOUL.md.j2", hermes_agent_grafana_enabled=True)
     if "grafana-mcp" not in soul or "Viewer token" not in soul:
         raise SystemExit("SOUL.md must describe sidecar-only Grafana access")
-    if "Alerting" not in soul or "Telegram channel" not in soul or "pager" not in soul:
-        raise SystemExit("SOUL.md must describe channel+email paging and Grafana Alerting")
+    if "Telegram channel" not in soul or "pager" not in soul:
+        raise SystemExit("SOUL.md must describe channel+email paging")
+    if "HMAC-v2" not in soul and "webhook" not in soul.lower():
+        raise SystemExit("SOUL.md must describe the Grafana webhook triage path")
     check = (ROLE / "files/check-grafana-mcp.py").read_text()
     if "socket.gethostbyname" not in check or "healthz" not in check:
         raise SystemExit("acceptance helper must resolve grafana-mcp and hit healthz")
@@ -517,12 +519,12 @@ def assert_grafana_mcp_sidecar() -> None:
     print("grafana mcp: --address, sidecar env, subnet RETURN, apply checks")
 
 
-def assert_no_alert_adapter() -> None:
-    if "hermes_agent_webhook_enabled" in DEFAULTS:
-        raise SystemExit("Alertmanager adapter is not a public role input")
+def assert_webhook_disabled_by_default() -> None:
+    if DEFAULTS["hermes_agent_webhook_enabled"]:
+        raise SystemExit("Grafana webhook must stay disabled until a site opts in")
     compose = render("compose.yaml.j2")
-    if "8644" in compose or "8787" in compose or "webhook" in compose.lower():
-        raise SystemExit("Hermes Compose must not publish an Alertmanager webhook")
+    if "8644" in compose or "8787" in compose:
+        raise SystemExit("disabled Hermes Compose must not publish webhook ports")
     config = render(
         "config.yaml.j2",
         hermes_agent_telegram_user_id=TELEGRAM_USER,
@@ -530,8 +532,8 @@ def assert_no_alert_adapter() -> None:
         hermes_agent_grafana_enabled=True,
         hermes_agent_grafana_mcp_server_token="mcp-caller-secret-not-for-logs",
     )
-    if "homelab-ops" in config or "webhook:" in config:
-        raise SystemExit("Hermes config must not declare an Alertmanager webhook route")
+    if "webhook:" in config:
+        raise SystemExit("disabled Hermes config must not declare a webhook route")
     managed = render(
         "managed.env.j2",
         hermes_agent_telegram_bot_token=SECRET_TOKEN,
@@ -539,19 +541,49 @@ def assert_no_alert_adapter() -> None:
         hermes_agent_telegram_user_id=TELEGRAM_USER,
         hermes_agent_provider_env_name="",
     )
-    if "WEBHOOK_" in managed:
-        raise SystemExit("managed .env must not enable a Hermes webhook")
-    if "alert-adapter.env.j2" in "\n".join(p.name for p in (ROLE / "templates").iterdir()):
-        raise SystemExit("adapter env template must be removed")
-    if (ROLE / "files" / "alertmanager_adapter.py").exists():
-        raise SystemExit("adapter script must be removed")
+    if "WEBHOOK_ENABLED=true" in managed:
+        raise SystemExit("managed .env must not enable a Hermes webhook by default")
     if "hermes-alert-adapter.service" not in PRESENT:
         raise SystemExit("present.yml must stop leftover adapter unit")
-    if "{{ hermes_agent_install_dir }}/alert-adapter.env" not in PRESENT:
-        raise SystemExit("present.yml must remove leftover adapter env")
-    if "hermes-alert-adapter.service" not in ABSENT:
-        raise SystemExit("absent.yml must remove leftover adapter unit")
-    print("alert adapter: removed; leftover unit cleaned on apply")
+    if "{{ hermes_agent_relay_unit }}" not in PRESENT:
+        raise SystemExit("present.yml must manage the Grafana HMAC relay")
+    print("webhook: disabled by default; leftover adapter still cleaned")
+
+
+def assert_webhook_enabled_loopback() -> None:
+    compose = render("compose.yaml.j2", hermes_agent_webhook_enabled=True)
+    if '"127.0.0.1:8644:8644"' not in compose.replace(" ", ""):
+        if "127.0.0.1:8644:8644" not in compose:
+            raise SystemExit("enabled webhook must publish 127.0.0.1:8644 only")
+    if "0.0.0.0:8644" in compose:
+        raise SystemExit("Hermes webhook must not bind the LAN")
+    config = render(
+        "config.yaml.j2",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_telegram_admin_id=TELEGRAM_USER,
+        hermes_agent_webhook_enabled=True,
+        hermes_agent_webhook_secret="hermes-hmac-secret-16",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_mcp_server_token="mcp-caller-secret-not-for-logs",
+    )
+    if "grafana-alert" not in config or "deliver: telegram" not in config:
+        raise SystemExit("enabled webhook route must deliver Grafana events to Telegram")
+    if "terminal" in config.split("grafana-alert", 1)[-1][:400]:
+        raise SystemExit("webhook route must not grant terminal")
+    if "INSECURE_NO_AUTH" in config:
+        raise SystemExit("webhook must not disable HMAC")
+    if "Do not use GitHub" not in config:
+        raise SystemExit("webhook prompt must forbid GitHub and mutation")
+    ingress = render(
+        "relay-ingress.sh.j2",
+        hermes_agent_relay_allow_from="192.0.2.16",
+        hermes_agent_relay_listen_port=8787,
+    )
+    if "192.0.2.16" not in ingress or "8787" not in ingress:
+        raise SystemExit("relay ingress must allow only the observe IPv4")
+    if "hermes_agent_webhook_secret" not in VALIDATE:
+        raise SystemExit("validate.yml must require webhook secrets")
+    print("webhook: loopback publish, HMAC route, observe-IP ingress")
 
 
 def main() -> None:
@@ -566,7 +598,8 @@ def main() -> None:
     assert_github_draft_pr_helpers()
     assert_pve_read_only_helpers()
     assert_grafana_mcp_sidecar()
-    assert_no_alert_adapter()
+    assert_webhook_disabled_by_default()
+    assert_webhook_enabled_loopback()
     print("hermes_agent rendered contract ok")
 
 

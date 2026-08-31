@@ -1,0 +1,40 @@
+# Managed by herickmotta.homelab.observability.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: grafana-notify
+    receivers:
+{% if observability_mail_enabled | bool %}
+      - uid: grafana-email
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: {{ observability_email_destination | to_json }}
+          singleEmail: true
+{% endif %}
+{% if observability_telegram_enabled | bool %}
+      - uid: grafana-telegram
+        type: telegram
+        disableResolveMessage: false
+        settings:
+          bottoken: {{ observability_telegram_bot_token | to_json }}
+          chatid: {{ observability_telegram_chat_id | to_json }}
+{% endif %}
+{% if observability_webhook_enabled | bool %}
+      - uid: grafana-hermes-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: {{ observability_webhook_url | to_json }}
+          httpMethod: POST
+          hmacConfig:
+            secret: {{ observability_webhook_hmac_secret | to_json }}
+            header: X-Grafana-Alerting-Signature
+            timestampHeader: X-Grafana-Alerting-Timestamp
+{% endif %}
+policies:
+  - orgId: 1
+    receiver: grafana-notify
+    group_by:
+      - alertname
+      - site

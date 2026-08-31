@@ -117,3 +117,22 @@ hermes_agent_grafana_image_digest: "sha256:f21a19cebbfa7c3a76ef1746171e5ffc36010
 hermes_agent_grafana_mcp_address: ":8000"
 hermes_agent_grafana_mcp_host: grafana-mcp:8000
 hermes_agent_grafana_enabled_tools: search,dashboard,folder,navigation,rendering,runpanelquery,alerting,prometheus,loki
+
+# Grafana Alerting webhook → host relay → loopback Hermes HMAC-v2.
+# Disabled until a site supplies secrets and the observe source IPv4.
+hermes_agent_webhook_enabled: false
+hermes_agent_webhook_port: 8644
+hermes_agent_webhook_route: grafana-alert
+hermes_agent_webhook_secret: ""
+hermes_agent_relay_listen_host: "0.0.0.0"
+hermes_agent_relay_listen_port: 8787
+hermes_agent_relay_allow_from: ""
+hermes_agent_relay_grafana_hmac_secret: ""
+hermes_agent_relay_max_body_bytes: 65536
+hermes_agent_relay_rate_per_minute: 30
+hermes_agent_relay_unit: grafana-hermes-relay.service
+hermes_agent_relay_ingress_unit: grafana-hermes-relay-ingress.service
+hermes_agent_relay_script: /usr/local/lib/homelab/grafana_hermes_relay.py
+hermes_agent_relay_env_file: /opt/hermes-agent/relay.env
+hermes_agent_relay_ingress_script: /usr/local/sbin/grafana-hermes-relay-ingress
+hermes_agent_relay_state_dir: /var/lib/grafana-hermes-relay

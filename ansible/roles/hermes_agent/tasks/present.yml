@@ -113,6 +113,99 @@
     - "{{ hermes_agent_managed_dir }}/bin/alertmanager_adapter.py"
     - /etc/systemd/system/hermes-alert-adapter.service
 
+- name: Create the Grafana Hermes relay install directory
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.file:
+    path: "{{ hermes_agent_relay_script | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the Grafana Hermes relay state directory
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.file:
+    path: "{{ hermes_agent_relay_state_dir }}"
+    state: directory
+    owner: "{{ hermes_agent_runtime_user }}"
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0750"
+
+- name: Install the Grafana Hermes relay script
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.copy:
+    src: grafana_hermes_relay.py
+    dest: "{{ hermes_agent_relay_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Reload Grafana Hermes relay
+
+- name: Install Grafana Hermes relay secrets
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: relay.env.j2
+    dest: "{{ hermes_agent_relay_env_file }}"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0640"
+  no_log: true
+  notify: Reload Grafana Hermes relay
+
+- name: Install the Grafana Hermes relay unit
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: relay.service.j2
+    dest: "/etc/systemd/system/{{ hermes_agent_relay_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Grafana Hermes relay
+
+- name: Install the Grafana Hermes relay ingress script
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: relay-ingress.sh.j2
+    dest: "{{ hermes_agent_relay_ingress_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Reload Grafana Hermes relay ingress
+
+- name: Install the Grafana Hermes relay ingress unit
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.template:
+    src: relay-ingress.service.j2
+    dest: "/etc/systemd/system/{{ hermes_agent_relay_ingress_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Grafana Hermes relay ingress
+
+- name: Disable the Grafana Hermes relay when webhook is off
+  when: not (hermes_agent_webhook_enabled | bool)
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+  loop:
+    - "{{ hermes_agent_relay_unit }}"
+    - "{{ hermes_agent_relay_ingress_unit }}"
+
+- name: Remove Grafana Hermes relay files when webhook is off
+  when: not (hermes_agent_webhook_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hermes_agent_relay_script }}"
+    - "{{ hermes_agent_relay_env_file }}"
+    - "{{ hermes_agent_relay_ingress_script }}"
+    - "/etc/systemd/system/{{ hermes_agent_relay_unit }}"
+    - "/etc/systemd/system/{{ hermes_agent_relay_ingress_unit }}"
+
 - name: Remove Grafana MCP secrets when disabled
   when: not (hermes_agent_grafana_enabled | bool)
   ansible.builtin.file:
@@ -217,6 +310,22 @@
 - name: Enable Hermes Agent egress policy
   ansible.builtin.systemd_service:
     name: "{{ hermes_agent_egress_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable Grafana Hermes relay ingress
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_relay_ingress_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable Grafana Hermes relay
+  when: hermes_agent_webhook_enabled | bool
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_relay_unit }}"
     enabled: true
     state: started
     daemon_reload: true

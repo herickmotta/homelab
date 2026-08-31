@@ -11,3 +11,17 @@
     state: restarted
     enabled: true
     daemon_reload: true
+
+- name: Reload Grafana Hermes relay
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_relay_unit }}"
+    state: restarted
+    enabled: true
+    daemon_reload: true
+
+- name: Reload Grafana Hermes relay ingress
+  ansible.builtin.systemd_service:
+    name: "{{ hermes_agent_relay_ingress_unit }}"
+    state: restarted
+    enabled: true
+    daemon_reload: true

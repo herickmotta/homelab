@@ -314,4 +314,28 @@ groups:
           dependency: pve
         annotations:
           summary: Observe Prometheus dropped Alertmanager notifications
-          description: The rich plane could not deliver alerts to Sentinel Alertmanager.
+          description: The rich plane could not deliver alerts to Grafana Alerting.
+
+{% if (observability_http_targets | default([])) | length > 0
+   or (observability_tcp_targets | default([])) | length > 0
+   or (observability_icmp_targets | default([])) | length > 0 %}
+      - alert: HouseholdEndpointUnavailable
+        expr: probe_success{job=~"blackbox_http|blackbox_tcp|blackbox_icmp"} == 0
+        for: "{{ observability_alert_for }}"
+        labels:
+          severity: critical
+          dependency: pve
+        annotations:
+          summary: "Endpoint {{ '{{ $labels.target_name }}' }} is unavailable"
+          description: "The {{ '{{ $labels.job }}' }} probe to {{ '{{ $labels.instance }}' }} failed."
+
+      - alert: TlsCertificateExpiring
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 21
+        for: 1h
+        labels:
+          severity: warning
+          dependency: pve
+        annotations:
+          summary: "TLS certificate for {{ '{{ $labels.target_name }}' }} expires in under 21 days"
+          description: Renew the lab certificate before HTTPS probes fail.
+{% endif %}

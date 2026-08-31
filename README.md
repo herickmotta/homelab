@@ -68,6 +68,7 @@ flowchart TB
   subgraph hermes["Hermes guest"]
     agent["Official Hermes container"]
     grafanaMcp["Grafana MCP sidecar"]
+    relay["Grafana HMAC relay"]
   end
 
   subgraph cameras["Cameras"]
@@ -82,12 +83,12 @@ flowchart TB
 
   away -->|"mesh VPN"| mesh
   runner -->|"OpenTofu + Ansible"| host
-  guard -->|"host and guest health"| host
-  guard -->|"service probes"| net
-  guard -->|"service probes"| nas
-  guard -->|"service probes"| apps
-  guard -->|"Grafana probe"| grafana
-  guard -->|"guest probe"| hermes
+  guard -->|"pve ICMP and API"| host
+  guard -->|"observe liveness"| grafana
+  grafana -->|"channel and email"| telegram
+  grafana -->|"HMAC webhook"| relay
+  relay -->|"loopback HMAC-v2"| agent
+  richProm -->|"alerts"| grafana
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
@@ -109,15 +110,15 @@ flowchart TB
   richProm -->|"Linux exporter"| guard
   richProm -->|"Linux, SMART, ZFS"| host
   richProm -->|"Frigate metrics"| frigate
-  richProm -->|"selected alerts"| guard
-  guard -->|"Alertmanager Telegram"| telegram
+  richProm -->|"household HTTPS DNS SMB"| net
+  guard -->|"survival channel"| telegram
+  agent -->|"operator DM"| telegram
   net -->|"Alloy logs"| loki
   nas -->|"Alloy logs"| loki
   apps -->|"Alloy logs"| loki
   hermes -->|"Alloy logs"| loki
   host -->|"Alloy logs"| loki
   guard -->|"Alloy logs"| loki
-  agent -->|"no published ports"| telegram
   agent -->|"no LAN listener"| provider
   agent -->|"App installation token"| github
   agent -->|"PVEAuditor GET :8006"| host
@@ -151,15 +152,16 @@ How traffic and data move:
 - Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
   journal and Docker logs to Loki on the observability guest. Grafana
   Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
-  selected rich-plane alerts to Sentinel Alertmanager; raw email stays on
-  Sentinel. Grafana on observe provisions a read-only Alertmanager
-  datasource so Alerting is the unified firing view.
+  household alerts to Grafana Alerting. Grafana pages a Telegram channel
+  and email, then a host relay on the Hermes guest signs Nous HMAC-v2 for
+  real-time triage. Sentinel Alertmanager pages only Proxmox health and
+  observe-plane liveness. Grafana keeps a read-only Sentinel Alertmanager
+  datasource so survival fires remain visible.
 - Hermes runs the official pinned container on its own guest. Telegram and
-  the model provider are outbound only. RFC1918 and link-local destinations
-  stay dropped except an optional GET-only Proxmox API hole to the hypervisor
-  on TCP 8006. There is no Docker socket, Caddy route, dashboard, or public
-  ingress for Hermes. Hermes reads firing alerts through Grafana MCP. It is
-  not on the Alertmanager notification path.
+  the model provider are outbound only. The Grafana webhook is loopback-only;
+  a host relay accepts Grafana HMAC from the observe IPv4. RFC1918 stays
+  dropped except optional GET-only Proxmox API on TCP 8006. There is no
+  Docker socket, Caddy route, dashboard, or public ingress.
 
 ```mermaid
 flowchart LR

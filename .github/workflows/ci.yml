@@ -71,10 +71,16 @@ jobs:
         run: python3 tests/observability/test_ops_alerts.py
 
       - name: Test Hermes Agent rendered contract
-        run: python3 tests/hermes_agent/test_rendered_contract.py
+        run:           python3 tests/hermes_agent/test_rendered_contract.py
+
+      - name: Test Grafana Hermes HMAC relay
+        run: python3 tests/hermes_agent/test_grafana_relay.py
 
       - name: Test Grafana alert datasources
-        run: python3 tests/observability/test_grafana_datasources.py
+        run:           python3 tests/observability/test_grafana_datasources.py
+
+      - name: Test Grafana contact points and Observe blackbox
+        run: python3 tests/observability/test_grafana_alerting.py
 
       - name: Test Alertmanager Telegram paging
         run: python3 tests/sentinel_monitoring/test_alertmanager_telegram.py

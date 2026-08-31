@@ -1,0 +1,17 @@
+#!/bin/sh
+# Managed by herickmotta.homelab.hermes_agent.
+# Allow Grafana on the observe guest to reach the relay; drop other sources.
+set -eu
+
+CHAIN="HERMES-RELAY-INGRESS"
+PORT="{{ hermes_agent_relay_listen_port | int }}"
+ALLOW="{{ hermes_agent_relay_allow_from }}"
+
+iptables -N "${CHAIN}" 2>/dev/null || iptables -F "${CHAIN}"
+
+if ! iptables -C INPUT -p tcp --dport "${PORT}" -j "${CHAIN}" >/dev/null 2>&1; then
+  iptables -I INPUT 1 -p tcp --dport "${PORT}" -j "${CHAIN}"
+fi
+
+iptables -A "${CHAIN}" -s "${ALLOW}" -j ACCEPT
+iptables -A "${CHAIN}" -j DROP

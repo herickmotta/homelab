@@ -21,8 +21,28 @@ observability_loki_grpc_listen_port: 9096
 observability_loki_ready_address: 127.0.0.1:3100
 
 observability_prometheus_listen_address: 127.0.0.1:9090
-observability_alertmanager_address: ""
+# Prometheus sends alerts to Grafana Unified Alerting (loopback AM API).
+observability_grafana_alertmanager_host: ""
+observability_grafana_alertmanager_path_prefix: /api/alertmanager/grafana
+# Grafana read-only datasource for Sentinel Alertmanager. Not a notify path.
+observability_external_alertmanager_address: ""
 observability_alert_for: 2m
+observability_blackbox_image: prom/blackbox-exporter:v0.28.0
+observability_blackbox_listen_address: 127.0.0.1:9115
+observability_http_targets: []
+observability_tcp_targets: []
+observability_icmp_targets: []
+observability_smtp_host: ""
+observability_smtp_port: 587
+observability_smtp_username: ""
+observability_smtp_password: ""
+observability_smtp_from: ""
+observability_smtp_require_tls: true
+observability_email_destination: ""
+observability_telegram_chat_id: ""
+observability_telegram_bot_token: ""
+observability_webhook_url: ""
+observability_webhook_hmac_secret: ""
 observability_alloy_targets: []
 observability_expected_log_hosts: []
 observability_node_exporter_listen_address: 127.0.0.1:9100

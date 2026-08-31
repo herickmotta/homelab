@@ -31,8 +31,36 @@
         observability_prometheus_listen_address: "{{
             site.monitoring.observability.prometheus_listen_address
           }}"
-        observability_alertmanager_address: "{{
-            site.monitoring.observability.alertmanager_address
+        observability_grafana_alertmanager_host: "{{
+            site.monitoring.observability.grafana_alertmanager_host | default('')
+          }}"
+        observability_external_alertmanager_address: "{{
+            site.monitoring.observability.external_alertmanager_address | default('')
+          }}"
+        observability_http_targets: "{{
+            site.monitoring.observability.http_targets | default([])
+          }}"
+        observability_tcp_targets: "{{
+            site.monitoring.observability.tcp_targets | default([])
+          }}"
+        observability_email_destination: "{{ site.storage.monitoring.email_destination | default('') }}"
+        observability_smtp_host: "{{ site.storage.monitoring.smtp.host | default('') }}"
+        observability_smtp_port: "{{ site.storage.monitoring.smtp.port | default(587) }}"
+        observability_smtp_username: "{{ site.storage.monitoring.smtp.username | default('') }}"
+        observability_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') | default('', true) }}"
+        observability_smtp_from: "{{ site.storage.monitoring.smtp.from | default('') }}"
+        observability_smtp_require_tls: "{{ site.storage.monitoring.smtp.starttls | default(true) }}"
+        observability_telegram_chat_id: "{{
+            site.monitoring.observability.telegram.chat_id | default('')
+          }}"
+        observability_telegram_bot_token: "{{
+            lookup('env', 'GRAFANA_TELEGRAM_BOT_TOKEN') | default('', true)
+          }}"
+        observability_webhook_url: "{{
+            site.monitoring.observability.webhook_url | default('')
+          }}"
+        observability_webhook_hmac_secret: "{{
+            lookup('env', 'GRAFANA_WEBHOOK_HMAC_SECRET') | default('', true)
           }}"
         observability_metrics_targets: "{{ site.monitoring.observability.metrics_targets }}"
         observability_node_targets: "{{ site.monitoring.host_metrics.node_targets }}"
