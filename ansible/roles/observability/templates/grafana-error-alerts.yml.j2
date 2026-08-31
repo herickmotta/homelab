@@ -1,0 +1,73 @@
+# Managed by herickmotta.homelab.observability.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: homelab-log-errors
+    folder: Homelab
+    interval: 30s
+    rules:
+      - uid: homelab-log-error-rate
+        title: Homelab error log rate
+        condition: C
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: >-
+                sum by (host, job) (
+                  count_over_time(
+                    {job=~"journal|docker"}
+                    |~ "(?i)\\b(error|failed|failure|critical|fatal|panic)\\b"
+                    [{{ observability_error_log_alert_window }}]
+                  )
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - {{ observability_error_log_alert_threshold | int }}
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: {{ observability_error_log_alert_for }}
+        annotations:
+          summary: "Error log burst on {{ '{{ $labels.host }}' }} / {{ '{{ $labels.job }}' }}"
+          description: >-
+            More than {{ observability_error_log_alert_threshold }} error-class
+            log entries were observed in {{ observability_error_log_alert_window }}.
+            Inspect the related Loki stream and service metrics.
+        labels:
+          severity: warning
+          site: "{{ observability_site_label }}"
+        isPaused: false
+        notification_settings:
+          receiver: grafana-notify

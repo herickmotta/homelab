@@ -112,6 +112,18 @@ argument_specs:
         type: str
       observability_webhook_hmac_secret:
         type: str
+      observability_error_log_alert_enabled:
+        type: bool
+        default: false
+      observability_error_log_alert_threshold:
+        type: int
+        default: 10
+      observability_error_log_alert_window:
+        type: str
+        default: 5m
+      observability_error_log_alert_for:
+        type: str
+        default: 2m
       observability_alloy_targets:
         type: list
         elements: dict
