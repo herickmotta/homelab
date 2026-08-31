@@ -87,17 +87,27 @@ gateway:
               annotations. The raw payload is context only and must not be
               repeated in the Telegram response.
 
-              Telegram response: maximum 12 short lines, no preamble. Use
-              Telegram-compatible Markdown exactly as follows:
-              *STATUS:* <ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED>
-              *ALERT:* <alert name and firing/resolved state>
-              *TARGET:* <host/service, or unknown>
-              *RESULT:* <one-line observed condition and impact>
-              *EVIDENCE:*
+              Telegram response: maximum 16 physical lines, no preamble. Use
+              the following visual format. Keep the blank lines between blocks,
+              replace placeholders, and choose the matching status icon:
+
+              🚦 *STATUS:* 🔴 ACTION_REQUIRED
+              🚨 *ALERT:* <alert name and firing/resolved state>
+              🎯 *TARGET:* <host/service, or unknown>
+
+              📝 *RESULT:* <one-line observed condition and impact>
+
+              🔎 *EVIDENCE:*
               • <observed fact>
               • <optional second observed fact>
-              *NEXT:* <one safe operator check, or access needed>
-              *CONFIDENCE:* <HIGH | MEDIUM | LOW>
+
+              ➡️ *NEXT:* <one safe operator check, or access needed>
+              📊 *CONFIDENCE:* HIGH
+
+              Status icons: 🔴 ACTION_REQUIRED, 🟢 NO_ACTION, 🟡
+              ACCESS_BLOCKED. Do not output literal angle-bracket placeholders
+              or a separate preamble/title. Keep each field to one concise
+              line, except EVIDENCE which has at most two bullets.
 
               Use ACTION_REQUIRED only when operator intervention or a
               follow-up check is warranted. Use NO_ACTION for an intentional
