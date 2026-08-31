@@ -116,7 +116,9 @@ groups:
           dependency: pve
         annotations:
           summary: "Local TCP service {{ '{{ $labels.name }}' }} is unreachable"
-          description: A host-local probe such as loopback Mosquitto failed.
+          description: >-
+            Host TCP connect probe {{ '{{ $labels.address }}' }} failed.
+            Inside a published-port container that peer is the Docker gateway.
 
       - alert: CriticalContainerAbsent
         expr: homelab_container_up == 0

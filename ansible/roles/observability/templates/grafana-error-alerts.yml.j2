@@ -73,7 +73,8 @@ groups:
             More than {{ observability_error_log_alert_threshold }} error-class
             log entries were observed in {{ observability_error_log_alert_window }}.
             Observability Compose containers are excluded. Inspect the related
-            Loki stream and homelab_docker_* metrics.
+            Loki stream, homelab_docker_* metrics, and homelab_local_tcp_up
+            (host TCP probes to published ports NAT as the Docker gateway).
         labels:
           severity: warning
           site: "{{ observability_site_label }}"

@@ -8,13 +8,13 @@ trap 'rm -f "${tmp}"' EXIT
 
 {
 {% if host_metrics_local_tcp_probes | length > 0 %}
-  echo '# HELP homelab_local_tcp_up Whether a local TCP probe succeeded (1) or failed (0).'
+  echo '# HELP homelab_local_tcp_up Whether a host TCP connect probe succeeded (1) or failed (0). Connect only; no payload. Published-port peers appear as the Docker bridge gateway inside the container.'
   echo '# TYPE homelab_local_tcp_up gauge'
 {% for probe in host_metrics_local_tcp_probes %}
-  if timeout 2 bash -c 'echo >/dev/tcp/{{ probe.address.split(":")[0] }}/{{ probe.address.split(":")[1] }}' 2>/dev/null; then
-    echo 'homelab_local_tcp_up{name="{{ probe.name }}"} 1'
+  if timeout 2 bash -c 'exec 3<>/dev/tcp/{{ probe.address.split(":")[0] }}/{{ probe.address.split(":")[1] }}' 2>/dev/null; then
+    echo 'homelab_local_tcp_up{name="{{ probe.name }}",address="{{ probe.address }}"} 1'
   else
-    echo 'homelab_local_tcp_up{name="{{ probe.name }}"} 0'
+    echo 'homelab_local_tcp_up{name="{{ probe.name }}",address="{{ probe.address }}"} 0'
   fi
 {% endfor %}
 {% endif %}

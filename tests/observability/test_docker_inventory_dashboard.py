@@ -18,6 +18,8 @@ def test_operations_dashboard_queries_docker_inventory() -> None:
     assert "homelab_docker_container_running" in joined
     assert "homelab_docker_container_network" in joined
     assert "homelab_docker_network_info" in joined
+    titles = [panel.get("title") for panel in data["panels"]]
+    assert "Local TCP probes" in titles
 
 
 def test_observe_node_exporter_reads_textfile() -> None:

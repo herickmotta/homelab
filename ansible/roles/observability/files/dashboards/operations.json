@@ -379,7 +379,8 @@
     },
     {
       "id": 12,
-      "title": "Local service state",
+      "title": "Local TCP probes",
+      "description": "Host-side connect probes (homelab_local_tcp_up). The address label is the target. Docker NAT shows these as the bridge gateway inside the container.",
       "type": "table",
       "gridPos": {
         "x": 8,
