@@ -47,6 +47,10 @@ observability_telegram_chat_id: ""
 observability_telegram_bot_token: ""
 observability_webhook_url: ""
 observability_webhook_hmac_secret: ""
+observability_error_log_alert_enabled: false
+observability_error_log_alert_threshold: 10
+observability_error_log_alert_window: 5m
+observability_error_log_alert_for: 2m
 observability_alloy_targets: []
 observability_expected_log_hosts: []
 observability_node_exporter_listen_address: 127.0.0.1:9100

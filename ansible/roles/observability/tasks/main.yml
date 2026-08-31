@@ -379,6 +379,22 @@
     path: "{{ observability_install_dir }}/grafana/provisioning/alerting/contact-points.yml"
     state: absent
 
+- name: Install Grafana error log alert rules
+  when: observability_error_log_alert_enabled | bool
+  ansible.builtin.template:
+    src: grafana-error-alerts.yml.j2
+    dest: "{{ observability_install_dir }}/grafana/provisioning/alerting/error-logs.yml"
+    owner: root
+    group: "472"
+    mode: "0640"
+  notify: Recreate observability compose
+
+- name: Remove Grafana error log alert rules when disabled
+  when: not (observability_error_log_alert_enabled | bool)
+  ansible.builtin.file:
+    path: "{{ observability_install_dir }}/grafana/provisioning/alerting/error-logs.yml"
+    state: absent
+
 - name: Remove the Prometheus-only Grafana datasource filename
   ansible.builtin.file:
     path: "{{ observability_install_dir }}/grafana/provisioning/datasources/prometheus.yml"
