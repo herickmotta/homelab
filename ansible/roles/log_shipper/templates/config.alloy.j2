@@ -66,6 +66,30 @@ loki.relabel "docker" {
     regex         = "/(.*)"
     target_label  = "container"
   }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "(.+)"
+    target_label  = "compose_project"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(.+)"
+    target_label  = "compose_service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_network_name"]
+    regex         = "(.+)"
+    target_label  = "network"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_network_ip"]
+    regex         = "(.+)"
+    target_label  = "container_ip"
+  }
 }
 
 loki.source.docker "containers" {

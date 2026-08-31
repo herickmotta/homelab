@@ -279,6 +279,14 @@
       owner: root
       group: root
       mode: "0755"
+    - path: "{{ observability_textfile_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: /usr/local/lib/homelab
+      owner: root
+      group: root
+      mode: "0755"
   loop_control:
     label: "{{ item.path }}"
 
@@ -428,6 +436,48 @@
   notify: Recreate observability compose
   loop_control:
     label: "{{ item | basename }}"
+
+- name: Install Docker inventory helper
+  ansible.builtin.copy:
+    src: docker_inventory.py
+    dest: "{{ observability_docker_inventory_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart observe Docker inventory
+
+- name: Install Docker inventory refresh command
+  ansible.builtin.template:
+    src: docker-inventory-refresh.j2
+    dest: /usr/local/bin/observability-docker-inventory
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart observe Docker inventory
+
+- name: Install Docker inventory units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - docker-inventory.service
+    - docker-inventory.timer
+  notify: Restart observe Docker inventory
+
+- name: Enable Docker inventory timer
+  ansible.builtin.systemd_service:
+    name: docker-inventory.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Write Docker inventory metrics once
+  ansible.builtin.command:
+    cmd: /usr/local/bin/observability-docker-inventory
+  changed_when: false
 
 - name: Install observability secret environment
   ansible.builtin.template:

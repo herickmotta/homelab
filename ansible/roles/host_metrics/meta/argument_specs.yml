@@ -32,6 +32,8 @@ argument_specs:
         elements: str
       host_metrics_textfile_dir:
         type: path
+      host_metrics_lib_dir:
+        type: path
       host_metrics_local_tcp_probes:
         type: list
         elements: dict
@@ -52,6 +54,9 @@ argument_specs:
           label:
             type: str
             required: true
+      host_metrics_docker_inventory:
+        type: bool
+        default: true
       host_metrics_smartctl:
         type: bool
         default: false

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Managed by herickmotta.homelab.observability.
+set -euo pipefail
+tmp="$(mktemp)"
+trap 'rm -f "${tmp}"' EXIT
+python3 {{ observability_docker_inventory_script | quote }} >"${tmp}"
+install -m 0644 "${tmp}" {{ (observability_textfile_dir ~ '/homelab-docker.prom') | quote }}

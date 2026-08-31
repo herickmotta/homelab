@@ -29,6 +29,9 @@ trap 'rm -f "${tmp}"' EXIT
   fi
 {% endfor %}
 {% endif %}
+{% if host_metrics_docker_inventory_active | default(false) | bool %}
+  python3 {{ host_metrics_lib_dir }}/docker_inventory.py
+{% endif %}
 } >"${tmp}"
 
 install -m 0644 "${tmp}" "${textfile_dir}/homelab-probes.prom"

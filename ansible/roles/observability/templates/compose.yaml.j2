@@ -112,11 +112,13 @@ services:
       - --path.rootfs=/host
       - --web.listen-address={{ observability_node_exporter_listen_address }}
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|run/docker/netns/.+)($|/)
+      - --collector.textfile.directory=/textfile
     read_only: true
     security_opt:
       - no-new-privileges:true
     volumes:
       - /:/host:ro,rslave
+      - ./textfile:/textfile:ro
     mem_limit: 128m
     cpus: "0.25"
     labels:

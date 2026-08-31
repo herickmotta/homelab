@@ -26,8 +26,14 @@ def test_error_log_alert_is_loki_backed_and_bounded():
     assert rule["title"] == "Homelab error log rate"
     assert rule["notification_settings"]["receiver"] == "grafana-notify"
     loki_query = rule["data"][0]["model"]["expr"]
-    assert 'job=~"journal|docker"' in loki_query
+    assert '{job="docker", container!~"observability-.*"}' in loki_query
+    assert '{job="journal"}' in loki_query
     assert "count_over_time" in loki_query
     assert "error|failed|failure|critical|fatal|panic" in loki_query
     assert rule["noDataState"] == "OK"
     assert rule["execErrState"] == "Alerting"
+
+
+if __name__ == "__main__":
+    test_error_log_alert_is_loki_backed_and_bounded()
+    print("grafana error log alert ok")

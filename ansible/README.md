@@ -46,11 +46,13 @@ Roles:
 - `herickmotta.homelab.host_metrics`: pinned `node_exporter` as a systemd
   unit on guests and the hypervisor. Optional `smartctl_exporter` and
   `zfs_exporter` on the hypervisor. Listen on a site IPv4, not loopback.
-  Optional textfile probes publish loopback TCP and allowlisted Compose
-  container state without exposing the Docker socket to other roles.
+  Optional textfile probes publish loopback TCP, allowlisted Compose
+  liveness, and a full Docker inventory (health, restarts, IPs, published
+  ports, network gateways) without exposing the Docker socket to other roles.
 - `herickmotta.homelab.log_shipper`: pinned Grafana Alloy as a systemd
   unit. It pushes selected journal units (info and above, not debug) and
-  optional Docker container logs to Loki. Every host also emits a bounded
+  optional Docker container logs to Loki, labeled with Compose service,
+  network, and container IP. Every host also emits a bounded
   journal heartbeat so a quiet service cannot hide a broken pipeline.
   Alloy's HTTP endpoint defaults to loopback; a site may bind the host IPv4
   so observe can scrape it.

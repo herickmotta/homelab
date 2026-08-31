@@ -77,11 +77,17 @@
   loop_control:
     label: "{{ item.name | default('unknown') }}"
 
-- name: Require Docker for container probes
-  when: host_metrics_container_probes | length > 0
+- name: Detect the Docker socket
   ansible.builtin.stat:
     path: /var/run/docker.sock
   register: host_metrics_docker_sock
+
+- name: Decide whether to emit Docker inventory
+  ansible.builtin.set_fact:
+    host_metrics_docker_inventory_active: "{{
+        (host_metrics_docker_inventory | bool)
+        and (host_metrics_docker_sock.stat.issock | default(false))
+      }}"
 
 - name: Assert Docker exists for container probes
   when: host_metrics_container_probes | length > 0
@@ -102,6 +108,7 @@
     - "{{ host_metrics_extract_dir }}"
     - "{{ host_metrics_bin_dir }}"
     - "{{ host_metrics_textfile_dir }}"
+    - "{{ host_metrics_lib_dir }}"
 
 - name: Create the node exporter group
   ansible.builtin.group:
@@ -148,10 +155,23 @@
     state: started
     daemon_reload: true
 
+- name: Install Docker inventory helper
+  when: host_metrics_docker_inventory_active | bool
+  ansible.builtin.copy:
+    src: docker_inventory.py
+    dest: "{{ host_metrics_lib_dir }}/docker_inventory.py"
+    owner: root
+    group: root
+    mode: "0755"
+  notify:
+    - Reload systemd
+    - Restart host-metrics probes
+
 - name: Install local probe command
   when: >-
     host_metrics_local_tcp_probes | length > 0
     or host_metrics_container_probes | length > 0
+    or (host_metrics_docker_inventory_active | bool)
   ansible.builtin.template:
     src: host-metrics-probes.j2
     dest: "{{ host_metrics_bin_dir }}/host-metrics-probes"
@@ -166,6 +186,7 @@
   when: >-
     host_metrics_local_tcp_probes | length > 0
     or host_metrics_container_probes | length > 0
+    or (host_metrics_docker_inventory_active | bool)
   ansible.builtin.template:
     src: "{{ item }}.j2"
     dest: "/etc/systemd/system/{{ item }}"
@@ -183,6 +204,7 @@
   when: >-
     host_metrics_local_tcp_probes | length > 0
     or host_metrics_container_probes | length > 0
+    or (host_metrics_docker_inventory_active | bool)
   ansible.builtin.systemd_service:
     name: host-metrics-probes.timer
     enabled: true
@@ -193,6 +215,7 @@
   when: >-
     host_metrics_local_tcp_probes | length > 0
     or host_metrics_container_probes | length > 0
+    or (host_metrics_docker_inventory_active | bool)
   ansible.builtin.command:
     cmd: "{{ host_metrics_bin_dir }}/host-metrics-probes"
   changed_when: false
@@ -201,6 +224,7 @@
   when: >-
     host_metrics_local_tcp_probes | length == 0
     and host_metrics_container_probes | length == 0
+    and not (host_metrics_docker_inventory_active | bool)
   ansible.builtin.systemd_service:
     name: host-metrics-probes.timer
     enabled: false
@@ -211,6 +235,7 @@
   when: >-
     host_metrics_local_tcp_probes | length == 0
     and host_metrics_container_probes | length == 0
+    and not (host_metrics_docker_inventory_active | bool)
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
