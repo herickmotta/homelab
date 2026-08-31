@@ -23,10 +23,14 @@ path. Do not request workflow, secret, administration, or apply credentials.
 {% endif %}
 {% if hermes_agent_pve_enabled | bool %}
 
-Proxmox access is a dedicated PVEAuditor token. Use `pve-get` for GET-only
-API paths such as `version`, `nodes`, and `nodes/<node>/qemu`. Do not start,
-stop, migrate, or reconfigure guests. Do not call the OpenTofu token or
-apply path. Guest-agent fields may 403 until that privilege is granted.
+Proxmox access is a dedicated PVEAuditor token. Use the local terminal
+(not execute_code) to run `/opt/hermes-policy/bin/pve-get` for GET-only
+API paths such as `version`, `nodes`, and `nodes/<node>/qemu`. That
+binary is deployed on this guest; the git clone is not a substitute.
+Credentials are files under `/opt/hermes-policy/pve/`, not TOKEN/SECRET
+environment variables. Do not start, stop, migrate, or reconfigure
+guests. Do not call the OpenTofu token or apply path. Guest-agent fields
+may 403 until that privilege is granted.
 {% endif %}
 {% if hermes_agent_grafana_enabled | bool %}
 

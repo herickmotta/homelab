@@ -1,5 +1,7 @@
 #!/bin/sh
 # GET-only Proxmox API helper. Path is relative to /api2/json/.
+# Credentials live in sibling files, not TOKEN/SECRET env vars: Hermes
+# execute_code/terminal sandboxes strip those names.
 set -eu
 
 usage() {
@@ -28,17 +30,31 @@ case "$path" in
     ;;
 esac
 
-: "${PVE_API_ENDPOINT:?PVE_API_ENDPOINT is unset}"
-: "${PVE_API_TOKEN_ID:?PVE_API_TOKEN_ID is unset}"
-: "${PVE_API_TOKEN_SECRET:?PVE_API_TOKEN_SECRET is unset}"
+bindir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+pvedir=$(CDPATH= cd -- "${bindir}/../pve" && pwd)
+
+read_file() {
+  file=$1
+  label=$2
+  if [ ! -f "$file" ]; then
+    printf '%s\n' "refused: missing ${label} (${file})" >&2
+    exit 1
+  fi
+  tr -d '\n' <"$file"
+}
+
+endpoint=$(read_file "${pvedir}/endpoint" "PVE endpoint")
+token_id=$(read_file "${pvedir}/token-id" "PVE token id")
+token_secret=$(read_file "${pvedir}/token-secret" "PVE token secret")
+verify=$(read_file "${pvedir}/verify-ssl" "PVE TLS verify")
 
 verify_args="-k"
-if [ "${PVE_API_VERIFY_SSL:-0}" = "1" ]; then
+if [ "$verify" = "1" ]; then
   verify_args=""
 fi
 
 # shellcheck disable=SC2086
 curl -sS ${verify_args} -X GET \
-  -H "Authorization: PVEAPIToken=${PVE_API_TOKEN_ID}=${PVE_API_TOKEN_SECRET}" \
-  "${PVE_API_ENDPOINT%/}/api2/json/${path}"
+  -H "Authorization: PVEAPIToken=${token_id}=${token_secret}" \
+  "${endpoint%/}/api2/json/${path}"
 printf '\n'

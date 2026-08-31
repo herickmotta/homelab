@@ -64,6 +64,7 @@
     - "{{ hermes_agent_managed_dir }}/bin/gh-bin"
     - "{{ hermes_agent_managed_dir }}/bin/git-credential-github-app"
     - "{{ hermes_agent_managed_dir }}/bin/pve-get"
+    - "{{ hermes_agent_managed_dir }}/pve"
     - "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
     - "{{ hermes_agent_install_dir }}/alert-adapter.env"
     - "{{ hermes_agent_managed_dir }}/alert-adapter.env"

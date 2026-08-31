@@ -88,7 +88,9 @@ Defaults keep Proxmox access **off**. A site may set
 `hermes_agent_pve_enabled: true` with a dedicated `PVEAuditor` user, token
 name, token secret, and hypervisor IPv4. The role then:
 
-- writes `PVE_API_*` into the managed `0640` `.env`, never Compose
+- writes endpoint, token id, and token secret as `0640` files under
+  `managed/pve/`, never Compose and never `TOKEN`/`SECRET` env vars
+  (Hermes sandboxes strip those names)
 - installs `pve-get`, a GET-only wrapper around `/api2/json/`
 - ACCEPTs TCP 8006 to that one IPv4 in `HERMES-AGENT-EGRESS` before the
   RFC1918 DROP rules
