@@ -34,6 +34,51 @@ def nous_v2_signature(secret: bytes, body: bytes, timestamp: str) -> str:
     return hmac.new(secret, f"{timestamp}.".encode() + body, hashlib.sha256).hexdigest()
 
 
+def alert_summary(payload: object, limit: int = 2000) -> str:
+    """Compact identity lines Hermes can interpolate without Grafana MCP."""
+    if not isinstance(payload, dict):
+        return ""
+    lines: list[str] = []
+    alerts = payload.get("alerts")
+    if isinstance(alerts, list):
+        for alert in alerts[:15]:
+            if not isinstance(alert, dict):
+                continue
+            labels = alert.get("labels")
+            anns = alert.get("annotations")
+            labels = labels if isinstance(labels, dict) else {}
+            anns = anns if isinstance(anns, dict) else {}
+            name = str(labels.get("alertname") or labels.get("alert") or "")
+            inst = str(
+                labels.get("instance")
+                or labels.get("name")
+                or labels.get("job")
+                or ""
+            )
+            summary = str(anns.get("summary") or anns.get("description") or "")
+            state = str(alert.get("status") or "")
+            piece = " ".join(part for part in (name, state, inst, summary) if part)
+            if piece:
+                lines.append(piece)
+    if not lines:
+        grouped = payload.get("groupLabels")
+        common = payload.get("commonLabels")
+        grouped = grouped if isinstance(grouped, dict) else {}
+        common = common if isinstance(common, dict) else {}
+        name = str(
+            common.get("alertname")
+            or grouped.get("alertname")
+            or payload.get("title")
+            or ""
+        )
+        if name:
+            lines.append(name)
+        message = payload.get("message")
+        if isinstance(message, str) and message.strip():
+            lines.append(message.strip()[:400])
+    return "\n".join(lines)[:limit]
+
+
 def fingerprints(payload: object, event_type: str) -> list[str]:
     if not isinstance(payload, dict):
         return [hashlib.sha256(f"{event_type}:all".encode()).hexdigest()]
@@ -174,6 +219,7 @@ def make_handler(settings: dict):
                 {
                     "event_type": event_type,
                     "status": status or event_type,
+                    "alert_summary": alert_summary(payload),
                     "grafana": payload,
                 },
                 separators=(",", ":"),

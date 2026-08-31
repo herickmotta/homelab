@@ -119,11 +119,12 @@ Listen with `--address`, not `-addr`. Do not put
 through Caddy; the hole is Grafana's own `:3000`. Write tools stay off.
 Enabled tools include Grafana `prometheus`, `loki`, and `alerting` groups
 so Telegram investigation can search datasources and list firing alerts,
-not only dashboard panels. Grafana Alerting pages the household channel and
-email. Optional `hermes_agent_webhook_enabled` runs a host relay that
-accepts Grafana HMAC from one observe IPv4, signs Nous HMAC-v2, and POSTs
-to loopback `:8644`. Compose publishes `127.0.0.1:8644` only then. There is
-no Alertmanager webhook and no poll cron.
+not only dashboard panels. Observe Alertmanager pages the household channel
+and email; Grafana contact points cover Grafana-managed rules. Optional
+`hermes_agent_webhook_enabled` runs a host relay that accepts Grafana HMAC
+and Alertmanager Bearer from one observe IPv4, signs Nous HMAC-v2, and POSTs
+to loopback `:8644` with the alert payload in the route prompt. Compose
+publishes `127.0.0.1:8644` only then. There is no poll cron.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:

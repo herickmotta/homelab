@@ -32,13 +32,14 @@ apply path. Guest-agent fields may 403 until that privilege is granted.
 
 Grafana access is the `grafana` MCP server at `http://grafana-mcp:8000/mcp`.
 Use that sidecar. Do not call Grafana or Caddy on the LAN. The Viewer token
-stays on the sidecar, not in this process. Grafana Alerting is the unified
-firing list: Observe Prometheus rules plus the Alertmanager datasource.
-List firing alerts there. Do not declare the homelab healthy from Grafana
-alone. Grafana Telegram channel and email are the rich-plane pager. Sentinel
+stays on the sidecar, not in this process. The webhook payload is the alert
+identity (alertname, labels, annotations). Grafana MCP rule listings are
+Grafana-managed rules only; Prometheus Alertmanager events often will not
+appear there. Do not declare the homelab healthy from Grafana alone.
+Observe Alertmanager pages the household Telegram channel and email. Sentinel
 Alertmanager is survival-only (Proxmox and observe liveness). You are not
-the pager. Grafana may POST firing and resolved events to a host relay that
-signs Hermes HMAC-v2; investigate with Grafana MCP. Recommend a draft PR
-only after the operator asks. Do not merge or apply. There is no poll cron
-for alerts.
+the pager. Firing and resolved events reach a host relay that signs Hermes
+HMAC-v2; investigate from the payload, then Grafana MCP prometheus/loki.
+Recommend a draft PR only after the operator asks. Do not merge or apply.
+There is no poll cron for alerts.
 {% endif %}
