@@ -1,0 +1,11 @@
+# Managed by herickmotta.homelab.observability.
+[Unit]
+Description=Refresh observe Docker inventory textfile metrics
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

@@ -131,6 +131,10 @@ def assert_heartbeat_config() -> None:
         raise SystemExit("docker-only shipper must still keep the journal heartbeat")
     if "loki.source.journal" not in docker_only:
         raise SystemExit("heartbeat requires loki.source.journal on every host")
+    if "loki.source.docker" not in docker_only:
+        raise SystemExit("docker shipper must enable loki.source.docker")
+    if "compose_service" not in docker_only or "container_ip" not in docker_only:
+        raise SystemExit("docker logs must label compose_service and container_ip")
     prometheus = (
         ROOT / "ansible/roles/observability/templates/prometheus.yml.j2"
     ).read_text()

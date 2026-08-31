@@ -153,8 +153,11 @@ How traffic and data move:
   into the NAS guest with VirtioFS. Samba exports SMB3. Disposable camera
   footage is mapped into the application guest, not exported over SMB.
 - Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
-  journal and Docker logs to Loki on the observability guest. Grafana
-  Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
+  journal and Docker logs to Loki on the observability guest. Docker
+  streams include Compose service, network, and container IP labels.
+  Node exporters publish `homelab_docker_*` inventory (health, restarts,
+  IPs, published ports, gateways) so Grafana MCP can debug without SSH.
+  Grafana Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
   household alerts to a loopback Alertmanager on the observability guest
   (Grafana 13.2 cannot ingest Prometheus AM v2 POSTs). That Alertmanager
   pages a Telegram channel and email, then Bearer-webhooks the Hermes

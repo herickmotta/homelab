@@ -54,6 +54,8 @@ observability_error_log_alert_for: 2m
 observability_alloy_targets: []
 observability_expected_log_hosts: []
 observability_node_exporter_listen_address: 127.0.0.1:9100
+observability_textfile_dir: "{{ observability_install_dir }}/textfile"
+observability_docker_inventory_script: /usr/local/lib/homelab/docker_inventory.py
 observability_pve_exporter_listen_address: 127.0.0.1:9221
 observability_grafana_bind_ip: 0.0.0.0
 observability_grafana_http_port: 3000

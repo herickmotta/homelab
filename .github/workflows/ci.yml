@@ -85,6 +85,15 @@ jobs:
       - name: Test Alertmanager Telegram paging
         run: python3 tests/sentinel_monitoring/test_alertmanager_telegram.py
 
+      - name: Test Grafana error log alert
+        run: python3 tests/observability/test_error_log_alert.py
+
+      - name: Test Docker inventory metrics
+        run: python3 tests/host_metrics/test_docker_inventory.py
+
+      - name: Test Docker inventory dashboard
+        run: python3 tests/observability/test_docker_inventory_dashboard.py
+
   ci:
     name: ci
     if: always()

@@ -1,0 +1,7 @@
+# Managed by herickmotta.homelab.observability.
+[Unit]
+Description=Refresh observe Docker inventory textfile metrics
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/observability-docker-inventory

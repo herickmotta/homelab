@@ -13,8 +13,11 @@ host_metrics_filesystem_mount_points_exclude: >-
   ^/(dev|proc|sys|var/lib/docker/.+|run/docker/netns/.+)($|/)
 host_metrics_systemd_units: []
 host_metrics_textfile_dir: /var/lib/node_exporter/textfile
+host_metrics_lib_dir: /usr/local/lib/homelab
 host_metrics_local_tcp_probes: []
 host_metrics_container_probes: []
+# When Docker is present, emit inventory metrics (IPs, health, restarts, ports).
+host_metrics_docker_inventory: true
 
 host_metrics_smartctl: false
 host_metrics_smartctl_port: 9633

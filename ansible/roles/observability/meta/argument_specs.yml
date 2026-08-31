@@ -144,6 +144,10 @@ argument_specs:
         elements: str
       observability_node_exporter_listen_address:
         type: str
+      observability_textfile_dir:
+        type: path
+      observability_docker_inventory_script:
+        type: path
       observability_pve_exporter_listen_address:
         type: str
       observability_grafana_bind_ip:

@@ -21,7 +21,15 @@ groups:
               expr: >-
                 sum by (host, job) (
                   count_over_time(
-                    {job=~"journal|docker"}
+                    {job="docker", container!~"observability-.*"}
+                    |~ "(?i)\\b(error|failed|failure|critical|fatal|panic)\\b"
+                    [{{ observability_error_log_alert_window }}]
+                  )
+                )
+                or
+                sum by (host, job) (
+                  count_over_time(
+                    {job="journal"}
                     |~ "(?i)\\b(error|failed|failure|critical|fatal|panic)\\b"
                     [{{ observability_error_log_alert_window }}]
                   )
@@ -64,7 +72,8 @@ groups:
           description: >-
             More than {{ observability_error_log_alert_threshold }} error-class
             log entries were observed in {{ observability_error_log_alert_window }}.
-            Inspect the related Loki stream and service metrics.
+            Observability Compose containers are excluded. Inspect the related
+            Loki stream and homelab_docker_* metrics.
         labels:
           severity: warning
           site: "{{ observability_site_label }}"
