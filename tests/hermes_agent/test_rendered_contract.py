@@ -508,6 +508,8 @@ def assert_grafana_mcp_sidecar() -> None:
         raise SystemExit("SOUL.md must describe channel+email paging")
     if "HMAC-v2" not in soul and "webhook" not in soul.lower():
         raise SystemExit("SOUL.md must describe the Grafana webhook triage path")
+    if "payload is the alert" not in soul.lower() and "webhook payload" not in soul.lower():
+        raise SystemExit("SOUL.md must treat the webhook payload as alert identity")
     check = (ROLE / "files/check-grafana-mcp.py").read_text()
     if "socket.gethostbyname" not in check or "healthz" not in check:
         raise SystemExit("acceptance helper must resolve grafana-mcp and hit healthz")
@@ -574,6 +576,10 @@ def assert_webhook_enabled_loopback() -> None:
         raise SystemExit("webhook must not disable HMAC")
     if "Do not use GitHub" not in config:
         raise SystemExit("webhook prompt must forbid GitHub and mutation")
+    if "{__raw__}" not in config or "{alert_summary}" not in config:
+        raise SystemExit("webhook prompt must include the payload and alert_summary")
+    if "Grafana-managed" not in config:
+        raise SystemExit("webhook prompt must not treat empty Grafana rules as missing identity")
     ingress = render(
         "relay-ingress.sh.j2",
         hermes_agent_relay_allow_from="192.0.2.16",

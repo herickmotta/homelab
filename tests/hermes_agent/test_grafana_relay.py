@@ -54,6 +54,36 @@ class RelayHelpers(unittest.TestCase):
         self.assertEqual(len(keys), 2)
         self.assertNotEqual(keys[0], keys[1])
 
+    def test_alert_summary_from_alertmanager(self) -> None:
+        payload = {
+            "status": "firing",
+            "alerts": [
+                {
+                    "status": "firing",
+                    "labels": {
+                        "alertname": "ObservePagingTest",
+                        "instance": "192.0.2.10:9090",
+                        "job": "prometheus",
+                    },
+                    "annotations": {"summary": "paging drill"},
+                }
+            ],
+        }
+        text = relay.alert_summary(payload)
+        self.assertIn("ObservePagingTest", text)
+        self.assertIn("192.0.2.10:9090", text)
+        self.assertIn("paging drill", text)
+
+    def test_alert_summary_from_grafana_group_labels(self) -> None:
+        payload = {
+            "status": "firing",
+            "title": "[FIRING:1] LinuxExporterDown",
+            "groupLabels": {"alertname": "LinuxExporterDown"},
+            "alerts": [],
+        }
+        text = relay.alert_summary(payload)
+        self.assertIn("LinuxExporterDown", text)
+
     def test_seen_store_duplicate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = relay.SeenStore(Path(tmp), ttl_seconds=60)

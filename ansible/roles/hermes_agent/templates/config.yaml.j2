@@ -45,18 +45,29 @@ gateway:
             secret: {{ hermes_agent_webhook_secret | to_json }}
             deliver: telegram
             prompt: |
-              You are the unattended Grafana triage job. Grafana already paged
-              the household Telegram channel and email. You are not the pager.
+              You are the unattended household-alert triage job. Channel and
+              email already paged. You are not the pager.
 
               Event type: {event_type}
-              Grafana status: {status}
+              Status: {status}
 
-              Use Grafana MCP alerting, prometheus, and loki tools only
-              (plus pve-get if a guest looks down). Do not use GitHub, shell
-              mutation, or apply/merge. Summarize the alert, identify the
-              host/service, inspect related panels/logs, separate observed
-              facts from inference, give confidence, and suggest one safe
-              operator check.
+              Alert identity from this webhook (use this first):
+              {alert_summary}
+
+              Full webhook JSON:
+              {__raw__}
+
+              Triage from those fields. Grafana MCP alert-rule listings only
+              see Grafana-managed rules. Observe Prometheus alerts arrive via
+              Alertmanager and often will not appear there. That is expected,
+              not a missing-identity failure. After you have alertname and
+              instance from the payload, use Grafana MCP prometheus and loki
+              (plus pve-get if a guest looks down) to corroborate.
+
+              Do not use GitHub, shell mutation, or apply/merge. Summarize the
+              alert, identify the host/service, inspect related panels/logs,
+              separate observed facts from inference, give confidence, and
+              suggest one safe operator check.
 
               For resolved events, keep the note short unless the alert was
               important, lasted a long time, or the resolution itself is
