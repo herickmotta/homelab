@@ -84,6 +84,9 @@ site:
           address: 192.0.2.10:8006
           kind: pve_api
           dependency: pve
+      # Observe guest only. Household VMs page from Grafana, not Sentinel.
+      critical_guest_ids:
+        - 116
     observability:
       site_label: example
       retention_time: 15d
