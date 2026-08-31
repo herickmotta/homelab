@@ -1,0 +1,53 @@
+# Managed by herickmotta.homelab.observability.
+global:
+  resolve_timeout: 5m
+{% if observability_mail_enabled | bool %}
+  smtp_smarthost: {{ (observability_smtp_host ~ ':' ~ observability_smtp_port) | to_json }}
+  smtp_from: {{ observability_smtp_from | to_json }}
+  smtp_auth_username: {{ observability_smtp_username | to_json }}
+  smtp_auth_password: {{ observability_smtp_password | to_json }}
+  smtp_require_tls: {{ observability_smtp_require_tls | bool | lower }}
+{% endif %}
+
+route:
+  receiver: "{{ 'notify' if (observability_mail_enabled | bool or observability_telegram_enabled | bool or observability_webhook_enabled | bool) else 'discard' }}"
+  group_by:
+    - alertname
+    - site
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="HypervisorUnavailable"
+    target_matchers:
+      - dependency="pve"
+    equal:
+      - site
+
+receivers:
+  - name: discard
+{% if observability_mail_enabled | bool or observability_telegram_enabled | bool or observability_webhook_enabled | bool %}
+  - name: notify
+{% if observability_mail_enabled | bool %}
+    email_configs:
+      - to: {{ observability_email_destination | to_json }}
+        send_resolved: true
+{% endif %}
+{% if observability_telegram_enabled | bool %}
+    telegram_configs:
+      - bot_token: {{ observability_telegram_bot_token | to_json }}
+        chat_id: {{ observability_telegram_chat_id | int }}
+        send_resolved: true
+{% endif %}
+{% if observability_webhook_enabled | bool %}
+    webhook_configs:
+      - url: {{ observability_webhook_url | regex_replace('/grafana/?$', '/alertmanager') | to_json }}
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: {{ observability_webhook_hmac_secret | to_json }}
+{% endif %}
+{% endif %}

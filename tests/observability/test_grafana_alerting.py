@@ -20,6 +20,9 @@ def render(template: str, **values) -> str:
     env.filters["to_json"] = lambda value: __import__("json").dumps(value)
     env.filters["bool"] = lambda value: value in (True, "true", "True", 1, "1")
     env.filters["string"] = lambda value: "" if value is None else str(value)
+    env.filters["regex_replace"] = (
+        lambda value, pattern, repl="": __import__("re").sub(pattern, repl, str(value))
+    )
     return env.get_template(template).render(**values)
 
 
@@ -48,6 +51,28 @@ def main() -> None:
         raise SystemExit("Grafana webhook must HMAC")
     if alerting["policies"][0]["receiver"] != "grafana-notify":
         raise SystemExit("default policy must use grafana-notify")
+
+    am = render(
+        "ansible/roles/observability/templates/alertmanager.yml.j2",
+        observability_mail_enabled=True,
+        observability_telegram_enabled=True,
+        observability_webhook_enabled=True,
+        observability_smtp_host="smtp.example.test",
+        observability_smtp_port=587,
+        observability_smtp_from="ops@example.test",
+        observability_smtp_username="ops@example.test",
+        observability_smtp_password="smtp-not-for-logs",
+        observability_smtp_require_tls=True,
+        observability_email_destination="ops@example.test",
+        observability_telegram_bot_token="tg-bot-not-for-logs",
+        observability_telegram_chat_id="-1001234567890",
+        observability_webhook_url="http://192.0.2.17:8787/grafana",
+        observability_webhook_hmac_secret="grafana-hmac-secret-16",
+    )
+    if "http://192.0.2.17:8787/alertmanager" not in am:
+        raise SystemExit("Observe Alertmanager must webhook /alertmanager, not Grafana HMAC")
+    if "type: Bearer" not in am:
+        raise SystemExit("Observe Alertmanager webhook must use Bearer auth")
 
     prom = render(
         "ansible/roles/observability/templates/prometheus.yml.j2",

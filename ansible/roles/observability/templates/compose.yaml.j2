@@ -25,6 +25,31 @@ services:
     labels:
       homelab.role: observability
 
+{% if observability_alerting_enabled | default(false) | bool %}
+  alertmanager:
+    image: "{{ observability_alertmanager_image }}"
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address={{ observability_local_alertmanager_address }}
+      - --cluster.listen-address=
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./data/alertmanager:/alertmanager
+    mem_limit: 128m
+    cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      homelab.role: observability
+{% endif %}
+
   grafana:
     image: "{{ observability_grafana_image }}"
     restart: unless-stopped

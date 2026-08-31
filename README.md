@@ -63,6 +63,7 @@ flowchart TB
     grafana["Grafana"]
     richProm["Prometheus 15d"]
     loki["Loki 14d"]
+    observeAM["Alertmanager loopback"]
   end
 
   subgraph hermes["Hermes guest"]
@@ -88,7 +89,9 @@ flowchart TB
   grafana -->|"channel and email"| telegram
   grafana -->|"HMAC webhook"| relay
   relay -->|"loopback HMAC-v2"| agent
-  richProm -->|"alerts"| grafana
+  richProm -->|"alerts"| observeAM
+  observeAM -->|"channel and email"| telegram
+  observeAM -->|"Bearer webhook"| relay
   mesh --> dns
   lan --> dns
   dns -->|"lab names"| proxy
@@ -152,14 +155,18 @@ How traffic and data move:
 - Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
   journal and Docker logs to Loki on the observability guest. Grafana
   Explore is the log UI. Loki is not on Caddy. Observe Prometheus sends
-  household alerts to Grafana Alerting. Grafana pages a Telegram channel
-  and email, then a host relay on the Hermes guest signs Nous HMAC-v2 for
-  real-time triage. Sentinel Alertmanager pages only Proxmox health and
+  household alerts to a loopback Alertmanager on the observability guest
+  (Grafana 13.2 cannot ingest Prometheus AM v2 POSTs). That Alertmanager
+  pages a Telegram channel and email, then Bearer-webhooks the Hermes
+  relay. Grafana contact points stay for Grafana-managed rules and HMAC
+  webhooks. Sentinel Alertmanager pages only Proxmox health and
   observe-plane liveness. Grafana keeps a read-only Sentinel Alertmanager
   datasource so survival fires remain visible.
 - Hermes runs the official pinned container on its own guest. Telegram and
-  the model provider are outbound only. The Grafana webhook is loopback-only;
-  a host relay accepts Grafana HMAC from the observe IPv4. RFC1918 stays
+  the model provider are outbound only. The Grafana HMAC webhook and the
+  Observe Alertmanager Bearer webhook share a host relay on the Hermes
+  guest; Compose publishes `127.0.0.1:8644` only when that webhook is
+  enabled. RFC1918 stays
   dropped except optional GET-only Proxmox API on TCP 8006. There is no
   Docker socket, Caddy route, dashboard, or public ingress.
 

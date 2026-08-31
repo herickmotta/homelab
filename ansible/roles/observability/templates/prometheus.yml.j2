@@ -8,16 +8,18 @@ global:
 
 rule_files:
   - /etc/prometheus/rules/*.yml
-{% if observability_grafana_alertmanager_host | default('') | length > 0 %}
+{% if observability_alerting_enabled | default(false) | bool %}
 
+# Grafana 13.2 cannot unmarshal Prometheus AM v2 arrays into its built-in
+# Alertmanager. Observe Alertmanager on loopback pages email/Telegram and
+# webhooks Hermes. Grafana contact points stay for Grafana-managed rules.
 alerting:
   alertmanagers:
     - scheme: http
-      path_prefix: "{{ observability_grafana_alertmanager_path_prefix | default('/api/alertmanager/grafana') }}"
       api_version: v2
       static_configs:
         - targets:
-            - "{{ observability_grafana_alertmanager_host }}"
+            - "{{ observability_local_alertmanager_address }}"
 {% endif %}
 
 scrape_configs:
