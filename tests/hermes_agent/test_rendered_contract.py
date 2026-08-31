@@ -574,10 +574,19 @@ def assert_webhook_enabled_loopback() -> None:
         raise SystemExit("webhook route must not grant terminal")
     if "INSECURE_NO_AUTH" in config:
         raise SystemExit("webhook must not disable HMAC")
-    if "Do not use GitHub" not in config:
-        raise SystemExit("webhook prompt must forbid GitHub and mutation")
-    if "{__raw__}" not in config or "{alert_summary}" not in config:
-        raise SystemExit("webhook prompt must include the payload and alert_summary")
+    required_prompt = (
+        "STATUS: ACTION_REQUIRED | NO_ACTION | ACCESS_BLOCKED",
+        "maximum 12 short lines",
+        "Investigate before replying",
+        "RESOURCE, requested operation, observed error",
+        "Do not use GitHub",
+        "Internal payload for investigation only",
+        "{__raw__}",
+        "{alert_summary}",
+    )
+    for snippet in required_prompt:
+        if snippet not in config:
+            raise SystemExit(f"webhook prompt missing {snippet!r}")
     if "Grafana-managed" not in config:
         raise SystemExit("webhook prompt must not treat empty Grafana rules as missing identity")
     ingress = render(
