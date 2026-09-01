@@ -124,6 +124,12 @@ def assert_ingress_and_backup() -> None:
         raise SystemExit("backup.sh must not inline AWS secrets")
     if "pg_dump" not in backup or "pg_dumpall" not in backup or "age -r" not in backup:
         raise SystemExit("backup must dump postgres, roles, and age-encrypt")
+    if "exec -T db pg_dump" not in backup or "exec -T db pg_dumpall" not in backup:
+        raise SystemExit("backup must dump from the pinned db container")
+    if "-h 127.0.0.1" in backup:
+        raise SystemExit("backup must not use host pg_dump against loopback")
+    if "stack.env" in backup:
+        raise SystemExit("container dump must not source stack.env")
     if "aws s3 cp" in backup:
         raise SystemExit("default backup.sh must not upload to S3")
     s3_backup = render("backup.sh.j2", data_platform_backup_s3_enabled=True)

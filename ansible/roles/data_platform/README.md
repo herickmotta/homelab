@@ -17,9 +17,10 @@ printf '%s' "$JWT_SECRET" | python3 files/mint_jwt.py --role service_role
 printf '%s' "$JWT_SECRET" | python3 files/mint_jwt.py --role ops_ledger_hermes
 ```
 
-Backup: nightly `pg_dump` custom format plus `--roles-only`, age-encrypted
-onto `data_platform_backup_dir` (a site may VirtioFS that path from healthy
-`iron` storage). S3 upload stays optional and off by default. `state: absent`
+Backup: nightly `pg_dump` custom format plus `--roles-only` from the pinned
+db container (so restore matches the image, not host postgresql-client),
+age-encrypted onto `data_platform_backup_dir` (a site may VirtioFS that path
+from healthy `iron` storage). S3 upload stays optional and off by default. `state: absent`
 keeps `/opt/data-platform/data` and the backup directory. Restore into a
 disposable directory with `restore.sh`; do not import onto the live volume
 for proof.
