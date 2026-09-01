@@ -100,6 +100,9 @@ jobs:
       - name: Test Docker inventory dashboard
         run: python3 tests/observability/test_docker_inventory_dashboard.py
 
+      - name: Test Service logs dashboard
+        run: python3 tests/observability/test_logs_dashboard.py
+
   ci:
     name: ci
     if: always()
