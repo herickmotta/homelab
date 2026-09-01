@@ -128,6 +128,15 @@ and Alertmanager Bearer from one observe IPv4, signs Nous HMAC-v2, and POSTs
 to loopback `:8644` with the alert payload in the route prompt. Compose
 publishes `127.0.0.1:8644` only then. There is no poll cron.
 
+## Optional ops_ledger MCP
+
+Defaults keep ledger access **off**. A site may set
+`hermes_agent_ops_ledger_enabled: true` with the data guest IPv4, Kong
+`:8000`, a low-privilege `ops_ledger_hermes` JWT, and a sidecar caller
+token. The JWT stays in `hermes_agent_ops_ledger_mcp_env_file` (`0640`
+`root:root`). Egress ACCEPTs TCP 8000 to that one data IPv4. Do not put
+the Supabase service-role key or backup IAM credentials on this guest.
+
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)
 are rendered for `openai-codex`. After login:
 

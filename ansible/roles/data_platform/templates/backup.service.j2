@@ -1,0 +1,8 @@
+[Unit]
+Description=Age-encrypted data platform database dump to local disk and S3
+After=docker.service
+
+[Service]
+Type=oneshot
+Nice=10
+ExecStart={{ data_platform_install_dir }}/backup.sh

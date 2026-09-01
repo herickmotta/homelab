@@ -1,0 +1,236 @@
+---
+- name: Install data platform host packages
+  ansible.builtin.apt:
+    name:
+      - iptables
+      - age
+      - awscli
+      - postgresql-client
+    state: present
+    update_cache: true
+
+- name: Create data platform directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ data_platform_install_dir }}"
+      owner: "{{ data_platform_owner }}"
+      group: "{{ data_platform_group }}"
+      mode: "0750"
+    - path: "{{ data_platform_data_dir }}"
+      owner: "{{ data_platform_owner }}"
+      group: "{{ data_platform_group }}"
+      mode: "0750"
+    - path: "{{ data_platform_data_dir }}/postgres"
+      owner: "999"
+      group: "999"
+      mode: "0700"
+    - path: "{{ data_platform_backup_dir }}"
+      owner: "{{ data_platform_owner }}"
+      group: "{{ data_platform_group }}"
+      mode: "0700"
+    - path: "{{ data_platform_config_dir }}"
+      owner: root
+      group: root
+      mode: "0750"
+    - path: "{{ data_platform_migrations_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install SQL migrations
+  ansible.builtin.copy:
+    src: "sql/{{ item }}"
+    dest: "{{ data_platform_migrations_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - 00-roles.sql
+    - 01-ops_ledger.sql
+  notify: Recreate data platform compose
+
+- name: Install data platform secret env
+  ansible.builtin.template:
+    src: stack.env.j2
+    dest: "{{ data_platform_config_dir }}/stack.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Recreate data platform compose
+
+- name: Install data platform backup env
+  ansible.builtin.template:
+    src: backup.env.j2
+    dest: "{{ data_platform_config_dir }}/backup.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install Kong declaration
+  ansible.builtin.template:
+    src: kong.yml.j2
+    dest: "{{ data_platform_config_dir }}/kong.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recreate data platform compose
+
+- name: Install data platform Compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ data_platform_install_dir }}/compose.yaml"
+    owner: "{{ data_platform_owner }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+  notify: Recreate data platform compose
+
+- name: Install backup and restore scripts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - src: backup.sh.j2
+      dest: "{{ data_platform_install_dir }}/backup.sh"
+    - src: restore.sh.j2
+      dest: "{{ data_platform_install_dir }}/restore.sh"
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Install data platform API ingress
+  ansible.builtin.template:
+    src: ingress.sh.j2
+    dest: "{{ data_platform_ingress_script }}"
+    owner: root
+    group: root
+    mode: "0750"
+  notify: Reload data platform API ingress
+
+- name: Install data platform API ingress unit
+  ansible.builtin.template:
+    src: ingress.service.j2
+    dest: "/etc/systemd/system/{{ data_platform_ingress_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload data platform API ingress
+
+- name: Install data platform backup systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: backup.service.j2
+      dest: /etc/systemd/system/data-platform-backup.service
+    - src: backup.timer.j2
+      dest: /etc/systemd/system/data-platform-backup.timer
+  notify: Reload data platform backup timer
+
+- name: Apply data platform Compose handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Check whether the data platform Compose project is running
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - ps
+      - -q
+    chdir: "{{ data_platform_install_dir }}"
+  register: data_platform_compose_ps
+  changed_when: false
+
+- name: Start the data platform Compose project
+  when: data_platform_compose_ps.stdout | trim | length == 0
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+
+- name: Wait for Postgres to accept connections
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - db
+      - pg_isready
+      - -U
+      - postgres
+    chdir: "{{ data_platform_install_dir }}"
+  register: data_platform_pg_ready
+  until: data_platform_pg_ready.rc == 0
+  retries: 30
+  delay: 2
+  changed_when: false
+
+- name: Apply role bootstrap SQL
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - db
+      - sh
+      - -c
+      - >-
+        psql -U postgres -v ON_ERROR_STOP=1
+        -v pgpass="$POSTGRES_PASSWORD"
+        -v jwt_secret="$JWT_SECRET"
+        -f /migrations/00-roles.sql
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+  no_log: true
+
+- name: Apply ops_ledger SQL
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - db
+      - psql
+      - -U
+      - postgres
+      - -v
+      - ON_ERROR_STOP=1
+      - -f
+      - /migrations/01-ops_ledger.sql
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+
+- name: Enable data platform API ingress
+  ansible.builtin.systemd_service:
+    name: "{{ data_platform_ingress_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable data platform backup timer
+  when: data_platform_backup_enabled | bool
+  ansible.builtin.systemd_service:
+    name: data-platform-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true

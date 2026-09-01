@@ -169,12 +169,22 @@ agent:
     - session_search
 {% endif %}
 
-{% if hermes_agent_grafana_enabled | bool %}
+{% if hermes_agent_grafana_enabled | bool or hermes_agent_ops_ledger_enabled | bool %}
 mcp_servers:
+{% if hermes_agent_grafana_enabled | bool %}
   grafana:
     url: "http://grafana-mcp:8000/mcp"
     headers:
       Authorization: "Bearer {{ hermes_agent_grafana_mcp_server_token }}"
     timeout: 120
     connect_timeout: 30
+{% endif %}
+{% if hermes_agent_ops_ledger_enabled | bool %}
+  ops_ledger:
+    url: "http://ops-ledger-mcp:8010/mcp"
+    headers:
+      Authorization: "Bearer {{ hermes_agent_ops_ledger_mcp_server_token }}"
+    timeout: 30
+    connect_timeout: 10
+{% endif %}
 {% endif %}

@@ -1,0 +1,71 @@
+---
+# Disabled until a site opts in. Preserve primary data on disable.
+data_platform_enabled: false
+data_platform_preserve_state_on_disable: true
+
+data_platform_install_dir: /opt/data-platform
+data_platform_data_dir: /opt/data-platform/data
+data_platform_backup_dir: /opt/data-platform/backups
+data_platform_config_dir: /opt/data-platform/config
+data_platform_migrations_dir: /opt/data-platform/migrations
+
+data_platform_owner: "{{ ansible_user }}"
+data_platform_group: "{{ ansible_user }}"
+
+data_platform_network_name: data-platform
+data_platform_network_subnet: 172.30.137.0/24
+
+# Pinned subset of self-hosted Supabase. Digests are linux/amd64.
+data_platform_postgres_image_repository: supabase/postgres
+data_platform_postgres_image_tag: "15.8.1.085"
+data_platform_postgres_image_digest: "sha256:caae3d066f437332d593011e3e7ecf78ab005ce9b89378efd53f97f0410563ad"
+
+data_platform_kong_image_repository: kong
+data_platform_kong_image_tag: "2.8.1"
+data_platform_kong_image_digest: "sha256:e21b0b793879ab96720ed4188f9441260273f4bf775bcbff8d435e019ffb759a"
+
+data_platform_postgrest_image_repository: postgrest/postgrest
+data_platform_postgrest_image_tag: v12.2.3
+data_platform_postgrest_image_digest: "sha256:bd918a7d03c801d03802e27c19e589b53fd71ab181a5ec942705551c7dbc3d53"
+
+data_platform_gotrue_image_repository: supabase/gotrue
+data_platform_gotrue_image_tag: v2.151.0
+data_platform_gotrue_image_digest: "sha256:93b7ff6168fef6bcd92d8f8ede36ebe74fcd405b81641520012be9a11db5b893"
+
+data_platform_studio_image_repository: supabase/studio
+data_platform_studio_image_tag: "20240422-5cf8f30"
+data_platform_studio_image_digest: "sha256:a598dd1eafbafd5ba6b6d81270f2b2874fccc3116ebf18c7e3126756d7e2b3dd"
+
+data_platform_meta_image_repository: supabase/postgres-meta
+data_platform_meta_image_tag: v0.83.2
+data_platform_meta_image_digest: "sha256:476ccd2e2f02181a8d12573dafb000ff9dd4b7bc01f6041d330dc734e08705bf"
+
+data_platform_postgres_db: postgres
+data_platform_postgres_password: ""
+data_platform_jwt_secret: ""
+data_platform_anon_key: ""
+data_platform_service_role_key: ""
+data_platform_jwt_expiry: 3600
+
+data_platform_kong_port: 8000
+data_platform_postgres_host_port: 5432
+data_platform_studio_host_port: 3000
+data_platform_public_url: "http://127.0.0.1:8000"
+data_platform_site_url: "http://127.0.0.1:3000"
+
+data_platform_api_allow_from: []
+data_platform_ingress_unit: data-platform-api-ingress.service
+data_platform_ingress_script: /usr/local/sbin/data-platform-api-ingress
+
+data_platform_backup_enabled: true
+data_platform_backup_bucket: ""
+data_platform_backup_prefix: data-platform
+data_platform_backup_region: us-east-1
+data_platform_backup_age_recipient: ""
+data_platform_backup_aws_access_key_id: ""
+data_platform_backup_aws_secret_access_key: ""
+data_platform_backup_on_calendar: "*-*-* 04:17:00"
+data_platform_backup_keep_local: 1
+
+data_platform_log_max_size: "10m"
+data_platform_log_max_file: "5"

@@ -71,6 +71,8 @@ def assert_defaults() -> None:
         raise SystemExit("Proxmox API access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_grafana_enabled"]:
         raise SystemExit("Grafana MCP access must stay disabled until a site opts in")
+    if DEFAULTS["hermes_agent_ops_ledger_enabled"]:
+        raise SystemExit("ops_ledger MCP access must stay disabled until a site opts in")
     if DEFAULTS["hermes_agent_runtime_user"] in ("root", ""):
         raise SystemExit("runtime user must be a non-root identity")
     if int(DEFAULTS["hermes_agent_runtime_uid"]) <= 0:
@@ -251,6 +253,16 @@ def assert_secrets_and_egress() -> None:
         raise SystemExit("default egress must not punch a Proxmox hole")
     if '-d "${SUBNET}" -j RETURN' not in egress:
         raise SystemExit("default egress must RETURN the Compose subnet")
+    if "--dport 8000 -j ACCEPT" in egress:
+        raise SystemExit("default egress must not punch a data-platform hole")
+    ledger_egress = render(
+        "egress.sh.j2",
+        hermes_agent_ops_ledger_enabled=True,
+        hermes_agent_ops_ledger_ipv4="192.0.2.18",
+        hermes_agent_ops_ledger_port=8000,
+    )
+    if "-d 192.0.2.18 -p tcp --dport 8000 -j ACCEPT" not in ledger_egress:
+        raise SystemExit("ops_ledger egress must ACCEPT data:8000")
     print("secrets stay in 0640 env; egress drops RFC1918 and link-local")
 
 
@@ -289,6 +301,8 @@ def assert_validation_contract() -> None:
         "hermes_agent_pve_token_value is not match('(?i)^replace')",
         "hermes_agent_grafana_enabled | bool",
         "hermes_agent_grafana_viewer_token is not match('(?i)^replace')",
+        "hermes_agent_ops_ledger_enabled | bool",
+        "hermes_agent_ops_ledger_jwt is not match('(?i)^replace')",
     )
     for snippet in required_snippets:
         if snippet not in VALIDATE:
@@ -315,6 +329,8 @@ def assert_example_and_specs() -> None:
         raise SystemExit("example site must keep Proxmox API access disabled")
     if hermes.get("grafana", {}).get("enabled"):
         raise SystemExit("example site must keep Grafana MCP access disabled")
+    if hermes.get("ops_ledger", {}).get("enabled"):
+        raise SystemExit("example site must keep ops_ledger MCP access disabled")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())
     options = specs["argument_specs"]["main"]["options"]
     for key in DEFAULTS:

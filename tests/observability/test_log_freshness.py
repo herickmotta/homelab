@@ -23,7 +23,7 @@ PROMTOOL_URL = (
     "https://github.com/prometheus/prometheus/releases/download/"
     f"v{PROM_VERSION}/prometheus-{PROM_VERSION}.linux-amd64.tar.gz"
 )
-EXPECTED_HOST_COUNT = 7
+EXPECTED_HOST_COUNT = 8
 
 
 def unique(values):

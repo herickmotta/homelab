@@ -90,6 +90,17 @@
   no_log: true
   notify: Recreate Hermes Agent compose
 
+- name: Install ops_ledger MCP secrets
+  when: hermes_agent_ops_ledger_enabled | bool
+  ansible.builtin.template:
+    src: ops-ledger-mcp.env.j2
+    dest: "{{ hermes_agent_ops_ledger_mcp_env_file }}"
+    owner: root
+    group: root
+    mode: "0640"
+  no_log: true
+  notify: Recreate Hermes Agent compose
+
 - name: Remove leftover Grafana MCP secrets from the Hermes policy mount
   ansible.builtin.file:
     path: "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
@@ -236,6 +247,15 @@
   ansible.builtin.copy:
     src: check-grafana-mcp.py
     dest: "{{ hermes_agent_managed_dir }}/bin/check-grafana-mcp.py"
+    owner: root
+    group: "{{ hermes_agent_runtime_group }}"
+    mode: "0755"
+
+- name: Install the ops_ledger MCP sidecar
+  when: hermes_agent_ops_ledger_enabled | bool
+  ansible.builtin.copy:
+    src: ops_ledger_mcp.py
+    dest: "{{ hermes_agent_managed_dir }}/bin/ops-ledger-mcp.py"
     owner: root
     group: "{{ hermes_agent_runtime_group }}"
     mode: "0755"

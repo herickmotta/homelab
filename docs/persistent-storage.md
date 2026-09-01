@@ -119,4 +119,6 @@ stay on the guest OS disk and are reproducible from git except event history.
 - NFS
 - A backup product
 - Loki, Alertmanager, or Grafana SMTP
+- Application PostgreSQL on host ZFS (the data guest keeps Postgres on its
+  local virtual disk)
 - LDAP, Active Directory, quotas, or a web file manager

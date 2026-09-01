@@ -20,7 +20,8 @@ DNS, HTTPS names, and remote access. The NAS guest is a replaceable SMB front
 end. The application guest runs Compose workloads such as Frigate. The
 observability guest holds Grafana and longer-retention Prometheus. Hermes is
 a dedicated guest for the official containerized assistant and is reached
-only through Telegram, not Caddy. ZFS stays on the hypervisor, so destroying
+only through Telegram, not Caddy. The data guest holds the shared Postgres
+ledger behind an allowlisted API. ZFS stays on the hypervisor, so destroying
 a guest does not destroy host datasets.
 
 ```mermaid
@@ -69,7 +70,13 @@ flowchart TB
   subgraph hermes["Hermes guest"]
     agent["Official Hermes container"]
     grafanaMcp["Grafana MCP sidecar"]
+    ledgerMcp["ops_ledger MCP sidecar"]
     relay["Grafana HMAC relay"]
+  end
+
+  subgraph dataGuest["Data guest"]
+    kong["Kong allowlisted :8000"]
+    postgres["Postgres loopback"]
   end
 
   subgraph cameras["Cameras"]
@@ -127,6 +134,11 @@ flowchart TB
   agent -->|"PVEAuditor GET :8006"| host
   agent -->|"Docker DNS grafana-mcp"| grafanaMcp
   grafanaMcp -->|"Viewer HTTP :3000"| grafana
+  agent -->|"Docker DNS ops-ledger-mcp"| ledgerMcp
+  ledgerMcp -->|"JWT TCP :8000"| kong
+  kong --> postgres
+  dataGuest -->|"Alloy logs"| loki
+  richProm -->|"Linux exporter"| dataGuest
 
   durable --> virtio
   virtio --> smb
@@ -219,7 +231,7 @@ under `examples/`. Collection `herickmotta.homelab` 0.16.2 ships
 `mqtt_broker`, `homeassistant`, `observability`, `host_metrics`,
 `log_shipper`, `proxmox_host_power`, `proxmox_host_storage`, `nas_server`,
 `netdata_agent`, `sentinel_base`, `github_actions_runner`,
-`sentinel_monitoring`, and `hermes_agent`. Site repositories pin a
+`sentinel_monitoring`, `hermes_agent`, and `data_platform`. Site repositories pin a
 full commit SHA, not a moving tag; `v0.1.0` is the earlier single-VM module
 only.
 

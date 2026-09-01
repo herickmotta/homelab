@@ -1,0 +1,50 @@
+#!/bin/sh
+# Managed by herickmotta.homelab.data_platform.
+# Logical dump of postgres plus roles. Age-encrypt, keep one local copy, upload.
+set -eu
+
+INSTALL_DIR="{{ data_platform_install_dir }}"
+BACKUP_DIR="{{ data_platform_backup_dir }}"
+BUCKET="{{ data_platform_backup_bucket }}"
+PREFIX="{{ data_platform_backup_prefix }}"
+REGION="{{ data_platform_backup_region }}"
+RECIPIENT="{{ data_platform_backup_age_recipient }}"
+KEEP="{{ data_platform_backup_keep_local | int }}"
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+WORK="$(mktemp -d)"
+trap 'rm -rf "${WORK}"' EXIT
+
+export PGPASSWORD
+# shellcheck disable=SC1091
+. "{{ data_platform_config_dir }}/stack.env"
+PGPASSWORD="${POSTGRES_PASSWORD}"
+
+mkdir -p "${BACKUP_DIR}"
+chmod 700 "${BACKUP_DIR}"
+
+pg_dump -h 127.0.0.1 -p {{ data_platform_postgres_host_port | int }} \
+  -U postgres -d {{ data_platform_postgres_db }} -Fc \
+  -f "${WORK}/postgres.dump"
+pg_dumpall -h 127.0.0.1 -p {{ data_platform_postgres_host_port | int }} \
+  -U postgres --roles-only \
+  > "${WORK}/roles.sql"
+
+tar -C "${WORK}" -cf "${WORK}/bundle.tar" postgres.dump roles.sql
+age -r "${RECIPIENT}" -o "${WORK}/${STAMP}.tar.age" "${WORK}/bundle.tar"
+
+cp -a "${WORK}/${STAMP}.tar.age" "${BACKUP_DIR}/"
+chmod 600 "${BACKUP_DIR}/${STAMP}.tar.age"
+
+# Keep the newest local generations only.
+# shellcheck disable=SC2012
+ls -1t "${BACKUP_DIR}"/*.tar.age 2>/dev/null | tail -n "+$((KEEP + 1))" | \
+  xargs -r rm -f
+
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+# shellcheck disable=SC1091
+set -a
+. "{{ data_platform_config_dir }}/backup.env"
+set +a
+aws s3 cp "${BACKUP_DIR}/${STAMP}.tar.age" \
+  "s3://${BUCKET}/${PREFIX}/${STAMP}.tar.age" \
+  --only-show-errors

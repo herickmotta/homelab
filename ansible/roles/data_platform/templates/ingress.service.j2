@@ -1,0 +1,13 @@
+[Unit]
+Description=Allowlist Kong API on the data platform guest
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={{ data_platform_ingress_script }}
+ExecStop=/bin/sh -c 'iptables -D INPUT -p tcp --dport {{ data_platform_kong_port | int }} -j DATA-PLATFORM-API 2>/dev/null || true; iptables -F DATA-PLATFORM-API 2>/dev/null || true; iptables -X DATA-PLATFORM-API 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target

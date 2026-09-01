@@ -85,6 +85,32 @@ services:
       homelab.role: grafana_mcp
 {% endif %}
 
+{% if hermes_agent_ops_ledger_enabled | bool %}
+  ops-ledger-mcp:
+    image: "{{ hermes_agent_ops_ledger_python_image_repository }}@{{ hermes_agent_ops_ledger_python_image_digest }}"
+    restart: unless-stopped
+    env_file:
+      - "{{ hermes_agent_ops_ledger_mcp_env_file }}"
+    command:
+      - python3
+      - /opt/ops-ledger-mcp.py
+    volumes:
+      - {{ hermes_agent_managed_dir }}/bin/ops-ledger-mcp.py:/opt/ops-ledger-mcp.py:ro
+    networks:
+      - hermes
+    user: "65534:65534"
+    security_opt:
+      - no-new-privileges:true
+    cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ hermes_agent_log_max_size }}"
+        max-file: "{{ hermes_agent_log_max_file }}"
+    labels:
+      homelab.role: ops_ledger_mcp
+{% endif %}
+
 networks:
   hermes:
     name: "{{ hermes_agent_network_name }}"

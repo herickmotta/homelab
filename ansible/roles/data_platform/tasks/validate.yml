@@ -1,0 +1,55 @@
+---
+- name: Validate the target operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["system"] == "Linux"
+      - ansible_facts["os_family"] == "Debian"
+    fail_msg: This role supports Debian-family Linux hosts only.
+
+- name: Validate data platform image pins
+  ansible.builtin.assert:
+    that:
+      - data_platform_postgres_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - data_platform_kong_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - data_platform_postgrest_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - data_platform_gotrue_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - data_platform_studio_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - data_platform_meta_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - "':' not in data_platform_postgres_image_repository"
+      - "'realtime' not in data_platform_postgres_image_repository"
+    fail_msg: Data platform images must be immutable sha256 pins.
+
+- name: Validate data platform paths
+  ansible.builtin.assert:
+    that:
+      - data_platform_install_dir is match('^/')
+      - data_platform_data_dir is match('^/')
+      - data_platform_backup_dir is match('^/')
+      - data_platform_kong_port | int > 0
+      - data_platform_postgres_host_port | int > 0
+      - data_platform_studio_host_port | int > 0
+      - data_platform_public_url is match('^http://127\\.0\\.0\\.1')
+    fail_msg: Data platform paths and loopback Studio/API URLs are required.
+
+- name: Require secrets when the data platform is enabled
+  when: data_platform_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - data_platform_postgres_password | length >= 16
+      - data_platform_postgres_password is match('^[A-Za-z0-9._~-]+$')
+      - data_platform_jwt_secret | length >= 32
+      - data_platform_jwt_secret is not match('(?i)^replace')
+      - data_platform_anon_key | length > 0
+      - data_platform_anon_key is not match('(?i)^replace')
+      - data_platform_service_role_key | length > 0
+      - data_platform_service_role_key is not match('(?i)^replace')
+      - data_platform_api_allow_from | length > 0
+      - data_platform_backup_bucket | length > 0
+      - data_platform_backup_age_recipient is match('^age1')
+      - data_platform_backup_aws_access_key_id | length > 0
+      - data_platform_backup_aws_secret_access_key | length > 0
+      - data_platform_backup_aws_secret_access_key is not match('(?i)^replace')
+    fail_msg: >-
+      Enabled data platform needs DB/JWT secrets, an API allowlist, an age
+      recipient, and dedicated backup IAM keys.
+  no_log: true

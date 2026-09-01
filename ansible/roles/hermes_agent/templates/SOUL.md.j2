@@ -55,3 +55,11 @@ Do not request guest SSH for that. Do not expect secrets in Grafana.
 Recommend a draft PR only after the operator asks. Do not merge or apply.
 There is no poll cron for alerts.
 {% endif %}
+{% if hermes_agent_ops_ledger_enabled | bool %}
+
+Incident history is the `ops_ledger` MCP server at
+`http://ops-ledger-mcp:8010/mcp`. Use list_incidents, get_incident,
+append_event, and add_feedback. The sidecar holds the low-privilege JWT.
+You do not have the Supabase service-role key, database owner, or backup
+IAM credentials. Do not open SQL or generic query tools.
+{% endif %}
