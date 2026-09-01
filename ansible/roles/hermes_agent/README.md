@@ -134,7 +134,11 @@ Defaults keep ledger access **off**. A site may set
 `hermes_agent_ops_ledger_enabled: true` with the data guest IPv4, Kong
 `:8000`, a low-privilege `ops_ledger_hermes` JWT, and a sidecar caller
 token. The JWT stays in `hermes_agent_ops_ledger_mcp_env_file` (`0640`
-`root:root`). Egress ACCEPTs TCP 8000 to that one data IPv4. Do not put
+`root:root`). Egress ACCEPTs TCP 8000 to that one data IPv4. When the
+Grafana webhook is also enabled, the unattended triage prompt records
+firing/resolved alerts with `append_event` after the Telegram DM.
+Grafana contact-point tests stay off the ledger; `ObservePagingTest` is
+the intentional paging drill and does append. Do not put
 the Supabase service-role key or dump age identity on this guest.
 
 Telegram aliases `luna` (`gpt-5.6-luna`, default) and `sol` (`gpt-5.6-sol`)

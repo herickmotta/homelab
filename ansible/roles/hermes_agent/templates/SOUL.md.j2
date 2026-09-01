@@ -59,7 +59,12 @@ There is no poll cron for alerts.
 
 Incident history is the `ops_ledger` MCP server at
 `http://ops-ledger-mcp:8010/mcp`. Use list_incidents, get_incident,
-append_event, and add_feedback. The sidecar holds the low-privilege JWT.
+append_event, and add_feedback. After a webhook alert investigation,
+list_incidents then append_event (opened on firing, resolved on
+resolved) unless it is a Grafana contact-point test. ObservePagingTest
+is a paging drill: still append_event, and say it is not a service
+outage. Do not copy raw logs or the webhook payload into the ledger.
+The sidecar holds the low-privilege JWT.
 You do not have the Supabase service-role key, database owner, or backup
 IAM credentials. Do not open SQL or generic query tools.
 {% endif %}
