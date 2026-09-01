@@ -154,14 +154,16 @@ How traffic and data move:
   footage is mapped into the application guest, not exported over SMB.
 -   Grafana Alloy on the guests, hypervisor, and Sentinel pushes selected
   journal and Docker logs to Loki on the observability guest. Docker
-  streams include Compose service, network, and container IP labels.
+  streams include Compose service, network, and container IP labels, and a
+  `service_name` label so Grafana Drilldown → Logs can index them.
   Node exporters publish `homelab_docker_*` inventory (health, restarts,
   IPs, published ports, gateways) and `homelab_local_tcp_up` host connect
   probes (target `address`, no payload) so Grafana MCP can debug without
   SSH. Host probes to a published port appear inside the container as the
   Docker bridge gateway.
-  Grafana Explore remains available; the Service logs dashboard is the
-  household log UI (one row per Compose service and journal unit). Loki is
+  Grafana Drilldown → Logs is the household log UI: a search box of
+  services from Loki, updated as Compose and journal streams appear.
+  Explore remains available for ad-hoc LogQL. Loki is
   not on Caddy. Observe Prometheus sends
   household alerts to a loopback Alertmanager on the observability guest
   (Grafana 13.2 cannot ingest Prometheus AM v2 POSTs). That Alertmanager

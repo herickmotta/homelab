@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "One row per Compose service and journal unit, filled from Loki labels. Filter with the host dropdown or the contains box; do not write LogQL.",
+  "description": "Optional log panels. The household log UI is Grafana Drilldown → Logs, which indexes Loki service_name automatically.",
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
