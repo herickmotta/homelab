@@ -126,6 +126,7 @@ services:
     env_file:
       - "{{ data_platform_config_dir }}/stack.env"
     environment:
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: "{{ data_platform_public_url }}"

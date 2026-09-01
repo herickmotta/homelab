@@ -87,6 +87,7 @@ def assert_compose_subset() -> None:
         "homelab.role: data_platform",
         "PGRST_DB_SCHEMAS: ops_ledger",
         "GOTRUE_DB_NAMESPACE: auth",
+        "HOSTNAME: \"0.0.0.0\"",
         "/migrations:ro",
     )
     for item in required:
