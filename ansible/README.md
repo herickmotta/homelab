@@ -93,8 +93,8 @@ Roles:
   email and then a Hermes HMAC relay. Sentinel Alertmanager pages only
   Proxmox health and observe-plane liveness. Grafana keeps a read-only
   Sentinel Alertmanager datasource. The Homelab overview dashboard
-  is the fleet/NAS view, Service logs lists each Loki Compose service and
-  journal unit as a row so operators do not write LogQL, and the
+  is the fleet/NAS view. Grafana Drilldown → Logs is the household log
+  UI (Loki `service_name` search, not a per-service dashboard). The
   Operations / Hermes evidence dashboard is the stable read-only evidence
   contract for alerts, target health, storage, services, Frigate, and log
   freshness. Optional read-only PVE exporter uses a

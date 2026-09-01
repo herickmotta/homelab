@@ -103,6 +103,9 @@ jobs:
       - name: Test Service logs dashboard
         run: python3 tests/observability/test_logs_dashboard.py
 
+      - name: Test Loki Logs Drilldown service names
+        run: python3 tests/observability/test_logs_drilldown.py
+
   ci:
     name: ci
     if: always()
