@@ -200,28 +200,14 @@
       dest: /etc/systemd/system/data-platform-backup.timer
   notify: Reload data platform backup timer
 
-- name: Apply data platform Compose handlers
-  ansible.builtin.meta: flush_handlers
-
-- name: Check whether the data platform Compose project is running
-  ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - ps
-      - -q
-    chdir: "{{ data_platform_install_dir }}"
-  register: data_platform_compose_ps
-  changed_when: false
-
-- name: Start the data platform Compose project
-  when: data_platform_compose_ps.stdout | trim | length == 0
+- name: Start Postgres before role SQL
   ansible.builtin.command:
     argv:
       - docker
       - compose
       - up
       - -d
+      - db
     chdir: "{{ data_platform_install_dir }}"
   changed_when: true
 
@@ -277,6 +263,30 @@
       - ON_ERROR_STOP=1
       - -f
       - /migrations/01-ops_ledger.sql
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+
+- name: Apply data platform Compose handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Start the data platform Compose project
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+
+- name: Restart auth and rest after role SQL
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - restart
+      - auth
+      - rest
     chdir: "{{ data_platform_install_dir }}"
   changed_when: true
 

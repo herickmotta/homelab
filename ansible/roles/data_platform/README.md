@@ -6,7 +6,9 @@ Defaults stay `enabled: false`. Postgres and Studio bind loopback. Kong
 PostgREST. Unused Supabase products (Realtime, Storage, Functions, analytics)
 are omitted from Compose.
 
-SQL migrations create only `ops_ledger`. Mint HS256 JWTs with
+SQL migrations create only `ops_ledger`. GoTrue owns schema `auth`
+(Postgres 15 no longer lets it create `schema_migrations` in `public`
+without an explicit GRANT). Mint HS256 JWTs with
 `files/mint_jwt.py` (read the secret from stdin; do not log the token):
 
 ```bash

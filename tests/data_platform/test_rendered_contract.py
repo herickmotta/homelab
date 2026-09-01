@@ -86,6 +86,7 @@ def assert_compose_subset() -> None:
         "127.0.0.1:3000",
         "homelab.role: data_platform",
         "PGRST_DB_SCHEMAS: ops_ledger",
+        "GOTRUE_DB_NAMESPACE: auth",
         "/migrations:ro",
     )
     for item in required:
@@ -148,7 +149,20 @@ def assert_sql_contract() -> None:
         raise SystemExit("RPC functions missing")
     if "ops_ledger_hermes" not in SQL_ROLES:
         raise SystemExit("hermes role missing")
-    print("sql: ops_ledger only, RPCs present")
+    if "CREATE SCHEMA IF NOT EXISTS auth" not in SQL_ROLES:
+        raise SystemExit("GoTrue auth schema missing")
+    if "search_path TO auth, public" not in SQL_ROLES:
+        raise SystemExit("supabase_auth_admin search_path missing")
+    if "GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin" not in SQL_ROLES:
+        raise SystemExit("Postgres 15 public CREATE grant missing")
+    present = (ROLE / "tasks/present.yml").read_text()
+    if present.index("Apply role bootstrap SQL") > present.index(
+        "Apply data platform Compose handlers"
+    ):
+        raise SystemExit("role SQL must run before compose recreate so GoTrue sees grants")
+    if "Restart auth and rest after role SQL" not in present:
+        raise SystemExit("auth must restart after role SQL")
+    print("sql: ops_ledger only, RPCs present, GoTrue auth schema")
 
 
 def assert_absent_and_validate() -> None:
