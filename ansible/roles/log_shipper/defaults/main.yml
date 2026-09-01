@@ -3,6 +3,7 @@ log_shipper_loki_url: ""
 log_shipper_site_label: homelab
 log_shipper_host_label: ""
 log_shipper_docker: false
+log_shipper_docker_drop_projects: []
 log_shipper_journal_units: []
 log_shipper_heartbeat_unit: alloy-heartbeat.service
 log_shipper_heartbeat_interval: 5min

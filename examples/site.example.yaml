@@ -244,6 +244,8 @@ site:
           journal_units: []
         observe-example:
           docker: true
+          docker_drop_projects:
+            - observability
           journal_units: []
         hermes-example:
           docker: true
@@ -258,6 +260,8 @@ site:
             - smartmontools.service
         sentinel-example:
           docker: true
+          docker_drop_projects:
+            - sentinel-monitoring
           journal_units:
             - sentinel-monitoring.service
 

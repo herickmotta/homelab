@@ -46,6 +46,9 @@
         log_shipper_host_label: "{{ inventory_hostname }}"
         log_shipper_listen_address: "{{ ansible_host }}:12345"
         log_shipper_docker: "{{ site.monitoring.log_shipper.hosts[inventory_hostname].docker }}"
+        log_shipper_docker_drop_projects: "{{
+            site.monitoring.log_shipper.hosts[inventory_hostname].docker_drop_projects | default([])
+          }}"
         log_shipper_journal_units: "{{
             site.monitoring.log_shipper.hosts[inventory_hostname].journal_units
           }}"

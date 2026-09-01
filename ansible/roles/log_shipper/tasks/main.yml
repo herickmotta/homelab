@@ -36,6 +36,15 @@
   loop_control:
     label: "{{ item }}"
 
+- name: Validate Docker Compose projects to drop
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9._-]+$')
+    fail_msg: Docker drop project names must be safe Compose project identifiers.
+  loop: "{{ log_shipper_docker_drop_projects }}"
+  loop_control:
+    label: "{{ item }}"
+
 - name: Require the Docker socket when shipping container logs
   when: log_shipper_docker | bool
   ansible.builtin.stat:
