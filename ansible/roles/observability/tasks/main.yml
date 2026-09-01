@@ -430,6 +430,7 @@
   loop:
     - dashboards/overview.json
     - dashboards/operations.json
+    - dashboards/logs.json
     - dashboards/linux.json
     - dashboards/zfs.json
     - dashboards/smart.json
