@@ -83,8 +83,33 @@ def test_alloy_drops_observability_compose_project() -> None:
     assert "sentinel\\\\-monitoring" in docker
 
 
+def test_compose_heartbeat_pushes_service_name() -> None:
+    script = (
+        ROOT / "ansible/roles/log_shipper/files/alloy-docker-heartbeat.py"
+    ).read_text(encoding="utf-8")
+    assert '"service_name": service' in script
+    unit = render(
+        "ansible/roles/log_shipper/templates/alloy-docker-heartbeat.service.j2",
+        log_shipper_user="alloy",
+        log_shipper_group="alloy",
+        log_shipper_loki_url="http://192.0.2.15:3100/loki/api/v1/push",
+        log_shipper_host_label="apps",
+        log_shipper_site_label="example",
+        log_shipper_docker_drop_projects=["observability"],
+        log_shipper_bin_dir="/usr/local/bin",
+    )
+    assert "LOG_SHIPPER_DOCKER_DROP_PROJECTS=observability" in unit
+    assert "User=alloy" in unit
+    timer = render(
+        "ansible/roles/log_shipper/templates/alloy-docker-heartbeat.timer.j2",
+        log_shipper_heartbeat_interval="5min",
+    )
+    assert "OnUnitActiveSec=5min" in timer
+
+
 if __name__ == "__main__":
     test_loki_indexes_compose_and_journal_services()
     test_alloy_sets_service_name()
     test_alloy_drops_observability_compose_project()
+    test_compose_heartbeat_pushes_service_name()
     print("loki and alloy expose service_name for logs drilldown")
