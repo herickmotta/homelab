@@ -1,0 +1,16 @@
+# Managed by herickmotta.homelab.log_shipper.
+[Unit]
+Description=Alloy Compose service heartbeat for Grafana Logs Drilldown
+
+[Service]
+Type=oneshot
+User={{ log_shipper_user }}
+Group={{ log_shipper_group }}
+SupplementaryGroups=docker
+Environment=LOG_SHIPPER_LOKI_URL={{ log_shipper_loki_url }}
+Environment=LOG_SHIPPER_HOST_LABEL={{ log_shipper_host_label }}
+Environment=LOG_SHIPPER_SITE_LABEL={{ log_shipper_site_label }}
+Environment=LOG_SHIPPER_DOCKER_DROP_PROJECTS={{ log_shipper_docker_drop_projects | join(',') }}
+ExecStart={{ log_shipper_bin_dir }}/alloy-docker-heartbeat
+PrivateTmp=true
+NoNewPrivileges=true

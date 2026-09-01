@@ -66,6 +66,14 @@ discovery.docker "containers" {
 loki.relabel "docker" {
   forward_to = []
 
+{% if log_shipper_docker_drop_projects | default([]) | length > 0 %}
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "^({{ log_shipper_docker_drop_projects | map('regex_escape') | join('|') | replace('\\', '\\\\') }})$"
+    action        = "drop"
+  }
+{% endif %}
+
   rule {
     source_labels = ["__meta_docker_container_name"]
     regex         = "/(.*)"

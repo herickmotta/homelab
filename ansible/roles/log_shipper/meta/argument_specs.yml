@@ -15,6 +15,10 @@ argument_specs:
       log_shipper_docker:
         type: bool
         default: false
+      log_shipper_docker_drop_projects:
+        type: list
+        elements: str
+        default: []
       log_shipper_journal_units:
         type: list
         elements: str

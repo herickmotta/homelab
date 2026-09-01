@@ -430,13 +430,18 @@
   loop:
     - dashboards/overview.json
     - dashboards/operations.json
-    - dashboards/logs.json
     - dashboards/linux.json
     - dashboards/zfs.json
     - dashboards/smart.json
   notify: Recreate observability compose
   loop_control:
     label: "{{ item | basename }}"
+
+- name: Remove retired Grafana dashboards
+  ansible.builtin.file:
+    path: "{{ observability_install_dir }}/grafana/dashboards/logs.json"
+    state: absent
+  notify: Recreate observability compose
 
 - name: Install Docker inventory helper
   ansible.builtin.copy:

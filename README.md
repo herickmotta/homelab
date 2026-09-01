@@ -163,7 +163,11 @@ How traffic and data move:
   Docker bridge gateway.
   Grafana Drilldown → Logs is the household log UI: a search box of
   services from Loki, updated as Compose and journal streams appear.
-  Explore remains available for ad-hoc LogQL. Loki is
+  Sites can omit Observe and Sentinel Compose projects from Alloy so
+  those firehoses do not hide Home Assistant and AdGuard. Quiet Compose
+  services get a five-minute heartbeat so Drilldown Search still finds
+  them in the default 15-minute window. Explore remains
+  available for ad-hoc LogQL. Loki is
   not on Caddy. Observe Prometheus sends
   household alerts to a loopback Alertmanager on the observability guest
   (Grafana 13.2 cannot ingest Prometheus AM v2 POSTs). That Alertmanager

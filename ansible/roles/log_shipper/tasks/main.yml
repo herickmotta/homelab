@@ -36,6 +36,15 @@
   loop_control:
     label: "{{ item }}"
 
+- name: Validate Docker Compose projects to drop
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9._-]+$')
+    fail_msg: Docker drop project names must be safe Compose project identifiers.
+  loop: "{{ log_shipper_docker_drop_projects }}"
+  loop_control:
+    label: "{{ item }}"
+
 - name: Require the Docker socket when shipping container logs
   when: log_shipper_docker | bool
   ansible.builtin.stat:
@@ -222,6 +231,65 @@
     enabled: true
     state: started
     daemon_reload: true
+
+- name: Install the Compose heartbeat script
+  when: log_shipper_docker | bool
+  ansible.builtin.copy:
+    src: alloy-docker-heartbeat.py
+    dest: "{{ log_shipper_bin_dir }}/alloy-docker-heartbeat"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the Compose heartbeat unit
+  when: log_shipper_docker | bool
+  ansible.builtin.template:
+    src: alloy-docker-heartbeat.service.j2
+    dest: /etc/systemd/system/alloy-docker-heartbeat.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the Compose heartbeat timer
+  when: log_shipper_docker | bool
+  ansible.builtin.template:
+    src: alloy-docker-heartbeat.timer.j2
+    dest: /etc/systemd/system/alloy-docker-heartbeat.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable the Compose heartbeat timer
+  when: log_shipper_docker | bool
+  ansible.builtin.systemd_service:
+    name: alloy-docker-heartbeat.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Stop the Compose heartbeat timer
+  when: not (log_shipper_docker | bool)
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - alloy-docker-heartbeat.timer
+    - alloy-docker-heartbeat.service
+  failed_when: false
+
+- name: Remove Compose heartbeat when Docker shipping is off
+  when: not (log_shipper_docker | bool)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ log_shipper_bin_dir }}/alloy-docker-heartbeat"
+    - /etc/systemd/system/alloy-docker-heartbeat.service
+    - /etc/systemd/system/alloy-docker-heartbeat.timer
+  notify: Reload systemd
 
 - name: Apply Alloy handlers
   ansible.builtin.meta: flush_handlers

@@ -1,0 +1,13 @@
+# Managed by herickmotta.homelab.log_shipper.
+[Unit]
+Description=Alloy Compose service heartbeat for Grafana Logs Drilldown
+
+[Timer]
+Unit=alloy-docker-heartbeat.service
+OnBootSec=15s
+OnUnitActiveSec={{ log_shipper_heartbeat_interval }}
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
