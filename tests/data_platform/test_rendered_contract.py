@@ -169,6 +169,8 @@ def assert_sql_contract() -> None:
         raise SystemExit("role SQL must run before compose recreate so GoTrue sees grants")
     if "Restart auth and rest after role SQL" not in present:
         raise SystemExit("auth must restart after role SQL")
+    if 'owner: "999"' in present:
+        raise SystemExit("do not force Docker Hub postgres uid 999 on supabase/postgres data")
     print("sql: ops_ledger only, RPCs present, GoTrue auth schema")
 
 
