@@ -622,6 +622,7 @@ def assert_webhook_enabled_loopback() -> None:
         "Internal payload for investigation only",
         "{__raw__}",
         "{alert_summary}",
+        "Do not attempt write operations",
     )
     for snippet in required_prompt:
         if snippet not in config:
@@ -637,6 +638,32 @@ def assert_webhook_enabled_loopback() -> None:
         raise SystemExit("relay ingress must allow only the observe IPv4")
     if "hermes_agent_webhook_secret" not in VALIDATE:
         raise SystemExit("validate.yml must require webhook secrets")
+    ledger_config = render(
+        "config.yaml.j2",
+        hermes_agent_telegram_user_id=TELEGRAM_USER,
+        hermes_agent_telegram_admin_id=TELEGRAM_USER,
+        hermes_agent_webhook_enabled=True,
+        hermes_agent_webhook_secret="hermes-hmac-secret-16",
+        hermes_agent_grafana_enabled=True,
+        hermes_agent_grafana_mcp_server_token="mcp-caller-secret-not-for-logs",
+        hermes_agent_ops_ledger_enabled=True,
+        hermes_agent_ops_ledger_ipv4="192.0.2.18",
+        hermes_agent_ops_ledger_port=8000,
+        hermes_agent_ops_ledger_url="http://192.0.2.18:8000",
+        hermes_agent_ops_ledger_jwt="ops-ledger-jwt-not-for-logs",
+        hermes_agent_ops_ledger_mcp_server_token="ops-ledger-mcp-token-not-for-logs",
+    )
+    if "append_event" not in ledger_config or "ObservePagingTest" not in ledger_config:
+        raise SystemExit("webhook prompt must record ObservePagingTest via ops_ledger")
+    if "Do not attempt write operations" in ledger_config:
+        raise SystemExit("ops_ledger webhook must allow append_event")
+    soul = render(
+        "SOUL.md.j2",
+        hermes_agent_ops_ledger_enabled=True,
+        hermes_agent_grafana_enabled=True,
+    )
+    if "append_event" not in soul or "ObservePagingTest" not in soul:
+        raise SystemExit("SOUL.md must append ObservePagingTest to ops_ledger")
     print("webhook: loopback publish, HMAC route, observe-IP ingress")
 
 
