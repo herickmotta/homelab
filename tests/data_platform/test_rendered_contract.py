@@ -122,12 +122,20 @@ def assert_ingress_and_backup() -> None:
         raise SystemExit("backup.sh must not inline AWS secrets")
     if "pg_dump" not in backup or "pg_dumpall" not in backup or "age -r" not in backup:
         raise SystemExit("backup must dump postgres, roles, and age-encrypt")
+    if "aws s3 cp" in backup:
+        raise SystemExit("default backup.sh must not upload to S3")
+    s3_backup = render("backup.sh.j2", data_platform_backup_s3_enabled=True)
+    if "aws s3 cp" not in s3_backup:
+        raise SystemExit("S3-enabled backup.sh must upload")
     env = render(
         "backup.env.j2",
         data_platform_backup_aws_secret_access_key=SECRET_AWS,
     )
     if SECRET_AWS not in env:
         raise SystemExit("backup.env should hold the IAM secret")
+    present = (ROLE / "tasks/present.yml").read_text()
+    if "awscli" in present and "data_platform_backup_s3_enabled" not in present:
+        raise SystemExit("awscli must be conditional on S3 backups")
     print("ingress allowlist and backup dump contract")
 
 
@@ -152,6 +160,8 @@ def assert_absent_and_validate() -> None:
         raise SystemExit("validate must require a long JWT secret")
     if "data_platform_public_url is match('^http://127\\\\.0\\\\.0\\\\.1')" not in VALIDATE:
         raise SystemExit("validate must keep public URL on loopback")
+    if "data_platform_backup_s3_enabled" not in VALIDATE:
+        raise SystemExit("validate must treat S3 backup as optional")
     print("absent preserves data; validate rejects REPLACE secrets")
 
 
@@ -159,10 +169,12 @@ def assert_example_and_specs() -> None:
     guest = EXAMPLE_SITE["guests"]["data"]
     if guest["vm_id"] != 118 or guest["ipv4"] != "192.0.2.18":
         raise SystemExit("fictional data guest must stay on documentation IDs")
-    if "data_platform" not in guest["groups"]:
-        raise SystemExit("example guest must include data_platform")
     if EXAMPLE_SITE["data_platform"]["enabled"]:
         raise SystemExit("example data_platform must stay disabled")
+    if EXAMPLE_SITE["data_platform"].get("backup_s3_enabled", True):
+        raise SystemExit("example data_platform must leave S3 backups off")
+    if "data_platform" not in guest["groups"]:
+        raise SystemExit("example guest must include data_platform")
     specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text())
     options = specs["argument_specs"]["main"]["options"]
     for key in DEFAULTS:

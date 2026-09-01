@@ -44,12 +44,58 @@
       - data_platform_service_role_key | length > 0
       - data_platform_service_role_key is not match('(?i)^replace')
       - data_platform_api_allow_from | length > 0
-      - data_platform_backup_bucket | length > 0
       - data_platform_backup_age_recipient is match('^age1')
+      - data_platform_backup_keep_local | int >= 1
+    fail_msg: >-
+      Enabled data platform needs DB/JWT secrets, an API allowlist, and an
+      age recipient for encrypted dumps.
+  no_log: true
+
+- name: Require backup IAM only when S3 off-host copy is enabled
+  when:
+    - data_platform_enabled | bool
+    - data_platform_backup_s3_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - data_platform_backup_bucket | length > 0
       - data_platform_backup_aws_access_key_id | length > 0
       - data_platform_backup_aws_secret_access_key | length > 0
       - data_platform_backup_aws_secret_access_key is not match('(?i)^replace')
-    fail_msg: >-
-      Enabled data platform needs DB/JWT secrets, an API allowlist, an age
-      recipient, and dedicated backup IAM keys.
+    fail_msg: S3 database backups need a dedicated bucket and IAM keys.
   no_log: true
+
+- name: Forbid S3 backup credentials when S3 copy is disabled
+  when:
+    - data_platform_enabled | bool
+    - not (data_platform_backup_s3_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - data_platform_backup_aws_access_key_id | length == 0
+      - data_platform_backup_aws_secret_access_key | length == 0
+    fail_msg: Leave backup IAM empty while S3 database backup stays deferred.
+  no_log: true
+
+- name: Validate optional backup VirtioFS mounts
+  when:
+    - data_platform_enabled | bool
+    - data_platform_backup_mounts | length > 0
+  ansible.builtin.assert:
+    that:
+      - item.mapping | length > 0
+      - item.mapping is match('^[A-Za-z][A-Za-z0-9._-]*$')
+      - item.path is match('^/')
+    fail_msg: >-
+      Backup mount {{ item.mapping | default('unknown') }} must declare a
+      mapping identifier and an absolute guest path.
+  loop: "{{ data_platform_backup_mounts }}"
+  loop_control:
+    label: "{{ item.mapping | default(item.path) }}"
+
+- name: Require the backup directory on a declared VirtioFS mount
+  when:
+    - data_platform_enabled | bool
+    - data_platform_backup_mounts | length > 0
+  ansible.builtin.assert:
+    that:
+      - data_platform_backup_dir in (data_platform_backup_mounts | map(attribute='path') | list)
+    fail_msg: data_platform_backup_dir must be one of the VirtioFS backup mount paths.

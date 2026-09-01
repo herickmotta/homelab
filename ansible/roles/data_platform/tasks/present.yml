@@ -1,13 +1,72 @@
 ---
 - name: Install data platform host packages
   ansible.builtin.apt:
-    name:
-      - iptables
-      - age
-      - awscli
-      - postgresql-client
+    name: "{{
+        ['iptables', 'age', 'postgresql-client']
+        + (['awscli'] if (data_platform_backup_s3_enabled | bool) else [])
+      }}"
     state: present
     update_cache: true
+
+- name: Create backup VirtioFS mountpoints
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop: "{{ data_platform_backup_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install persistent backup VirtioFS mounts
+  ansible.builtin.blockinfile:
+    path: "{{ data_platform_backup_fstab }}"
+    marker: "# {mark} homelab data-platform virtiofs"
+    block: |
+      {% for mount in data_platform_backup_mounts %}
+      {{ mount.mapping }} {{ mount.path }} virtiofs {{ 'ro' if mount.read_only | default(false) else 'rw' }},_netdev,x-systemd.device-timeout=60 0 0
+      {% endfor %}
+    state: "{{ 'present' if data_platform_backup_mounts | length > 0 else 'absent' }}"
+
+- name: Inspect backup VirtioFS mounts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - "{{ item.path }}"
+  register: data_platform_backup_findmnt
+  changed_when: false
+  failed_when: false
+  loop: "{{ data_platform_backup_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Mount backup VirtioFS filesystems
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ item.item.path }}"
+  register: data_platform_backup_mount
+  changed_when: data_platform_backup_mount.rc == 0
+  when: item.rc != 0
+  loop: "{{ data_platform_backup_findmnt.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Confirm backup VirtioFS mounts
+  when: data_platform_backup_mounts | length > 0
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - "-t"
+      - virtiofs
+      - "{{ item.path }}"
+  changed_when: false
+  loop: "{{ data_platform_backup_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
 
 - name: Create data platform directories
   ansible.builtin.file:
@@ -67,6 +126,7 @@
   notify: Recreate data platform compose
 
 - name: Install data platform backup env
+  when: data_platform_backup_s3_enabled | bool
   ansible.builtin.template:
     src: backup.env.j2
     dest: "{{ data_platform_config_dir }}/backup.env"

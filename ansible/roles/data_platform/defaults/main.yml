@@ -58,6 +58,7 @@ data_platform_ingress_unit: data-platform-api-ingress.service
 data_platform_ingress_script: /usr/local/sbin/data-platform-api-ingress
 
 data_platform_backup_enabled: true
+data_platform_backup_s3_enabled: false
 data_platform_backup_bucket: ""
 data_platform_backup_prefix: data-platform
 data_platform_backup_region: us-east-1
@@ -65,7 +66,9 @@ data_platform_backup_age_recipient: ""
 data_platform_backup_aws_access_key_id: ""
 data_platform_backup_aws_secret_access_key: ""
 data_platform_backup_on_calendar: "*-*-* 04:17:00"
-data_platform_backup_keep_local: 1
+data_platform_backup_keep_local: 7
+data_platform_backup_fstab: /etc/fstab
+data_platform_backup_mounts: []
 
 data_platform_log_max_size: "10m"
 data_platform_log_max_file: "5"

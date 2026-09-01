@@ -140,6 +140,7 @@ flowchart TB
   dataGuest -->|"Alloy logs"| loki
   richProm -->|"Linux exporter"| dataGuest
 
+  durable -->|"VirtioFS dumps"| dataGuest
   durable --> virtio
   virtio --> smb
   lan --> smb

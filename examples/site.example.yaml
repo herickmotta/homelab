@@ -414,6 +414,11 @@ site:
         - data
       startup:
         order: 6
+      virtiofs:
+        - mapping: example-data-backups
+      virtiofs_mounts:
+        - mapping: example-data-backups
+          path: /srv/data-backups
 
   storage:
     pools:
@@ -455,6 +460,13 @@ site:
         mountpoint: /srv/example/iron/media
         mapping_id: example-media
         class: replaceable
+      data_backups:
+        pool: iron
+        dataset: iron/data-backups
+        mountpoint: /srv/example/iron/data-backups
+        mapping_id: example-data-backups
+        nas_export: false
+        class: important_unbacked
       frigate:
         pool: volatile
         dataset: volatile/frigate
@@ -532,7 +544,8 @@ site:
 
   data_platform:
     enabled: false
-    backup_bucket: example-homelab-backups
+    backup_s3_enabled: false
+    backup_dir: /srv/data-backups
     backup_age_recipient: age1exampleplaceholderrecipient0000000000000000000000000000000000
     api_allow_from:
       - 192.0.2.17/32
