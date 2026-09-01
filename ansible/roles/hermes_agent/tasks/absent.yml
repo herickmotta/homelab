@@ -58,6 +58,8 @@
     - "{{ hermes_agent_managed_dir }}/.env"
     - "{{ hermes_agent_managed_dir }}/grafana-mcp.env"
     - "{{ hermes_agent_grafana_mcp_env_file }}"
+    - "{{ hermes_agent_ops_ledger_mcp_env_file }}"
+    - "{{ hermes_agent_managed_dir }}/bin/ops-ledger-mcp.py"
     - "{{ hermes_agent_managed_dir }}/github-app.pem"
     - "{{ hermes_agent_managed_dir }}/bin/github-app-token"
     - "{{ hermes_agent_managed_dir }}/bin/gh"

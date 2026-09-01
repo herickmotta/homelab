@@ -1,0 +1,11 @@
+---
+- name: Include data platform validation
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Disable the data platform stack
+  when: not (data_platform_enabled | bool)
+  ansible.builtin.import_tasks: absent.yml
+
+- name: Configure the data platform stack
+  when: data_platform_enabled | bool
+  ansible.builtin.import_tasks: present.yml

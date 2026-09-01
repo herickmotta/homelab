@@ -1,0 +1,26 @@
+---
+- name: Recreate data platform compose
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --force-recreate
+      - --remove-orphans
+    chdir: "{{ data_platform_install_dir }}"
+  changed_when: true
+
+- name: Reload data platform API ingress
+  ansible.builtin.systemd_service:
+    name: "{{ data_platform_ingress_unit }}"
+    state: restarted
+    enabled: true
+    daemon_reload: true
+
+- name: Reload data platform backup timer
+  ansible.builtin.systemd_service:
+    name: data-platform-backup.timer
+    state: restarted
+    enabled: true
+    daemon_reload: true

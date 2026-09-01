@@ -441,12 +441,28 @@
     label: "{{ item.key }}"
 
 - name: Set stable ownership on NAS-exported datasets
-  when: item.value.mapping_id | default('') | length > 0
+  when:
+    - item.value.mapping_id | default('') | length > 0
+    - item.value.nas_export | default(true) | bool
   ansible.builtin.file:
     path: "{{ item.value.mountpoint }}"
     owner: "{{ proxmox_host_storage_data_uid | string }}"
     group: "{{ proxmox_host_storage_data_gid | string }}"
     mode: "0775"
+    state: directory
+  loop: "{{ proxmox_host_storage_datasets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Restrict non-NAS mapped dataset permissions
+  when:
+    - item.value.mapping_id | default('') | length > 0
+    - not (item.value.nas_export | default(true) | bool)
+  ansible.builtin.file:
+    path: "{{ item.value.mountpoint }}"
+    owner: root
+    group: root
+    mode: "0700"
     state: directory
   loop: "{{ proxmox_host_storage_datasets | dict2items }}"
   loop_control:

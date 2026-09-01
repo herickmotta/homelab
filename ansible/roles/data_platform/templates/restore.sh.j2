@@ -1,0 +1,24 @@
+#!/bin/sh
+# Managed by herickmotta.homelab.data_platform.
+# Restore an age-encrypted dump into a disposable data directory. Do not use
+# on the live postgres volume.
+set -eu
+
+ARCHIVE="${1:?usage: restore.sh /path/to/stamp.tar.age}"
+TARGET="${2:?usage: restore.sh archive disposable-data-dir}"
+IDENTITY="${DATA_BACKUP_AGE_IDENTITY:?set DATA_BACKUP_AGE_IDENTITY to the age private key file}"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "${WORK}"' EXIT
+
+age -d -i "${IDENTITY}" -o "${WORK}/bundle.tar" "${ARCHIVE}"
+tar -C "${WORK}" -xf "${WORK}/bundle.tar"
+
+mkdir -p "${TARGET}"
+# Caller brings up a disposable postgres and runs:
+#   pg_restore -h 127.0.0.1 -U postgres -d postgres --clean --if-exists postgres.dump
+#   psql -h 127.0.0.1 -U postgres -f roles.sql
+printf '%s\n' "${WORK}/postgres.dump" > "${TARGET}/postgres.dump.path"
+cp -a "${WORK}/postgres.dump" "${TARGET}/postgres.dump"
+cp -a "${WORK}/roles.sql" "${TARGET}/roles.sql"
+echo "unpacked dump into ${TARGET}"

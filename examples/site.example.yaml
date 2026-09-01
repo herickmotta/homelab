@@ -153,6 +153,10 @@ site:
           address: 192.0.2.17:12345
           host: hermes-example
           dependency: pve
+        - name: data
+          address: 192.0.2.18:12345
+          host: data-example
+          dependency: pve
         - name: pve
           address: 192.0.2.10:12345
           host: pve-example
@@ -167,6 +171,7 @@ site:
         - apps-example
         - observe-example
         - hermes-example
+        - data-example
         - pve-example
         - sentinel-example
     host_metrics:
@@ -183,6 +188,9 @@ site:
         - name: hermes
           address: 192.0.2.17:9100
           host: hermes-example
+        - name: data
+          address: 192.0.2.18:9100
+          host: data-example
         - name: pve
           address: 192.0.2.10:9100
           host: pve-example
@@ -219,6 +227,13 @@ site:
           container_probes:
             - name: hermes-agent
               label: homelab.role=hermes_agent
+        data-example:
+          systemd_units:
+            - alloy.service
+            - data-platform-backup.timer
+          container_probes:
+            - name: data-kong
+              label: homelab.component=kong
         pve-example:
           systemd_units:
             - smartmontools.service
@@ -248,6 +263,9 @@ site:
             - observability
           journal_units: []
         hermes-example:
+          docker: true
+          journal_units: []
+        data-example:
           docker: true
           journal_units: []
         pve-example:
@@ -380,6 +398,28 @@ site:
       startup:
         order: 5
 
+    data:
+      hostname: data-example
+      vm_id: 118
+      ipv4: 192.0.2.18
+      groups:
+        - homelab_guest
+        - data_platform
+        - host_metrics
+        - log_shipper
+      cores: 4
+      memory_mb: 8192
+      disk_gb: 64
+      tags:
+        - data
+      startup:
+        order: 6
+      virtiofs:
+        - mapping: example-data-backups
+      virtiofs_mounts:
+        - mapping: example-data-backups
+          path: /srv/data-backups
+
   storage:
     pools:
       iron:
@@ -420,6 +460,13 @@ site:
         mountpoint: /srv/example/iron/media
         mapping_id: example-media
         class: replaceable
+      data_backups:
+        pool: iron
+        dataset: iron/data-backups
+        mountpoint: /srv/example/iron/data-backups
+        mapping_id: example-data-backups
+        nas_export: false
+        class: important_unbacked
       frigate:
         pool: volatile
         dataset: volatile/frigate
@@ -492,6 +539,17 @@ site:
       enabled: false
     webhook:
       enabled: false
+    ops_ledger:
+      enabled: false
+
+  data_platform:
+    enabled: false
+    backup_s3_enabled: false
+    backup_dir: /srv/data-backups
+    backup_age_recipient: age1exampleplaceholderrecipient0000000000000000000000000000000000
+    api_allow_from:
+      - 192.0.2.17/32
+      - 192.0.2.0/24
 
   frigate:
     media_path: /mnt/frigate

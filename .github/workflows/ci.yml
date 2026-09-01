@@ -103,6 +103,9 @@ jobs:
       - name: Test Loki Logs Drilldown service names
         run: python3 tests/observability/test_logs_drilldown.py
 
+      - name: Test data platform rendered contract
+        run: python3 tests/data_platform/test_rendered_contract.py
+
   ci:
     name: ci
     if: always()

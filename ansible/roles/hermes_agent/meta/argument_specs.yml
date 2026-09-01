@@ -158,6 +158,26 @@ argument_specs:
         type: str
       hermes_agent_grafana_enabled_tools:
         type: str
+      hermes_agent_ops_ledger_enabled:
+        type: bool
+      hermes_agent_ops_ledger_ipv4:
+        type: str
+      hermes_agent_ops_ledger_port:
+        type: int
+      hermes_agent_ops_ledger_url:
+        type: str
+      hermes_agent_ops_ledger_jwt:
+        type: str
+      hermes_agent_ops_ledger_mcp_server_token:
+        type: str
+      hermes_agent_ops_ledger_mcp_env_file:
+        type: str
+      hermes_agent_ops_ledger_python_image_repository:
+        type: str
+      hermes_agent_ops_ledger_python_image_digest:
+        type: str
+      hermes_agent_ops_ledger_mcp_address:
+        type: str
       hermes_agent_webhook_enabled:
         type: bool
       hermes_agent_webhook_port:

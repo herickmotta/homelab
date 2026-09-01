@@ -1,0 +1,121 @@
+---
+argument_specs:
+  main:
+    short_description: Pinned minimal self-hosted Supabase subset
+    options:
+      data_platform_enabled:
+        type: bool
+      data_platform_preserve_state_on_disable:
+        type: bool
+      data_platform_install_dir:
+        type: str
+      data_platform_data_dir:
+        type: str
+      data_platform_backup_dir:
+        type: str
+      data_platform_config_dir:
+        type: str
+      data_platform_migrations_dir:
+        type: str
+      data_platform_owner:
+        type: str
+      data_platform_group:
+        type: str
+      data_platform_network_name:
+        type: str
+      data_platform_network_subnet:
+        type: str
+      data_platform_postgres_image_repository:
+        type: str
+      data_platform_postgres_image_tag:
+        type: str
+      data_platform_postgres_image_digest:
+        type: str
+      data_platform_kong_image_repository:
+        type: str
+      data_platform_kong_image_tag:
+        type: str
+      data_platform_kong_image_digest:
+        type: str
+      data_platform_postgrest_image_repository:
+        type: str
+      data_platform_postgrest_image_tag:
+        type: str
+      data_platform_postgrest_image_digest:
+        type: str
+      data_platform_gotrue_image_repository:
+        type: str
+      data_platform_gotrue_image_tag:
+        type: str
+      data_platform_gotrue_image_digest:
+        type: str
+      data_platform_studio_image_repository:
+        type: str
+      data_platform_studio_image_tag:
+        type: str
+      data_platform_studio_image_digest:
+        type: str
+      data_platform_meta_image_repository:
+        type: str
+      data_platform_meta_image_tag:
+        type: str
+      data_platform_meta_image_digest:
+        type: str
+      data_platform_postgres_db:
+        type: str
+      data_platform_postgres_password:
+        type: str
+      data_platform_jwt_secret:
+        type: str
+      data_platform_anon_key:
+        type: str
+      data_platform_service_role_key:
+        type: str
+      data_platform_jwt_expiry:
+        type: int
+      data_platform_kong_port:
+        type: int
+      data_platform_postgres_host_port:
+        type: int
+      data_platform_studio_host_port:
+        type: int
+      data_platform_public_url:
+        type: str
+      data_platform_site_url:
+        type: str
+      data_platform_api_allow_from:
+        type: list
+        elements: str
+      data_platform_ingress_unit:
+        type: str
+      data_platform_ingress_script:
+        type: str
+      data_platform_backup_enabled:
+        type: bool
+      data_platform_backup_s3_enabled:
+        type: bool
+      data_platform_backup_bucket:
+        type: str
+      data_platform_backup_prefix:
+        type: str
+      data_platform_backup_region:
+        type: str
+      data_platform_backup_age_recipient:
+        type: str
+      data_platform_backup_aws_access_key_id:
+        type: str
+      data_platform_backup_aws_secret_access_key:
+        type: str
+      data_platform_backup_on_calendar:
+        type: str
+      data_platform_backup_keep_local:
+        type: int
+      data_platform_backup_fstab:
+        type: str
+      data_platform_backup_mounts:
+        type: list
+        elements: dict
+      data_platform_log_max_size:
+        type: str
+      data_platform_log_max_file:
+        type: str

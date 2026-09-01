@@ -124,6 +124,17 @@ Roles:
   Alerting is the household notify path. An optional host relay accepts
   Grafana HMAC from the observe guest and signs Hermes HMAC-v2 on
   loopback. Raw Sentinel email/channel stays independent for survival.
+  Optional ops_ledger MCP is a same-network sidecar: Hermes talks to
+  `ops-ledger-mcp` over Docker DNS; the sidecar holds a low-privilege JWT
+  and reaches the data guest Kong API on TCP 8000. Dump age identity and the
+  Supabase service-role key stay off Hermes.
+- `herickmotta.homelab.data_platform`: pinned minimal self-hosted Supabase
+  subset (`db`, `auth`, `rest`, `kong`, `meta`, `studio`) on a dedicated
+  guest. Disabled by default. Postgres and Studio bind loopback. Kong
+  `:8000` is allowlisted. SQL migrations create only `ops_ledger`. Nightly
+  age-encrypted dumps land on a site backup directory (often VirtioFS from
+  `iron`). S3 upload is optional and off by default. Disabling the role
+  preserves the postgres volume.
 
 Storage architecture, VirtioFS, and monitoring:
 [Persistent storage and NAS serving](../docs/persistent-storage.md).

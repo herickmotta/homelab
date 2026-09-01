@@ -1,0 +1,56 @@
+---
+- name: Stop the data platform Compose project
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - down
+      - --remove-orphans
+    chdir: "{{ data_platform_install_dir }}"
+  register: data_platform_compose_down
+  changed_when: data_platform_compose_down.rc == 0
+  failed_when: false
+
+- name: Disable data platform API ingress
+  ansible.builtin.systemd_service:
+    name: "{{ data_platform_ingress_unit }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+
+- name: Disable data platform backup timer
+  ansible.builtin.systemd_service:
+    name: data-platform-backup.timer
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  failed_when: false
+
+- name: Remove data platform units and scripts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ data_platform_ingress_script }}"
+    - "/etc/systemd/system/{{ data_platform_ingress_unit }}"
+    - /etc/systemd/system/data-platform-backup.service
+    - /etc/systemd/system/data-platform-backup.timer
+    - "{{ data_platform_install_dir }}/compose.yaml"
+    - "{{ data_platform_install_dir }}/backup.sh"
+    - "{{ data_platform_install_dir }}/restore.sh"
+    - "{{ data_platform_config_dir }}/stack.env"
+    - "{{ data_platform_config_dir }}/backup.env"
+    - "{{ data_platform_config_dir }}/kong.yml"
+
+- name: Reload systemd after removing data platform units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Leave data platform persistent state
+  ansible.builtin.debug:
+    msg: >-
+      Preserved {{ data_platform_data_dir }} and {{ data_platform_backup_dir }}
+      because data_platform_preserve_state_on_disable is
+      {{ data_platform_preserve_state_on_disable }}.
+  when: data_platform_preserve_state_on_disable | bool

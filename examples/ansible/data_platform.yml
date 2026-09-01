@@ -1,0 +1,35 @@
+---
+- name: Build the fictional data platform inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../site.example.yaml
+  tasks:
+    - name: Add the fictional data guest
+      ansible.builtin.add_host:
+        name: "{{ site.guests.data.hostname }}"
+        ansible_host: "{{ site.guests.data.ipv4 }}"
+        ansible_user: "{{ site.access.username }}"
+        groups:
+          - data_platform
+
+- name: Configure the fictional data platform
+  hosts: data_platform
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../site.example.yaml
+  roles:
+    - role: herickmotta.homelab.guest_base
+    - role: herickmotta.homelab.data_platform
+      vars:
+        data_platform_enabled: "{{ site.data_platform.enabled | bool }}"
+        data_platform_api_allow_from: "{{ site.data_platform.api_allow_from }}"
+        data_platform_backup_s3_enabled: "{{ site.data_platform.backup_s3_enabled | default(false) | bool }}"
+        data_platform_backup_dir: "{{ site.data_platform.backup_dir | default('/opt/data-platform/backups') }}"
+        data_platform_backup_age_recipient: "{{ site.data_platform.backup_age_recipient }}"
+        data_platform_backup_mounts: "{{ site.guests.data.virtiofs_mounts | default([]) }}"
+        data_platform_postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') | default('', true) }}"
+        data_platform_jwt_secret: "{{ lookup('env', 'JWT_SECRET') | default('', true) }}"
+        data_platform_anon_key: "{{ lookup('env', 'ANON_KEY') | default('', true) }}"
+        data_platform_service_role_key: "{{ lookup('env', 'SERVICE_ROLE_KEY') | default('', true) }}"

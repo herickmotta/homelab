@@ -198,6 +198,35 @@
     fail_msg: Do not pass a Grafana Viewer token when Grafana MCP is disabled.
   no_log: true
 
+- name: Require ops_ledger binding when the MCP sidecar is enabled
+  when:
+    - hermes_agent_enabled | bool
+    - hermes_agent_ops_ledger_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_ops_ledger_ipv4 is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+      - hermes_agent_ops_ledger_port | int == 8000
+      - hermes_agent_ops_ledger_url is match('^http://[^ ]+:8000$')
+      - hermes_agent_ops_ledger_jwt | length > 0
+      - hermes_agent_ops_ledger_jwt is not match('(?i)^replace')
+      - hermes_agent_ops_ledger_mcp_server_token | length > 0
+      - hermes_agent_ops_ledger_mcp_server_token is not match('(?i)^replace')
+      - hermes_agent_ops_ledger_python_image_digest is match('^sha256:[0-9a-f]{64}$')
+    fail_msg: >-
+      Enabled ops_ledger MCP needs the data guest IPv4, Kong port 8000, a
+      low-privilege JWT, and a sidecar caller token. Do not pass backup IAM
+      keys or the service-role JWT.
+  no_log: true
+
+- name: Reject ops_ledger secrets when the MCP sidecar is disabled
+  when: not (hermes_agent_ops_ledger_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - hermes_agent_ops_ledger_jwt | length == 0
+      - hermes_agent_ops_ledger_mcp_server_token | length == 0
+    fail_msg: Do not pass an ops_ledger JWT when the sidecar is disabled.
+  no_log: true
+
 - name: Require webhook secrets and observe source when enabled
   when: hermes_agent_webhook_enabled | bool
   ansible.builtin.assert:

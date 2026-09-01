@@ -1,0 +1,20 @@
+#!/bin/sh
+# Managed by herickmotta.homelab.data_platform.
+# Allowlist Kong :8000. Postgres and Studio stay on loopback via Compose.
+set -eu
+
+CHAIN="DATA-PLATFORM-API"
+PORT="{{ data_platform_kong_port | int }}"
+
+iptables -N "${CHAIN}" 2>/dev/null || iptables -F "${CHAIN}"
+
+if ! iptables -C INPUT -p tcp --dport "${PORT}" -j "${CHAIN}" >/dev/null 2>&1; then
+  iptables -I INPUT 1 -p tcp --dport "${PORT}" -j "${CHAIN}"
+fi
+
+iptables -A "${CHAIN}" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A "${CHAIN}" -i lo -j ACCEPT
+{% for source in data_platform_api_allow_from %}
+iptables -A "${CHAIN}" -s {{ source }} -j ACCEPT
+{% endfor %}
+iptables -A "${CHAIN}" -j DROP
