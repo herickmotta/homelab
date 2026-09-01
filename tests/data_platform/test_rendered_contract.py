@@ -86,6 +86,8 @@ def assert_compose_subset() -> None:
         "127.0.0.1:3000",
         "homelab.role: data_platform",
         "PGRST_DB_SCHEMAS: ops_ledger",
+        "GOTRUE_DB_NAMESPACE: auth",
+        "HOSTNAME: \"0.0.0.0\"",
         "/migrations:ro",
     )
     for item in required:
@@ -122,6 +124,12 @@ def assert_ingress_and_backup() -> None:
         raise SystemExit("backup.sh must not inline AWS secrets")
     if "pg_dump" not in backup or "pg_dumpall" not in backup or "age -r" not in backup:
         raise SystemExit("backup must dump postgres, roles, and age-encrypt")
+    if "exec -T db pg_dump" not in backup or "exec -T db pg_dumpall" not in backup:
+        raise SystemExit("backup must dump from the pinned db container")
+    if "-h 127.0.0.1" in backup:
+        raise SystemExit("backup must not use host pg_dump against loopback")
+    if "stack.env" in backup:
+        raise SystemExit("container dump must not source stack.env")
     if "aws s3 cp" in backup:
         raise SystemExit("default backup.sh must not upload to S3")
     s3_backup = render("backup.sh.j2", data_platform_backup_s3_enabled=True)
@@ -148,7 +156,20 @@ def assert_sql_contract() -> None:
         raise SystemExit("RPC functions missing")
     if "ops_ledger_hermes" not in SQL_ROLES:
         raise SystemExit("hermes role missing")
-    print("sql: ops_ledger only, RPCs present")
+    if "CREATE SCHEMA IF NOT EXISTS auth" not in SQL_ROLES:
+        raise SystemExit("GoTrue auth schema missing")
+    if "search_path TO auth, public" not in SQL_ROLES:
+        raise SystemExit("supabase_auth_admin search_path missing")
+    if "GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin" not in SQL_ROLES:
+        raise SystemExit("Postgres 15 public CREATE grant missing")
+    present = (ROLE / "tasks/present.yml").read_text()
+    if present.index("Apply role bootstrap SQL") > present.index(
+        "Apply data platform Compose handlers"
+    ):
+        raise SystemExit("role SQL must run before compose recreate so GoTrue sees grants")
+    if "Restart auth and rest after role SQL" not in present:
+        raise SystemExit("auth must restart after role SQL")
+    print("sql: ops_ledger only, RPCs present, GoTrue auth schema")
 
 
 def assert_absent_and_validate() -> None:

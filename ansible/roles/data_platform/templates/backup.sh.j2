@@ -1,8 +1,10 @@
 #!/bin/sh
 # Managed by herickmotta.homelab.data_platform.
-# Logical dump of postgres plus roles. Age-encrypt onto backup_dir.
+# Logical dump of postgres plus roles from the pinned db container.
+# Host postgresql-client may be newer than the image; dump inside Compose.
 set -eu
 
+INSTALL="{{ data_platform_install_dir }}"
 BACKUP_DIR="{{ data_platform_backup_dir }}"
 RECIPIENT="{{ data_platform_backup_age_recipient }}"
 KEEP="{{ data_platform_backup_keep_local | int }}"
@@ -10,19 +12,14 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
-export PGPASSWORD
-# shellcheck disable=SC1091
-. "{{ data_platform_config_dir }}/stack.env"
-PGPASSWORD="${POSTGRES_PASSWORD}"
-
 mkdir -p "${BACKUP_DIR}"
 chmod 700 "${BACKUP_DIR}"
 
-pg_dump -h 127.0.0.1 -p {{ data_platform_postgres_host_port | int }} \
-  -U postgres -d {{ data_platform_postgres_db }} -Fc \
-  -f "${WORK}/postgres.dump"
-pg_dumpall -h 127.0.0.1 -p {{ data_platform_postgres_host_port | int }} \
-  -U postgres --roles-only \
+docker compose -f "${INSTALL}/compose.yaml" --project-directory "${INSTALL}" \
+  exec -T db pg_dump -U postgres -d {{ data_platform_postgres_db }} -Fc \
+  > "${WORK}/postgres.dump"
+docker compose -f "${INSTALL}/compose.yaml" --project-directory "${INSTALL}" \
+  exec -T db pg_dumpall -U postgres --roles-only \
   > "${WORK}/roles.sql"
 
 tar -C "${WORK}" -cf "${WORK}/bundle.tar" postgres.dump roles.sql

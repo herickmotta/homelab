@@ -39,6 +39,15 @@ $$;
 ALTER ROLE authenticator WITH PASSWORD :'pgpass';
 ALTER ROLE supabase_auth_admin WITH PASSWORD :'pgpass';
 
+-- GoTrue (and golang-migrate) need a home after Postgres 15 revoked
+-- PUBLIC CREATE on schema public. Keep auth objects in schema auth;
+-- grant CREATE on public only so schema_migrations can be created.
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;
+ALTER SCHEMA auth OWNER TO supabase_auth_admin;
+GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
+GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin;
+ALTER ROLE supabase_auth_admin SET search_path TO auth, public;
+
 GRANT anon TO authenticator;
 GRANT authenticated TO authenticator;
 GRANT service_role TO authenticator;

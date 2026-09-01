@@ -72,6 +72,7 @@ services:
       GOTRUE_API_PORT: "9999"
       API_EXTERNAL_URL: "{{ data_platform_public_url }}"
       GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_NAMESPACE: auth
       GOTRUE_SITE_URL: "{{ data_platform_site_url }}"
       GOTRUE_DISABLE_SIGNUP: "true"
       GOTRUE_JWT_ADMIN_ROLES: service_role
@@ -125,6 +126,7 @@ services:
     env_file:
       - "{{ data_platform_config_dir }}/stack.env"
     environment:
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: "{{ data_platform_public_url }}"
