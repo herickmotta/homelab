@@ -94,7 +94,8 @@ Roles:
   Proxmox health and observe-plane liveness. Grafana keeps a read-only
   Sentinel Alertmanager datasource. The Homelab overview dashboard
   is the fleet/NAS view. Grafana Drilldown → Logs is the household log
-  UI (Loki `service_name` search, not a per-service dashboard). Sites may
+  UI (Loki `service_name` search, not a per-service dashboard). Apply
+  deletes leftover uid `homelab-logs` if Grafana still has it. Sites may
   omit Observe and Sentinel Compose projects from Alloy so those firehoses
   do not hide household services. Quiet Compose services emit a five-minute
   heartbeat so Drilldown can find them when they are not logging. The

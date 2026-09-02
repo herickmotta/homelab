@@ -83,6 +83,19 @@ def test_alloy_drops_observability_compose_project() -> None:
     assert "sentinel\\\\-monitoring" in docker
 
 
+def test_retired_service_logs_dashboard_is_removed() -> None:
+    dashboards = ROOT / "ansible/roles/observability/files/dashboards"
+    names = sorted(path.name for path in dashboards.glob("*.json"))
+    assert "logs.json" not in names
+    tasks = (
+        ROOT / "ansible/roles/observability/tasks/main.yml"
+    ).read_text(encoding="utf-8")
+    assert "grafana/dashboards/logs.json" in tasks
+    assert 'state: absent' in tasks.split("Remove retired Grafana dashboards", 1)[1][:400]
+    assert "/api/dashboards/uid/homelab-logs" in tasks
+    assert "method: DELETE" in tasks.split("Delete leftover Service logs dashboard", 1)[1][:500]
+
+
 def test_compose_heartbeat_pushes_service_name() -> None:
     script = (
         ROOT / "ansible/roles/log_shipper/files/alloy-docker-heartbeat.py"
@@ -111,5 +124,6 @@ if __name__ == "__main__":
     test_loki_indexes_compose_and_journal_services()
     test_alloy_sets_service_name()
     test_alloy_drops_observability_compose_project()
+    test_retired_service_logs_dashboard_is_removed()
     test_compose_heartbeat_pushes_service_name()
     print("loki and alloy expose service_name for logs drilldown")
