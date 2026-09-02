@@ -551,6 +551,20 @@
   delay: 5
   until: observability_loki_ready.status | default(0) == 200
 
+# File provisioning does not remove dashboards Grafana already saved into
+# its database (provisioned: false). 0.20.6 left uid homelab-logs behind.
+- name: Delete leftover Service logs dashboard
+  ansible.builtin.uri:
+    url: "http://{{ observability_grafana_scrape_address }}/api/dashboards/uid/homelab-logs"
+    method: DELETE
+    url_username: "{{ observability_grafana_admin_user }}"
+    url_password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code:
+      - 200
+      - 404
+  no_log: true
+
 - name: Verify the PVE exporter endpoint
   when: observability_pve_enabled | bool
   ansible.builtin.uri:
