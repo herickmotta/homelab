@@ -1,7 +1,11 @@
 ---
+# Pull when compose image tags change; up -d recreates only services whose
+# definition changed. Bind-mounted configs may need a targeted restart (Phase 3).
 - name: Recreate Hermes Agent compose
-  ansible.builtin.command:
-    cmd: docker compose up -d --force-recreate
+  ansible.builtin.shell: |
+    docker compose pull --quiet
+    docker compose up -d
+  args:
     chdir: "{{ hermes_agent_install_dir }}"
   changed_when: true
 
