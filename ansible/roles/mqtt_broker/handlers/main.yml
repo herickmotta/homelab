@@ -1,6 +1,10 @@
 ---
+# Pull when compose image tags change; up -d recreates only services whose
+# definition changed.
 - name: Recreate Mosquitto compose
-  ansible.builtin.command:
-    cmd: docker compose up -d --force-recreate
+  ansible.builtin.shell: |
+    docker compose pull --quiet
+    docker compose up -d
+  args:
     chdir: "{{ mqtt_broker_install_dir }}"
   changed_when: true

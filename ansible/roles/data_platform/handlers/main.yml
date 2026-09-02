@@ -1,13 +1,11 @@
 ---
+# Pull when compose image tags change; up -d recreates only services whose
+# definition changed. Bind-mounted configs may need a targeted restart (Phase 3).
 - name: Recreate data platform compose
-  ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - up
-      - -d
-      - --force-recreate
-      - --remove-orphans
+  ansible.builtin.shell: |
+    docker compose pull --quiet
+    docker compose up -d --remove-orphans
+  args:
     chdir: "{{ data_platform_install_dir }}"
   changed_when: true
 
